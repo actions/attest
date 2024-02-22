@@ -60,7 +60,7 @@ jobs:
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - name: Run attest
         id: attest
-        uses: ./attest
+        uses: ./
         with:
           subject-path: ${{ github.workspace }}/README.md
           predicate-path: ${{ github.workspace }}/testing/sbom.json
