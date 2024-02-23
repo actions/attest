@@ -64798,7 +64798,7 @@ exports.writeAttestation = writeAttestation;
 
 /***/ }),
 
-/***/ 5144:
+/***/ 9112:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -64810,181 +64810,6 @@ exports.REKOR_PUBLIC_GOOD_URL = 'https://rekor.sigstore.dev';
 exports.SEARCH_PUBLIC_GOOD_URL = 'https://search.sigstore.dev';
 exports.FULCIO_INTERNAL_URL = 'https://fulcio.githubapp.com';
 exports.TSA_INTERNAL_URL = 'https://timestamp.githubapp.com';
-
-
-/***/ }),
-
-/***/ 7391:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.storePredicate = exports.predicateFromInputs = void 0;
-const core = __importStar(__nccwpck_require__(2186));
-const fs_1 = __importDefault(__nccwpck_require__(7147));
-const path = __importStar(__nccwpck_require__(1017));
-// Returns the predicate specified by the action's inputs. The predicate value
-// may be specified as a path to a file or as a string.
-const predicateFromInputs = () => {
-    const predicateType = core.getInput('predicate-type', { required: true });
-    const predicateStr = core.getInput('predicate', { required: false });
-    const predicatePath = core.getInput('predicate-path', { required: false });
-    if (!predicatePath && !predicateStr) {
-        throw new Error('One of predicate-path or predicate must be provided');
-    }
-    const params = predicatePath
-        ? fs_1.default.readFileSync(predicatePath, 'utf-8')
-        : predicateStr;
-    return { type: predicateType, params: JSON.parse(params) };
-};
-exports.predicateFromInputs = predicateFromInputs;
-const storePredicate = (predicate) => {
-    // random tempfile
-    const basePath = process.env['RUNNER_TEMP'];
-    if (!basePath) {
-        throw new Error('Missing RUNNER_TEMP environment variable');
-    }
-    const tmpDir = fs_1.default.mkdtempSync(path.join(basePath, path.sep));
-    const tempFile = path.join(tmpDir, 'predicate.json');
-    // write predicate to file
-    fs_1.default.writeFileSync(tempFile, JSON.stringify(predicate.params));
-    return tempFile;
-};
-exports.storePredicate = storePredicate;
-
-
-/***/ }),
-
-/***/ 7552:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.subjectFromInputs = void 0;
-const core = __importStar(__nccwpck_require__(2186));
-const glob = __importStar(__nccwpck_require__(8090));
-const crypto_1 = __importDefault(__nccwpck_require__(6113));
-const fs_1 = __importDefault(__nccwpck_require__(7147));
-const path_1 = __importDefault(__nccwpck_require__(1017));
-const DIGEST_ALGORITHM = 'sha256';
-// Returns the subject specified by the action's inputs. The subject may be
-// specified as a path to a file or as a digest. If a path is provided, the
-// file's digest is calculated and returned along with the subject's name. If a
-// digest is provided, the name must also be provided.
-const subjectFromInputs = async () => {
-    const subjectPath = core.getInput('subject-path', { required: false });
-    const subjectDigest = core.getInput('subject-digest', { required: false });
-    const subjectName = core.getInput('subject-name', { required: false });
-    if (!subjectPath && !subjectDigest) {
-        throw new Error('One of subject-path or subject-digest must be provided');
-    }
-    if (subjectPath && subjectDigest) {
-        throw new Error('Only one of subject-path or subject-digest may be provided');
-    }
-    if (subjectDigest && !subjectName) {
-        throw new Error('subject-name must be provided when using subject-digest');
-    }
-    if (subjectPath) {
-        return await getSubjectFromPath(subjectPath, subjectName);
-    }
-    else {
-        return [getSubjectFromDigest(subjectDigest, subjectName)];
-    }
-};
-exports.subjectFromInputs = subjectFromInputs;
-// Returns the subject specified by the path to a file. The file's digest is
-// calculated and returned along with the subject's name.
-const getSubjectFromPath = async (subjectPath, subjectName) => {
-    /* eslint-disable-next-line github/no-then */
-    const files = await glob.create(subjectPath).then(async (g) => g.glob());
-    const subjects = files.map(async (file) => {
-        const name = subjectName || path_1.default.parse(file).base;
-        const digest = await digestFile(DIGEST_ALGORITHM, file);
-        return { name, digest: { [DIGEST_ALGORITHM]: digest } };
-    });
-    if (subjects.length === 0) {
-        throw new Error(`Could not find subject at path ${subjectPath}`);
-    }
-    return Promise.all(subjects);
-};
-// Returns the subject specified by the digest of a file. The digest is returned
-// along with the subject's name.
-const getSubjectFromDigest = (subjectDigest, subjectName) => {
-    if (!subjectDigest.match(/^sha256:[A-Za-z0-9]{64}$/)) {
-        throw new Error('subject-digest must be in the format "sha256:<hex-digest>"');
-    }
-    const [alg, digest] = subjectDigest.split(':');
-    return {
-        name: subjectName,
-        digest: { [alg]: digest }
-    };
-};
-// Calculates the digest of a file using the specified algorithm. The file is
-// streamed into the digest function to avoid loading the entire file into
-// memory. The returned digest is a hex string.
-const digestFile = async (algorithm, filePath) => {
-    return new Promise((resolve, reject) => {
-        const hash = crypto_1.default.createHash(algorithm).setEncoding('hex');
-        fs_1.default.createReadStream(filePath)
-            .once('error', reject)
-            .pipe(hash)
-            .once('finish', () => resolve(hash.read()));
-    });
-};
 
 
 /***/ }),
@@ -65030,9 +64855,9 @@ const oci_1 = __nccwpck_require__(7353);
 const fs_1 = __importDefault(__nccwpck_require__(7147));
 const os_1 = __importDefault(__nccwpck_require__(2037));
 const path_1 = __importDefault(__nccwpck_require__(1017));
-const endpoints_1 = __nccwpck_require__(5144);
-const predicate_1 = __nccwpck_require__(7391);
-const subject_1 = __nccwpck_require__(7552);
+const endpoints_1 = __nccwpck_require__(9112);
+const predicate_1 = __nccwpck_require__(2103);
+const subject_1 = __nccwpck_require__(5206);
 const COLOR_CYAN = '\x1B[36m';
 const COLOR_DEFAULT = '\x1B[39m';
 const ATTESTATION_FILE_NAME = 'attestation.jsonl';
@@ -65143,6 +64968,181 @@ const subjectDigest = (subject) => {
     return `${alg}:${subject.digest[alg]}`;
 };
 const attestationURL = (id) => `${github.context.serverUrl}/${github.context.repo.owner}/${github.context.repo.repo}/attestations/${id}`;
+
+
+/***/ }),
+
+/***/ 2103:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.storePredicate = exports.predicateFromInputs = void 0;
+const core = __importStar(__nccwpck_require__(2186));
+const fs_1 = __importDefault(__nccwpck_require__(7147));
+const path = __importStar(__nccwpck_require__(1017));
+// Returns the predicate specified by the action's inputs. The predicate value
+// may be specified as a path to a file or as a string.
+const predicateFromInputs = () => {
+    const predicateType = core.getInput('predicate-type', { required: true });
+    const predicateStr = core.getInput('predicate', { required: false });
+    const predicatePath = core.getInput('predicate-path', { required: false });
+    if (!predicatePath && !predicateStr) {
+        throw new Error('One of predicate-path or predicate must be provided');
+    }
+    const params = predicatePath
+        ? fs_1.default.readFileSync(predicatePath, 'utf-8')
+        : predicateStr;
+    return { type: predicateType, params: JSON.parse(params) };
+};
+exports.predicateFromInputs = predicateFromInputs;
+const storePredicate = (predicate) => {
+    // random tempfile
+    const basePath = process.env['RUNNER_TEMP'];
+    if (!basePath) {
+        throw new Error('Missing RUNNER_TEMP environment variable');
+    }
+    const tmpDir = fs_1.default.mkdtempSync(path.join(basePath, path.sep));
+    const tempFile = path.join(tmpDir, 'predicate.json');
+    // write predicate to file
+    fs_1.default.writeFileSync(tempFile, JSON.stringify(predicate.params));
+    return tempFile;
+};
+exports.storePredicate = storePredicate;
+
+
+/***/ }),
+
+/***/ 5206:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.subjectFromInputs = void 0;
+const core = __importStar(__nccwpck_require__(2186));
+const glob = __importStar(__nccwpck_require__(8090));
+const crypto_1 = __importDefault(__nccwpck_require__(6113));
+const fs_1 = __importDefault(__nccwpck_require__(7147));
+const path_1 = __importDefault(__nccwpck_require__(1017));
+const DIGEST_ALGORITHM = 'sha256';
+// Returns the subject specified by the action's inputs. The subject may be
+// specified as a path to a file or as a digest. If a path is provided, the
+// file's digest is calculated and returned along with the subject's name. If a
+// digest is provided, the name must also be provided.
+const subjectFromInputs = async () => {
+    const subjectPath = core.getInput('subject-path', { required: false });
+    const subjectDigest = core.getInput('subject-digest', { required: false });
+    const subjectName = core.getInput('subject-name', { required: false });
+    if (!subjectPath && !subjectDigest) {
+        throw new Error('One of subject-path or subject-digest must be provided');
+    }
+    if (subjectPath && subjectDigest) {
+        throw new Error('Only one of subject-path or subject-digest may be provided');
+    }
+    if (subjectDigest && !subjectName) {
+        throw new Error('subject-name must be provided when using subject-digest');
+    }
+    if (subjectPath) {
+        return await getSubjectFromPath(subjectPath, subjectName);
+    }
+    else {
+        return [getSubjectFromDigest(subjectDigest, subjectName)];
+    }
+};
+exports.subjectFromInputs = subjectFromInputs;
+// Returns the subject specified by the path to a file. The file's digest is
+// calculated and returned along with the subject's name.
+const getSubjectFromPath = async (subjectPath, subjectName) => {
+    /* eslint-disable-next-line github/no-then */
+    const files = await glob.create(subjectPath).then(async (g) => g.glob());
+    const subjects = files.map(async (file) => {
+        const name = subjectName || path_1.default.parse(file).base;
+        const digest = await digestFile(DIGEST_ALGORITHM, file);
+        return { name, digest: { [DIGEST_ALGORITHM]: digest } };
+    });
+    if (subjects.length === 0) {
+        throw new Error(`Could not find subject at path ${subjectPath}`);
+    }
+    return Promise.all(subjects);
+};
+// Returns the subject specified by the digest of a file. The digest is returned
+// along with the subject's name.
+const getSubjectFromDigest = (subjectDigest, subjectName) => {
+    if (!subjectDigest.match(/^sha256:[A-Za-z0-9]{64}$/)) {
+        throw new Error('subject-digest must be in the format "sha256:<hex-digest>"');
+    }
+    const [alg, digest] = subjectDigest.split(':');
+    return {
+        name: subjectName,
+        digest: { [alg]: digest }
+    };
+};
+// Calculates the digest of a file using the specified algorithm. The file is
+// streamed into the digest function to avoid loading the entire file into
+// memory. The returned digest is a hex string.
+const digestFile = async (algorithm, filePath) => {
+    return new Promise((resolve, reject) => {
+        const hash = crypto_1.default.createHash(algorithm).setEncoding('hex');
+        fs_1.default.createReadStream(filePath)
+            .once('error', reject)
+            .pipe(hash)
+            .once('finish', () => resolve(hash.read()));
+    });
+};
 
 
 /***/ }),
