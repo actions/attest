@@ -12,9 +12,9 @@ import {
   REKOR_PUBLIC_GOOD_URL,
   SEARCH_PUBLIC_GOOD_URL,
   TSA_INTERNAL_URL
-} from './helper/endpoints'
-import { predicateFromInputs } from './helper/predicate'
-import { subjectFromInputs } from './helper/subject'
+} from './endpoints'
+import { predicateFromInputs } from './predicate'
+import { subjectFromInputs } from './subject'
 
 type Endpoints = {
   fulcioURL: string
