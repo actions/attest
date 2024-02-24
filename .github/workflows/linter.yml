@@ -2,6 +2,8 @@ name: Lint Codebase
 
 on:
   pull_request:
+    branches:
+      - main
   push:
     branches:
       - main
@@ -36,7 +38,7 @@ jobs:
 
        - name: Build @actions/attest
         run: npm run build --workspace packages/attest
-        
+
       - name: Lint Codebase
         id: super-linter
         uses: super-linter/super-linter/slim@v6
