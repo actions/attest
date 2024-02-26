@@ -1,6 +1,444 @@
 /******/ (() => { // webpackBootstrap
 /******/ 	var __webpack_modules__ = ({
 
+/***/ 6373:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.attest = void 0;
+const bundle_1 = __nccwpck_require__(9715);
+const crypto_1 = __nccwpck_require__(6113);
+const endpoints_1 = __nccwpck_require__(1205);
+const intoto_1 = __nccwpck_require__(5184);
+const sign_1 = __nccwpck_require__(9878);
+const store_1 = __nccwpck_require__(5911);
+const INTOTO_PAYLOAD_TYPE = 'application/vnd.in-toto+json';
+/**
+ * Generates an attestation for the given subject and predicate. The subject and
+ * predicate are combined into an in-toto statement, which is then signed using
+ * the identified Sigstore instance and stored as an attestation.
+ * @param options - The options for attestation.
+ * @returns A promise that resolves to the attestation.
+ */
+function attest(options) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const subject = {
+            name: options.subjectName,
+            digest: options.subjectDigest
+        };
+        const predicate = {
+            type: options.predicateType,
+            params: options.predicate
+        };
+        const statement = (0, intoto_1.buildIntotoStatement)(subject, predicate);
+        // Sign the provenance statement
+        const payload = {
+            body: Buffer.from(JSON.stringify(statement)),
+            type: INTOTO_PAYLOAD_TYPE
+        };
+        const endpoints = (0, endpoints_1.signingEndpoints)(options.sigstore);
+        const bundle = yield (0, sign_1.signPayload)(payload, endpoints);
+        // Store the attestation
+        let attestationID;
+        if (options.skipWrite !== true) {
+            attestationID = yield (0, store_1.writeAttestation)((0, bundle_1.bundleToJSON)(bundle), options.token);
+        }
+        return toAttestation(bundle, attestationID);
+    });
+}
+exports.attest = attest;
+function toAttestation(bundle, attestationID) {
+    let certBytes;
+    switch (bundle.verificationMaterial.content.$case) {
+        case 'x509CertificateChain':
+            certBytes =
+                bundle.verificationMaterial.content.x509CertificateChain.certificates[0]
+                    .rawBytes;
+            break;
+        case 'certificate':
+            certBytes = bundle.verificationMaterial.content.certificate.rawBytes;
+            break;
+        default:
+            throw new Error('Bundle must contain an x509 certificate');
+    }
+    const signingCert = new crypto_1.X509Certificate(certBytes);
+    // Collect transparency log ID if available
+    const tlogEntries = bundle.verificationMaterial.tlogEntries;
+    const tlogID = tlogEntries.length > 0 ? tlogEntries[0].logIndex : undefined;
+    return {
+        bundle: (0, bundle_1.bundleToJSON)(bundle),
+        certificate: signingCert.toString(),
+        tlogID,
+        attestationID
+    };
+}
+//# sourceMappingURL=attest.js.map
+
+/***/ }),
+
+/***/ 1205:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.signingEndpoints = exports.SIGSTORE_GITHUB = exports.SIGSTORE_PUBLIC_GOOD = void 0;
+const github = __importStar(__nccwpck_require__(5438));
+const PUBLIC_GOOD_ID = 'public-good';
+const GITHUB_ID = 'github';
+const FULCIO_PUBLIC_GOOD_URL = 'https://fulcio.sigstore.dev';
+const REKOR_PUBLIC_GOOD_URL = 'https://rekor.sigstore.dev';
+const FULCIO_INTERNAL_URL = 'https://fulcio.githubapp.com';
+const TSA_INTERNAL_URL = 'https://timestamp.githubapp.com';
+exports.SIGSTORE_PUBLIC_GOOD = {
+    fulcioURL: FULCIO_PUBLIC_GOOD_URL,
+    rekorURL: REKOR_PUBLIC_GOOD_URL
+};
+exports.SIGSTORE_GITHUB = {
+    fulcioURL: FULCIO_INTERNAL_URL,
+    tsaServerURL: TSA_INTERNAL_URL
+};
+const signingEndpoints = (sigstore) => {
+    var _a;
+    let instance;
+    // An explicitly set instance type takes precedence, but if not set, use the
+    // repository's visibility to determine the instance type.
+    if (sigstore && [PUBLIC_GOOD_ID, GITHUB_ID].includes(sigstore)) {
+        instance = sigstore;
+    }
+    else {
+        instance =
+            ((_a = github.context.payload.repository) === null || _a === void 0 ? void 0 : _a.visibility) === 'public'
+                ? PUBLIC_GOOD_ID
+                : GITHUB_ID;
+    }
+    switch (instance) {
+        case PUBLIC_GOOD_ID:
+            return exports.SIGSTORE_PUBLIC_GOOD;
+        case GITHUB_ID:
+            return exports.SIGSTORE_GITHUB;
+    }
+};
+exports.signingEndpoints = signingEndpoints;
+//# sourceMappingURL=endpoints.js.map
+
+/***/ }),
+
+/***/ 4113:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.buildSLSAProvenancePredicate = exports.attestProvenance = exports.attest = void 0;
+var attest_1 = __nccwpck_require__(6373);
+Object.defineProperty(exports, "attest", ({ enumerable: true, get: function () { return attest_1.attest; } }));
+var provenance_1 = __nccwpck_require__(5703);
+Object.defineProperty(exports, "attestProvenance", ({ enumerable: true, get: function () { return provenance_1.attestProvenance; } }));
+Object.defineProperty(exports, "buildSLSAProvenancePredicate", ({ enumerable: true, get: function () { return provenance_1.buildSLSAProvenancePredicate; } }));
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 5184:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.buildIntotoStatement = void 0;
+const INTOTO_STATEMENT_V1_TYPE = 'https://in-toto.io/Statement/v1';
+/**
+ * Assembles the given subject and predicate into an in-toto statement.
+ * @param subject - The subject of the statement.
+ * @param predicate - The predicate of the statement.
+ * @returns The constructed in-toto statement.
+ */
+const buildIntotoStatement = (subject, predicate) => {
+    return {
+        _type: INTOTO_STATEMENT_V1_TYPE,
+        subject: [subject],
+        predicateType: predicate.type,
+        predicate: predicate.params
+    };
+};
+exports.buildIntotoStatement = buildIntotoStatement;
+//# sourceMappingURL=intoto.js.map
+
+/***/ }),
+
+/***/ 5703:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.attestProvenance = exports.buildSLSAProvenancePredicate = void 0;
+const attest_1 = __nccwpck_require__(6373);
+const SLSA_PREDICATE_V1_TYPE = 'https://slsa.dev/provenance/v1';
+const GITHUB_BUILDER_ID_PREFIX = 'https://github.com/actions/runner';
+const GITHUB_BUILD_TYPE = 'https://slsa-framework.github.io/github-actions-buildtypes/workflow/v1';
+/**
+ * Builds an SLSA (Supply Chain Levels for Software Artifacts) provenance
+ * predicate using the GitHub Actions Workflow build type.
+ * https://slsa.dev/spec/v1.0/provenance
+ * https://github.com/slsa-framework/github-actions-buildtypes/tree/main/workflow/v1
+ * @param env - The Node.js process environment variables. Defaults to
+ * `process.env`.
+ * @returns The SLSA provenance predicate.
+ */
+const buildSLSAProvenancePredicate = (env = process.env) => {
+    const workflow = env.GITHUB_WORKFLOW_REF || '';
+    // Split just the path and ref from the workflow string.
+    // owner/repo/.github/workflows/main.yml@main =>
+    //   .github/workflows/main.yml, main
+    const [workflowPath, workflowRef] = workflow
+        .replace(`${env.GITHUB_REPOSITORY}/`, '')
+        .split('@');
+    return {
+        type: SLSA_PREDICATE_V1_TYPE,
+        params: {
+            buildDefinition: {
+                buildType: GITHUB_BUILD_TYPE,
+                externalParameters: {
+                    workflow: {
+                        ref: workflowRef,
+                        repository: `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}`,
+                        path: workflowPath
+                    }
+                },
+                internalParameters: {
+                    github: {
+                        event_name: env.GITHUB_EVENT_NAME,
+                        repository_id: env.GITHUB_REPOSITORY_ID,
+                        repository_owner_id: env.GITHUB_REPOSITORY_OWNER_ID
+                    }
+                },
+                resolvedDependencies: [
+                    {
+                        uri: `git+${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}@${env.GITHUB_REF}`,
+                        digest: {
+                            gitCommit: env.GITHUB_SHA
+                        }
+                    }
+                ]
+            },
+            runDetails: {
+                builder: {
+                    id: `${GITHUB_BUILDER_ID_PREFIX}/${env.RUNNER_ENVIRONMENT}`
+                },
+                metadata: {
+                    invocationId: `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}/attempts/${env.GITHUB_RUN_ATTEMPT}`
+                }
+            }
+        }
+    };
+};
+exports.buildSLSAProvenancePredicate = buildSLSAProvenancePredicate;
+/**
+ * Attests the build provenance of the provided subject. Generates the SLSA
+ * build provenance predicate, assembles it into an in-toto statement, and
+ * attests it.
+ *
+ * @param options - The options for attesting the provenance.
+ * @returns A promise that resolves to the attestation.
+ */
+function attestProvenance(options) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const predicate = (0, exports.buildSLSAProvenancePredicate)(process.env);
+        return (0, attest_1.attest)(Object.assign(Object.assign({}, options), { predicateType: predicate.type, predicate: predicate.params }));
+    });
+}
+exports.attestProvenance = attestProvenance;
+//# sourceMappingURL=provenance.js.map
+
+/***/ }),
+
+/***/ 9878:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.signPayload = void 0;
+const sign_1 = __nccwpck_require__(2071);
+const OIDC_AUDIENCE = 'sigstore';
+const DEFAULT_TIMEOUT = 10000;
+const DEFAULT_RETRIES = 3;
+/**
+ * Signs the provided payload with a Sigstore-issued certificate and returns the
+ * signature bundle.
+ * @param payload Payload to be signed.
+ * @param options Signing options.
+ * @returns A promise that resolves to the Sigstore signature bundle.
+ */
+const signPayload = (payload, options) => __awaiter(void 0, void 0, void 0, function* () {
+    const artifact = {
+        data: payload.body,
+        type: payload.type
+    };
+    // Sign the artifact and build the bundle
+    return initBundleBuilder(options).create(artifact);
+});
+exports.signPayload = signPayload;
+// Assembles the Sigstore bundle builder with the appropriate options
+const initBundleBuilder = (opts) => {
+    const identityProvider = new sign_1.CIContextProvider(OIDC_AUDIENCE);
+    const timeout = opts.timeout || DEFAULT_TIMEOUT;
+    const retry = opts.retry || DEFAULT_RETRIES;
+    const witnesses = [];
+    const signer = new sign_1.FulcioSigner({
+        identityProvider,
+        fulcioBaseURL: opts.fulcioURL,
+        timeout,
+        retry
+    });
+    if (opts.rekorURL) {
+        witnesses.push(new sign_1.RekorWitness({
+            rekorBaseURL: opts.rekorURL,
+            entryType: 'dsse',
+            timeout,
+            retry
+        }));
+    }
+    if (opts.tsaServerURL) {
+        witnesses.push(new sign_1.TSAWitness({
+            tsaBaseURL: opts.tsaServerURL,
+            timeout,
+            retry
+        }));
+    }
+    return new sign_1.DSSEBundleBuilder({ signer, witnesses });
+};
+//# sourceMappingURL=sign.js.map
+
+/***/ }),
+
+/***/ 5911:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.writeAttestation = void 0;
+const github = __importStar(__nccwpck_require__(5438));
+const make_fetch_happen_1 = __importDefault(__nccwpck_require__(9525));
+const CREATE_ATTESTATION_REQUEST = 'POST /repos/{owner}/{repo}/attestations';
+/**
+ * Writes an attestation to the repository's attestations endpoint.
+ * @param attestation - The attestation to write.
+ * @param token - The GitHub token for authentication.
+ * @returns The ID of the attestation.
+ * @throws Error if the attestation fails to persist.
+ */
+const writeAttestation = (attestation, token) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const octokit = github.getOctokit(token, { request: { fetch: make_fetch_happen_1.default } });
+    try {
+        const response = yield octokit.request(CREATE_ATTESTATION_REQUEST, {
+            owner: github.context.repo.owner,
+            repo: github.context.repo.repo,
+            data: { bundle: attestation }
+        });
+        return (_a = response.data) === null || _a === void 0 ? void 0 : _a.id;
+    }
+    catch (err) {
+        const message = err instanceof Error ? err.message : err;
+        throw new Error(`Failed to persist attestation: ${message}`);
+    }
+});
+exports.writeAttestation = writeAttestation;
+//# sourceMappingURL=store.js.map
+
+/***/ }),
+
 /***/ 7351:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -4698,7 +5136,7 @@ module.exports = withTempDir
 
 /***/ }),
 
-/***/ 9379:
+/***/ 334:
 /***/ ((module) => {
 
 "use strict";
@@ -4816,7 +5254,7 @@ var import_universal_user_agent = __nccwpck_require__(5030);
 var import_before_after_hook = __nccwpck_require__(3682);
 var import_request = __nccwpck_require__(6234);
 var import_graphql = __nccwpck_require__(8467);
-var import_auth_token = __nccwpck_require__(9379);
+var import_auth_token = __nccwpck_require__(334);
 
 // pkg/dist-src/version.js
 var VERSION = "5.1.0";
@@ -9804,7 +10242,7 @@ const asn1_1 = __nccwpck_require__(4095);
 const crypto = __importStar(__nccwpck_require__(3914));
 const oid_1 = __nccwpck_require__(5960);
 const error_1 = __nccwpck_require__(4526);
-const tstinfo_1 = __nccwpck_require__(852);
+const tstinfo_1 = __nccwpck_require__(6368);
 const OID_PKCS9_CONTENT_TYPE_SIGNED_DATA = '1.2.840.113549.1.7.2';
 const OID_PKCS9_CONTENT_TYPE_TSTINFO = '1.2.840.113549.1.9.16.1.4';
 const OID_PKCS9_MESSAGE_DIGEST_KEY = '1.2.840.113549.1.9.4';
@@ -9964,7 +10402,7 @@ exports.RFC3161Timestamp = RFC3161Timestamp;
 
 /***/ }),
 
-/***/ 852:
+/***/ 6368:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -13201,7 +13639,7 @@ exports.checkStatus = checkStatus;
 
 /***/ }),
 
-/***/ 2960:
+/***/ 269:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -13572,7 +14010,7 @@ Object.defineProperty(exports, "TSAWitness", ({ enumerable: true, get: function 
 
 /***/ }),
 
-/***/ 334:
+/***/ 4606:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -13595,7 +14033,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 const error_1 = __nccwpck_require__(532);
-const fulcio_1 = __nccwpck_require__(2960);
+const fulcio_1 = __nccwpck_require__(269);
 class CAClient {
     constructor(options) {
         this.fulcio = new fulcio_1.Fulcio({
@@ -13717,7 +14155,7 @@ limitations under the License.
 */
 const error_1 = __nccwpck_require__(532);
 const util_1 = __nccwpck_require__(724);
-const ca_1 = __nccwpck_require__(334);
+const ca_1 = __nccwpck_require__(4606);
 const ephemeral_1 = __nccwpck_require__(8489);
 exports.DEFAULT_FULCIO_URL = 'https://fulcio.sigstore.dev';
 // Signer implementation which can be used to decorate another signer
@@ -20255,7 +20693,7 @@ module.exports = {
     'gb18030': {
         type: '_dbcs',
         table: function() { return (__nccwpck_require__(3336).concat)(__nccwpck_require__(4346)) },
-        gb18030: function() { return __nccwpck_require__(3121) },
+        gb18030: function() { return __nccwpck_require__(6290) },
         encodeSkipVals: [0x80],
         encodeAdd: {'€': 0xA2E3},
     },
@@ -20311,14 +20749,14 @@ module.exports = {
     '950': 'cp950',
     'cp950': {
         type: '_dbcs',
-        table: function() { return __nccwpck_require__(4284) },
+        table: function() { return __nccwpck_require__(3270) },
     },
 
     // Big5 has many variations and is an extension of cp950. We use Encoding Standard's as a consensus.
     'big5': 'big5hkscs',
     'big5hkscs': {
         type: '_dbcs',
-        table: function() { return (__nccwpck_require__(4284).concat)(__nccwpck_require__(3480)) },
+        table: function() { return (__nccwpck_require__(3270).concat)(__nccwpck_require__(3480)) },
         encodeSkipVals: [
             // Although Encoding Standard says we should avoid encoding to HKSCS area (See Step 1 of
             // https://encoding.spec.whatwg.org/#index-big5-pointer), we still do it to increase compatibility with ICU.
@@ -34365,7 +34803,7 @@ module.exports = async (
 
 
 var errcode = __nccwpck_require__(2997);
-var retry = __nccwpck_require__(4347);
+var retry = __nccwpck_require__(1604);
 
 var hasOwn = Object.prototype.hasOwnProperty;
 
@@ -34418,7 +34856,7 @@ module.exports = promiseRetry;
 
 /***/ }),
 
-/***/ 4347:
+/***/ 1604:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 module.exports = __nccwpck_require__(6244);
@@ -41950,7 +42388,7 @@ if (util.nodeMajor >= 16) {
 }
 
 if (util.nodeMajor >= 18 && hasCrypto) {
-  const { WebSocket } = __nccwpck_require__(8470)
+  const { WebSocket } = __nccwpck_require__(4284)
 
   module.exports.WebSocket = WebSocket
 }
@@ -42192,7 +42630,7 @@ module.exports = {
 "use strict";
 
 
-const { AsyncResource } = __nccwpck_require__(8705)
+const { AsyncResource } = __nccwpck_require__(852)
 const { InvalidArgumentError, RequestAbortedError, SocketError } = __nccwpck_require__(8045)
 const util = __nccwpck_require__(3983)
 const { addSignal, removeSignal } = __nccwpck_require__(7032)
@@ -42315,7 +42753,7 @@ const {
   RequestAbortedError
 } = __nccwpck_require__(8045)
 const util = __nccwpck_require__(3983)
-const { AsyncResource } = __nccwpck_require__(8705)
+const { AsyncResource } = __nccwpck_require__(852)
 const { addSignal, removeSignal } = __nccwpck_require__(7032)
 const assert = __nccwpck_require__(9491)
 
@@ -42568,7 +43006,7 @@ const {
 } = __nccwpck_require__(8045)
 const util = __nccwpck_require__(3983)
 const { getResolveErrorBodyCallback } = __nccwpck_require__(7474)
-const { AsyncResource } = __nccwpck_require__(8705)
+const { AsyncResource } = __nccwpck_require__(852)
 const { addSignal, removeSignal } = __nccwpck_require__(7032)
 
 class RequestHandler extends AsyncResource {
@@ -42757,7 +43195,7 @@ const {
 } = __nccwpck_require__(8045)
 const util = __nccwpck_require__(3983)
 const { getResolveErrorBodyCallback } = __nccwpck_require__(7474)
-const { AsyncResource } = __nccwpck_require__(8705)
+const { AsyncResource } = __nccwpck_require__(852)
 const { addSignal, removeSignal } = __nccwpck_require__(7032)
 
 class StreamHandler extends AsyncResource {
@@ -42978,7 +43416,7 @@ module.exports = stream
 
 
 const { InvalidArgumentError, RequestAbortedError, SocketError } = __nccwpck_require__(8045)
-const { AsyncResource } = __nccwpck_require__(8705)
+const { AsyncResource } = __nccwpck_require__(852)
 const util = __nccwpck_require__(3983)
 const { addSignal, removeSignal } = __nccwpck_require__(7032)
 const assert = __nccwpck_require__(9491)
@@ -47122,7 +47560,7 @@ module.exports = {
 
 
 const { parseSetCookie } = __nccwpck_require__(4408)
-const { stringify, getHeadersList } = __nccwpck_require__(6576)
+const { stringify, getHeadersList } = __nccwpck_require__(3121)
 const { webidl } = __nccwpck_require__(1744)
 const { Headers } = __nccwpck_require__(554)
 
@@ -47314,7 +47752,7 @@ module.exports = {
 
 
 const { maxNameValuePairSize, maxAttributeValueSize } = __nccwpck_require__(663)
-const { isCTLExcludingHtab } = __nccwpck_require__(6576)
+const { isCTLExcludingHtab } = __nccwpck_require__(3121)
 const { collectASequenceOfCodePointsFast } = __nccwpck_require__(685)
 const assert = __nccwpck_require__(9491)
 
@@ -47632,7 +48070,7 @@ module.exports = {
 
 /***/ }),
 
-/***/ 6576:
+/***/ 3121:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 "use strict";
@@ -59979,7 +60417,7 @@ const {
   kGetNetConnect,
   kOptions,
   kFactory
-} = __nccwpck_require__(9106)
+} = __nccwpck_require__(4347)
 const MockClient = __nccwpck_require__(8687)
 const MockPool = __nccwpck_require__(6193)
 const { matchValue, buildMockOptions } = __nccwpck_require__(9323)
@@ -60157,7 +60595,7 @@ const {
   kOrigin,
   kOriginalDispatch,
   kConnected
-} = __nccwpck_require__(9106)
+} = __nccwpck_require__(4347)
 const { MockInterceptor } = __nccwpck_require__(410)
 const Symbols = __nccwpck_require__(2785)
 const { InvalidArgumentError } = __nccwpck_require__(8045)
@@ -60246,7 +60684,7 @@ const {
   kDefaultTrailers,
   kContentLength,
   kMockDispatch
-} = __nccwpck_require__(9106)
+} = __nccwpck_require__(4347)
 const { InvalidArgumentError } = __nccwpck_require__(8045)
 const { buildURL } = __nccwpck_require__(3983)
 
@@ -60463,7 +60901,7 @@ const {
   kOrigin,
   kOriginalDispatch,
   kConnected
-} = __nccwpck_require__(9106)
+} = __nccwpck_require__(4347)
 const { MockInterceptor } = __nccwpck_require__(410)
 const Symbols = __nccwpck_require__(2785)
 const { InvalidArgumentError } = __nccwpck_require__(8045)
@@ -60513,7 +60951,7 @@ module.exports = MockPool
 
 /***/ }),
 
-/***/ 9106:
+/***/ 4347:
 /***/ ((module) => {
 
 "use strict";
@@ -60557,7 +60995,7 @@ const {
   kOriginalDispatch,
   kOrigin,
   kGetNetConnect
-} = __nccwpck_require__(9106)
+} = __nccwpck_require__(4347)
 const { buildURL, nop } = __nccwpck_require__(3983)
 const { STATUS_CODES } = __nccwpck_require__(3685)
 const {
@@ -63090,7 +63528,7 @@ module.exports = {
 
 /***/ }),
 
-/***/ 8470:
+/***/ 4284:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 "use strict";
@@ -64484,320 +64922,6 @@ function wrappy (fn, cb) {
 
 /***/ }),
 
-/***/ 1556:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.attestProvenance = exports.attest = void 0;
-const bundle_1 = __nccwpck_require__(9715);
-const provenance_1 = __nccwpck_require__(3918);
-const sign_1 = __nccwpck_require__(1759);
-const store_1 = __nccwpck_require__(6951);
-const assert_1 = __importDefault(__nccwpck_require__(9491));
-const crypto_1 = __nccwpck_require__(6113);
-const INTOTO_PAYLOAD_TYPE = 'application/vnd.in-toto+json';
-const INTOTO_STATEMENT_V1_TYPE = 'https://in-toto.io/Statement/v1';
-async function attest(options) {
-    const subject = {
-        name: options.subjectName,
-        digest: options.subjectDigest
-    };
-    const statement = {
-        _type: INTOTO_STATEMENT_V1_TYPE,
-        subject: [subject],
-        predicateType: options.predicateType,
-        predicate: options.predicate
-    };
-    // Sign the provenance statement
-    const payload = {
-        body: Buffer.from(JSON.stringify(statement)),
-        type: INTOTO_PAYLOAD_TYPE
-    };
-    const bundle = await (0, sign_1.signPayload)(payload, options);
-    // Store the attestation
-    let attestationID;
-    if (options.skipWrite !== true) {
-        attestationID = await (0, store_1.writeAttestation)((0, bundle_1.bundleToJSON)(bundle), options.token);
-    }
-    return toAttestation(bundle, attestationID);
-}
-exports.attest = attest;
-async function attestProvenance(options) {
-    const predicate = (0, provenance_1.generateProvenancePredicate)(process.env);
-    return attest({
-        ...options,
-        predicateType: predicate.type,
-        predicate: predicate.params
-    });
-}
-exports.attestProvenance = attestProvenance;
-function toAttestation(bundle, attestationID) {
-    // Extract the signing certificate from the bundle
-    (0, assert_1.default)(bundle.verificationMaterial.content.$case === 'x509CertificateChain', 'Bundle must contain an x509 certificate chain');
-    const signingCert = new crypto_1.X509Certificate(bundle.verificationMaterial.content.x509CertificateChain.certificates[0].rawBytes);
-    // Determine if we can provide a link to the transparency log
-    const tlogEntries = bundle.verificationMaterial.tlogEntries;
-    const tlogID = tlogEntries.length > 0 ? tlogEntries[0].logIndex : undefined;
-    return {
-        bundle: (0, bundle_1.bundleToJSON)(bundle),
-        certificate: signingCert.toString(),
-        tlogID,
-        attestationID
-    };
-}
-
-
-/***/ }),
-
-/***/ 3697:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.generateSBOMPredicate = exports.generateProvenancePredicate = exports.attestProvenance = exports.attest = void 0;
-var attest_1 = __nccwpck_require__(1556);
-Object.defineProperty(exports, "attest", ({ enumerable: true, get: function () { return attest_1.attest; } }));
-Object.defineProperty(exports, "attestProvenance", ({ enumerable: true, get: function () { return attest_1.attestProvenance; } }));
-var provenance_1 = __nccwpck_require__(3918);
-Object.defineProperty(exports, "generateProvenancePredicate", ({ enumerable: true, get: function () { return provenance_1.generateProvenancePredicate; } }));
-var sbom_1 = __nccwpck_require__(1695);
-Object.defineProperty(exports, "generateSBOMPredicate", ({ enumerable: true, get: function () { return sbom_1.generateSBOMPredicate; } }));
-
-
-/***/ }),
-
-/***/ 3918:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.generateProvenance = exports.generateProvenancePredicate = exports.SLSA_PREDICATE_V1_TYPE = void 0;
-const INTOTO_STATEMENT_V1_TYPE = 'https://in-toto.io/Statement/v1';
-exports.SLSA_PREDICATE_V1_TYPE = 'https://slsa.dev/provenance/v1';
-const GITHUB_BUILDER_ID_PREFIX = 'https://github.com/actions/runner';
-const GITHUB_BUILD_TYPE = 'https://slsa-framework.github.io/github-actions-buildtypes/workflow/v1';
-const generateProvenancePredicate = (env) => {
-    const workflow = env.GITHUB_WORKFLOW_REF || /* istanbul ignore next */ '';
-    // Split just the path and ref from the workflow string.
-    // owner/repo/.github/workflows/main.yml@main =>
-    //   .github/workflows/main.yml, main
-    const [workflowPath, workflowRef] = workflow
-        .replace(`${env.GITHUB_REPOSITORY}/`, '')
-        .split('@');
-    return {
-        type: exports.SLSA_PREDICATE_V1_TYPE,
-        params: {
-            buildDefinition: {
-                buildType: GITHUB_BUILD_TYPE,
-                externalParameters: {
-                    workflow: {
-                        ref: workflowRef,
-                        repository: `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}`,
-                        path: workflowPath
-                    }
-                },
-                internalParameters: {
-                    github: {
-                        event_name: env.GITHUB_EVENT_NAME,
-                        repository_id: env.GITHUB_REPOSITORY_ID,
-                        repository_owner_id: env.GITHUB_REPOSITORY_OWNER_ID
-                    }
-                },
-                resolvedDependencies: [
-                    {
-                        uri: `git+${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}@${env.GITHUB_REF}`,
-                        digest: {
-                            gitCommit: env.GITHUB_SHA
-                        }
-                    }
-                ]
-            },
-            runDetails: {
-                builder: {
-                    id: `${GITHUB_BUILDER_ID_PREFIX}/${env.RUNNER_ENVIRONMENT}`
-                },
-                metadata: {
-                    invocationId: `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}/attempts/${env.GITHUB_RUN_ATTEMPT}`
-                }
-            }
-        }
-    };
-};
-exports.generateProvenancePredicate = generateProvenancePredicate;
-const generateProvenance = (subject, env) => {
-    const predicate = (0, exports.generateProvenancePredicate)(env);
-    return {
-        _type: INTOTO_STATEMENT_V1_TYPE,
-        subject: [subject],
-        predicateType: predicate.type,
-        predicate: predicate.params
-    };
-};
-exports.generateProvenance = generateProvenance;
-
-
-/***/ }),
-
-/***/ 1695:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.generateSBOMPredicate = void 0;
-const generateSBOMPredicate = (sbom) => {
-    if (sbom.type === 'spdx') {
-        return generateSPDXIntoto(sbom.object);
-    }
-    if (sbom.type === 'cyclonedx') {
-        return generateCycloneDXIntoto(sbom.object);
-    }
-    throw new Error('Unsupported SBOM format');
-};
-exports.generateSBOMPredicate = generateSBOMPredicate;
-// ref: https://github.com/in-toto/attestation/blob/main/spec/predicates/spdx.md
-const generateSPDXIntoto = (sbom) => {
-    const spdxVersion = sbom?.['spdxVersion'];
-    if (!spdxVersion) {
-        throw new Error('Cannot find spdxVersion in the SBOM');
-    }
-    const version = spdxVersion.split('-')[1];
-    return {
-        type: `https://spdx.dev/Document/v${version}`,
-        params: sbom
-    };
-};
-// ref: https://github.com/in-toto/attestation/blob/main/spec/predicates/cyclonedx.md
-const generateCycloneDXIntoto = (sbom) => {
-    return {
-        type: 'https://cyclonedx.org/bom',
-        params: sbom
-    };
-};
-
-
-/***/ }),
-
-/***/ 1759:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.signPayload = void 0;
-const sign_1 = __nccwpck_require__(2071);
-const OIDC_AUDIENCE = 'sigstore';
-const DEFAULT_TIMEOUT = 10000;
-const DEFAULT_RETRIES = 3;
-// Signs the provided payload with Sigstore.
-const signPayload = async (payload, options) => {
-    const artifact = {
-        data: payload.body,
-        type: payload.type
-    };
-    // Sign the artifact and build the bundle
-    return initBundleBuilder(options).create(artifact);
-};
-exports.signPayload = signPayload;
-// Assembles the Sigstore bundle builder with the appropriate options
-const initBundleBuilder = (opts) => {
-    const identityProvider = opts.identityProvider || new sign_1.CIContextProvider(OIDC_AUDIENCE);
-    const timeout = opts.timeout || DEFAULT_TIMEOUT;
-    const retry = opts.retry || DEFAULT_RETRIES;
-    const witnesses = [];
-    const signer = new sign_1.FulcioSigner({
-        identityProvider: identityProvider,
-        fulcioBaseURL: opts.fulcioURL,
-        timeout: timeout,
-        retry: retry
-    });
-    if (opts.rekorURL) {
-        witnesses.push(new sign_1.RekorWitness({
-            rekorBaseURL: opts.rekorURL,
-            entryType: 'dsse',
-            timeout: timeout,
-            retry: retry
-        }));
-    }
-    if (opts.tsaServerURL) {
-        witnesses.push(new sign_1.TSAWitness({
-            tsaBaseURL: opts.tsaServerURL,
-            timeout: timeout,
-            retry: retry
-        }));
-    }
-    return new sign_1.DSSEBundleBuilder({ signer, witnesses });
-};
-
-
-/***/ }),
-
-/***/ 6951:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.writeAttestation = void 0;
-const github = __importStar(__nccwpck_require__(5438));
-const make_fetch_happen_1 = __importDefault(__nccwpck_require__(9525));
-const CREATE_ATTESTATION_REQUEST = 'POST /repos/{owner}/{repo}/attestations';
-// Upload the attestation to the repository's attestations endpoint. Returns the
-// ID of the uploaded attestation.
-const writeAttestation = async (attestation, token) => {
-    const octokit = github.getOctokit(token, { request: { fetch: make_fetch_happen_1.default } });
-    try {
-        const response = await octokit.request(CREATE_ATTESTATION_REQUEST, {
-            owner: github.context.repo.owner,
-            repo: github.context.repo.repo,
-            data: { bundle: attestation }
-        });
-        return response.data?.id;
-    }
-    catch (err) {
-        /* istanbul ignore next */
-        const message = err instanceof Error ? err.message : err;
-        throw new Error(`Failed to persist attestation: ${message}`);
-    }
-};
-exports.writeAttestation = writeAttestation;
-
-
-/***/ }),
-
 /***/ 9112:
 /***/ ((__unused_webpack_module, exports) => {
 
@@ -64847,7 +64971,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = void 0;
-const attest_1 = __nccwpck_require__(3697);
+const attest_1 = __nccwpck_require__(4113);
 const core = __importStar(__nccwpck_require__(2186));
 const github = __importStar(__nccwpck_require__(5438));
 const bundle_1 = __nccwpck_require__(9715);
@@ -65155,7 +65279,7 @@ module.exports = require("assert");
 
 /***/ }),
 
-/***/ 8705:
+/***/ 852:
 /***/ ((module) => {
 
 "use strict";
@@ -65435,7 +65559,7 @@ module.exports = require("zlib");
 
 /***/ }),
 
-/***/ 9718:
+/***/ 2960:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 "use strict";
@@ -66023,7 +66147,7 @@ module.exports = SBMH
 
 const WritableStream = (__nccwpck_require__(4492).Writable)
 const { inherits } = __nccwpck_require__(7261)
-const Dicer = __nccwpck_require__(9718)
+const Dicer = __nccwpck_require__(2960)
 
 const MultipartParser = __nccwpck_require__(2183)
 const UrlencodedParser = __nccwpck_require__(8306)
@@ -66124,7 +66248,7 @@ module.exports.Dicer = Dicer
 const { Readable } = __nccwpck_require__(4492)
 const { inherits } = __nccwpck_require__(7261)
 
-const Dicer = __nccwpck_require__(9718)
+const Dicer = __nccwpck_require__(2960)
 
 const parseParams = __nccwpck_require__(1854)
 const decodeText = __nccwpck_require__(4619)
@@ -77741,7 +77865,7 @@ module.exports = JSON.parse('[["0","\\u0000",127],["8141","갂갃갅갆갋",4,"�
 
 /***/ }),
 
-/***/ 4284:
+/***/ 3270:
 /***/ ((module) => {
 
 "use strict";
@@ -77757,7 +77881,7 @@ module.exports = JSON.parse('[["0","\\u0000",127],["8ea1","｡",62],["a1a1","　
 
 /***/ }),
 
-/***/ 3121:
+/***/ 6290:
 /***/ ((module) => {
 
 "use strict";
