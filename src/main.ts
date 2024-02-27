@@ -6,35 +6,15 @@ import { attachArtifactToImage, getRegistryCredentials } from '@sigstore/oci'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import {
-  FULCIO_INTERNAL_URL,
-  FULCIO_PUBLIC_GOOD_URL,
-  REKOR_PUBLIC_GOOD_URL,
-  SEARCH_PUBLIC_GOOD_URL,
-  TSA_INTERNAL_URL
-} from './endpoints'
+import { SEARCH_PUBLIC_GOOD_URL } from './endpoints'
 import { predicateFromInputs } from './predicate'
 import { subjectFromInputs } from './subject'
 
-type Endpoints = {
-  fulcioURL: string
-  rekorURL?: string
-  tsaServerURL?: string
-}
+type SigstoreInstance = 'public-good' | 'github'
 
 const COLOR_CYAN = '\x1B[36m'
 const COLOR_DEFAULT = '\x1B[39m'
 const ATTESTATION_FILE_NAME = 'attestation.jsonl'
-
-const SIGSTORE_PUBLIC_GOOD_ENDPOINTS: Endpoints = {
-  fulcioURL: FULCIO_PUBLIC_GOOD_URL,
-  rekorURL: REKOR_PUBLIC_GOOD_URL
-}
-
-const SIGSTORE_INTERNAL_ENDPOINTS: Endpoints = {
-  fulcioURL: FULCIO_INTERNAL_URL,
-  tsaServerURL: TSA_INTERNAL_URL
-}
 
 /**
  * The main function for the action.
@@ -44,13 +24,19 @@ export async function run(): Promise<void> {
   // Provenance visibility will be public ONLY if we can confirm that the
   // repository is public AND the undocumented "private-signing" arg is NOT set.
   // Otherwise, it will be private.
-  const endpoints =
+  const sigstoreInstance: SigstoreInstance =
     github.context.payload.repository?.visibility === 'public' &&
     core.getInput('private-signing') !== 'true'
-      ? SIGSTORE_PUBLIC_GOOD_ENDPOINTS
-      : SIGSTORE_INTERNAL_ENDPOINTS
+      ? 'public-good'
+      : 'github'
 
   try {
+    if (!process.env.ACTIONS_ID_TOKEN_REQUEST_URL) {
+      throw new Error(
+        'missing "id-token" permission. Please add "permissions: id-token: write" to your workflow.'
+      )
+    }
+
     // Calculate subject from inputs and generate provenance
     const subjects = await subjectFromInputs()
     const predicate = predicateFromInputs()
@@ -58,7 +44,7 @@ export async function run(): Promise<void> {
 
     // Generate attestations for each subject serially
     for (const subject of subjects) {
-      const att = await createAttestation(subject, predicate, endpoints)
+      const att = await createAttestation(subject, predicate, sigstoreInstance)
 
       // Write attestation bundle to output file
       fs.writeFileSync(outputPath, JSON.stringify(att.bundle) + os.EOL, {
@@ -97,21 +83,25 @@ export async function run(): Promise<void> {
 const createAttestation = async (
   subject: Subject,
   predicate: Predicate,
-  endpoints: Endpoints
+  sigstoreInstance: SigstoreInstance
 ): Promise<Attestation> => {
   // Sign provenance w/ Sigstore
   const attestation = await attest({
-    ...endpoints,
     subjectName: subject.name,
     subjectDigest: subject.digest,
     predicateType: predicate.type,
     predicate: predicate.params,
+    sigstore: sigstoreInstance,
     token: core.getInput('github-token')
   })
 
+  core.info(`Attestation created for ${subject.name}@${subjectDigest(subject)}`)
+
+  const instanceName =
+    sigstoreInstance === 'public-good' ? 'Public Good' : 'GitHub'
   core.startGroup(
     highlight(
-      `Attestation signed using ephemeral certificate from ${endpoints.fulcioURL}`
+      `Attestation signed using certificate from ${instanceName} Sigstore instance`
     )
   )
   core.info(attestation.certificate)
@@ -153,6 +143,7 @@ const highlight = (str: string): string => `${COLOR_CYAN}${str}${COLOR_DEFAULT}`
 const tempDir = (): string => {
   const basePath = process.env['RUNNER_TEMP']
 
+  /* istanbul ignore if */
   if (!basePath) {
     throw new Error('Missing RUNNER_TEMP environment variable')
   }
