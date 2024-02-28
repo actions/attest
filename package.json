@@ -39,6 +39,9 @@
   "license": "MIT",
   "jest": {
     "preset": "ts-jest",
+    "setupFilesAfterEnv": [
+      "./jest.setup.js"
+    ],
     "verbose": true,
     "clearMocks": true,
     "testEnvironment": "node",

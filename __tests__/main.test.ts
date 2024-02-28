@@ -21,6 +21,9 @@ const getBooleanInputMock = jest.spyOn(core, 'getBooleanInput')
 const setOutputMock = jest.spyOn(core, 'setOutput')
 const setFailedMock = jest.spyOn(core, 'setFailed')
 
+// Ensure that setFailed doesn't set an exit code during tests
+setFailedMock.mockImplementation(() => {})
+
 const summaryWriteMock = jest.spyOn(core.summary, 'write')
 summaryWriteMock.mockImplementation(async () => Promise.resolve(core.summary))
 
