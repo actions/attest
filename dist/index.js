@@ -64928,12 +64928,8 @@ function wrappy (fn, cb) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.TSA_INTERNAL_URL = exports.FULCIO_INTERNAL_URL = exports.SEARCH_PUBLIC_GOOD_URL = exports.REKOR_PUBLIC_GOOD_URL = exports.FULCIO_PUBLIC_GOOD_URL = void 0;
-exports.FULCIO_PUBLIC_GOOD_URL = 'https://fulcio.sigstore.dev';
-exports.REKOR_PUBLIC_GOOD_URL = 'https://rekor.sigstore.dev';
+exports.SEARCH_PUBLIC_GOOD_URL = void 0;
 exports.SEARCH_PUBLIC_GOOD_URL = 'https://search.sigstore.dev';
-exports.FULCIO_INTERNAL_URL = 'https://fulcio.githubapp.com';
-exports.TSA_INTERNAL_URL = 'https://timestamp.githubapp.com';
 
 
 /***/ }),
@@ -64985,14 +64981,6 @@ const subject_1 = __nccwpck_require__(5206);
 const COLOR_CYAN = '\x1B[36m';
 const COLOR_DEFAULT = '\x1B[39m';
 const ATTESTATION_FILE_NAME = 'attestation.jsonl';
-const SIGSTORE_PUBLIC_GOOD_ENDPOINTS = {
-    fulcioURL: endpoints_1.FULCIO_PUBLIC_GOOD_URL,
-    rekorURL: endpoints_1.REKOR_PUBLIC_GOOD_URL
-};
-const SIGSTORE_INTERNAL_ENDPOINTS = {
-    fulcioURL: endpoints_1.FULCIO_INTERNAL_URL,
-    tsaServerURL: endpoints_1.TSA_INTERNAL_URL
-};
 /**
  * The main function for the action.
  * @returns {Promise<void>} Resolves when the action is complete.
@@ -65001,18 +64989,21 @@ async function run() {
     // Provenance visibility will be public ONLY if we can confirm that the
     // repository is public AND the undocumented "private-signing" arg is NOT set.
     // Otherwise, it will be private.
-    const endpoints = github.context.payload.repository?.visibility === 'public' &&
+    const sigstoreInstance = github.context.payload.repository?.visibility === 'public' &&
         core.getInput('private-signing') !== 'true'
-        ? SIGSTORE_PUBLIC_GOOD_ENDPOINTS
-        : SIGSTORE_INTERNAL_ENDPOINTS;
+        ? 'public-good'
+        : 'github';
     try {
+        if (!process.env.ACTIONS_ID_TOKEN_REQUEST_URL) {
+            throw new Error('missing "id-token" permission. Please add "permissions: id-token: write" to your workflow.');
+        }
         // Calculate subject from inputs and generate provenance
         const subjects = await (0, subject_1.subjectFromInputs)();
         const predicate = (0, predicate_1.predicateFromInputs)();
         const outputPath = path_1.default.join(tempDir(), ATTESTATION_FILE_NAME);
         // Generate attestations for each subject serially
         for (const subject of subjects) {
-            const att = await createAttestation(subject, predicate, endpoints);
+            const att = await createAttestation(subject, predicate, sigstoreInstance);
             // Write attestation bundle to output file
             fs_1.default.writeFileSync(outputPath, JSON.stringify(att.bundle) + os_1.default.EOL, {
                 encoding: 'utf-8',
@@ -65039,17 +65030,19 @@ async function run() {
     }
 }
 exports.run = run;
-const createAttestation = async (subject, predicate, endpoints) => {
+const createAttestation = async (subject, predicate, sigstoreInstance) => {
     // Sign provenance w/ Sigstore
     const attestation = await (0, attest_1.attest)({
-        ...endpoints,
         subjectName: subject.name,
         subjectDigest: subject.digest,
         predicateType: predicate.type,
         predicate: predicate.params,
+        sigstore: sigstoreInstance,
         token: core.getInput('github-token')
     });
-    core.startGroup(highlight(`Attestation signed using ephemeral certificate from ${endpoints.fulcioURL}`));
+    core.info(`Attestation created for ${subject.name}@${subjectDigest(subject)}`);
+    const instanceName = sigstoreInstance === 'public-good' ? 'Public Good' : 'GitHub';
+    core.startGroup(highlight(`Attestation signed using certificate from ${instanceName} Sigstore instance`));
     core.info(attestation.certificate);
     core.endGroup();
     if (attestation.tlogID) {
@@ -65080,6 +65073,7 @@ const createAttestation = async (subject, predicate, endpoints) => {
 const highlight = (str) => `${COLOR_CYAN}${str}${COLOR_DEFAULT}`;
 const tempDir = () => {
     const basePath = process.env['RUNNER_TEMP'];
+    /* istanbul ignore if */
     if (!basePath) {
         throw new Error('Missing RUNNER_TEMP environment variable');
     }
