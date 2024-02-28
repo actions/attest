@@ -52,18 +52,27 @@ jobs:
       contents: read
       id-token: write
       packages: write
-
+    env:
+      SUBJECT: /repos/${{ github.repository }}/tarball/${{ github.sha }}
     steps:
       - name: Checkout
         id: checkout
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - name: Calculate subject digest
+        id: subject
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA_256=$(gh api "${{ env.SUBJECT }}" | shasum -a 256 | cut -d " " -f 1)
+          echo "sha-256=${SHA_256}" >> "$GITHUB_OUTPUT"
       - name: Run attest
         id: attest
         uses: ./
         with:
-          subject-path: ${{ github.workspace }}/README.md
-          predicate-path: ${{ github.workspace }}/__tests__/data/sbom.json
-          predicate-type: 'https://spdx.dev/Document/v2.3'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          subject-name: 'https://api.github.com${{ env.SUBJECT }}'
+          subject-digest: 'sha256:${{ steps.subject.outputs.sha-256 }}'
+          predicate-type: 'https://in-toto.io/attestation/release/v0.1'
+          predicate:
+            '{"purl":"pkg:github/${{ github.repository }}@${{ github.sha }}"}'
       - name: Dump output
         run: jq < ${{ steps.attest.outputs.bundle-path }}
