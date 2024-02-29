@@ -67,6 +67,8 @@ jobs:
           echo "sha-256=${SHA_256}" >> "$GITHUB_OUTPUT"
       - name: Run attest
         id: attest
+        env:
+          INPUT_PRIVATE-SIGNING: 'true'
         uses: ./
         with:
           subject-name: 'https://api.github.com${{ env.SUBJECT }}'
