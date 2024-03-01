@@ -65122,10 +65122,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.storePredicate = exports.predicateFromInputs = void 0;
+exports.predicateFromInputs = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const fs_1 = __importDefault(__nccwpck_require__(7147));
-const path = __importStar(__nccwpck_require__(1017));
 // Returns the predicate specified by the action's inputs. The predicate value
 // may be specified as a path to a file or as a string.
 const predicateFromInputs = () => {
@@ -65135,25 +65134,15 @@ const predicateFromInputs = () => {
     if (!predicatePath && !predicateStr) {
         throw new Error('One of predicate-path or predicate must be provided');
     }
+    if (predicatePath && predicateStr) {
+        throw new Error('Only one of predicate-path or predicate may be provided');
+    }
     const params = predicatePath
         ? fs_1.default.readFileSync(predicatePath, 'utf-8')
         : predicateStr;
     return { type: predicateType, params: JSON.parse(params) };
 };
 exports.predicateFromInputs = predicateFromInputs;
-const storePredicate = (predicate) => {
-    // random tempfile
-    const basePath = process.env['RUNNER_TEMP'];
-    if (!basePath) {
-        throw new Error('Missing RUNNER_TEMP environment variable');
-    }
-    const tmpDir = fs_1.default.mkdtempSync(path.join(basePath, path.sep));
-    const tempFile = path.join(tmpDir, 'predicate.json');
-    // write predicate to file
-    fs_1.default.writeFileSync(tempFile, JSON.stringify(predicate.params));
-    return tempFile;
-};
-exports.storePredicate = storePredicate;
 
 
 /***/ }),
