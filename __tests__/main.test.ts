@@ -9,6 +9,7 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 import { mockFulcio, mockRekor, mockTSA } from '@sigstore/mock'
+import * as oci from '@sigstore/oci'
 import nock from 'nock'
 import { SEARCH_PUBLIC_GOOD_URL } from '../src/endpoints'
 import * as main from '../src/main'
@@ -43,7 +44,7 @@ describe('action', () => {
     'base64'
   )}.}`
 
-  const subjectName = 'subject'
+  const subjectName = 'registry/foo/bar'
   const subjectDigest =
     'sha256:7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32'
   const predicate = '{}'
@@ -189,6 +190,9 @@ describe('action', () => {
   })
 
   describe('when the repository is public', () => {
+    const getRegCredsSpy = jest.spyOn(oci, 'getRegistryCredentials')
+    const attachArtifactSpy = jest.spyOn(oci, 'attachArtifactToImage')
+
     const inputs = {
       'subject-digest': subjectDigest,
       'subject-name': subjectName,
@@ -206,13 +210,26 @@ describe('action', () => {
 
       // Mock the action's inputs
       getInputMock.mockImplementation(mockInput(inputs))
-      getBooleanInputMock.mockImplementation(() => false)
+      // This is where we mock the push-to-registry input
+      getBooleanInputMock.mockImplementation(() => true)
 
       await mockFulcio({
         baseURL: 'https://fulcio.sigstore.dev',
         strict: false
       })
       await mockRekor({ baseURL: 'https://rekor.sigstore.dev' })
+
+      getRegCredsSpy.mockImplementation(() => ({
+        username: 'username',
+        password: 'password'
+      }))
+      attachArtifactSpy.mockImplementation(async () =>
+        Promise.resolve({
+          digest: 'sha256:123456',
+          mediaType: 'application/vnd.cncf.notary.v2',
+          size: 123456
+        })
+      )
     })
 
     it('invokes the action w/o error', async () => {
@@ -220,6 +237,8 @@ describe('action', () => {
 
       expect(runMock).toHaveReturned()
       expect(setFailedMock).not.toHaveBeenCalled()
+      expect(getRegCredsSpy).toHaveBeenCalledWith(subjectName)
+      expect(attachArtifactSpy).toHaveBeenCalled()
       expect(infoMock).toHaveBeenNthCalledWith(
         1,
         expect.stringMatching(

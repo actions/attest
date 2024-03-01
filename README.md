@@ -34,8 +34,8 @@ attest:
      contents: write # TODO: Update this
    ```
 
-   The `id-token` permission gives the action the ability to mint the OIDC
-   token necessary to request a Sigstore signing certificate. The `contents`
+   The `id-token` permission gives the action the ability to mint the OIDC token
+   necessary to request a Sigstore signing certificate. The `contents`
    permission is necessary to persist the attestation.
 
 1. Add the following to your workflow after your artifact has been built:
@@ -99,9 +99,9 @@ See [action.yml](action.yml)
 
 <!-- markdownlint-disable MD013 -->
 
-| Name          | Description                                                    | Example                 |
-| ------------- | -------------------------------------------------------------- | ----------------------- |
-| `bundle-path` | Absolute path to the file containing the generated attestation | `/tmp/attestaion.jsonl` |
+| Name          | Description                                                    | Example                  |
+| ------------- | -------------------------------------------------------------- | ------------------------ |
+| `bundle-path` | Absolute path to the file containing the generated attestation | `/tmp/attestation.jsonl` |
 
 <!-- markdownlint-enable MD013 -->
 
