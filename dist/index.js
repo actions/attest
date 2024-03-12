@@ -11349,7 +11349,7 @@ const constants_1 = __nccwpck_require__(1319);
 const error_1 = __nccwpck_require__(64);
 const registry_1 = __nccwpck_require__(7464);
 const EMPTY_BLOB = Buffer.from('{}');
-const DOWNGRADE_REGISTRIES = ['docker.io', 'amazonaws.com'];
+const DOWNGRADE_REGISTRIES = ['amazonaws.com'];
 class OCIImage {
     constructor(image, creds, opts) {
         _OCIImage_instances.add(this);
@@ -11389,15 +11389,12 @@ class OCIImage {
             });
             /* istanbul ignore if */
             if (__classPrivateFieldGet(this, _OCIImage_downgrade, "f")) {
-                delete manifest.subject;
-                delete manifest.artifactType;
                 // ECR can't handle media types with parameters, so we need to strip the
                 // version parameter from the Sigstore bundle media type.
+                manifest.artifactType = manifest.artifactType
+                    ? manifest.artifactType.replace(/;.*/, '')
+                    : undefined;
                 manifest.layers[0].mediaType = manifest.layers[0].mediaType.replace(/;.*/, '');
-                // ECR can't handle the "application/vnd.oci.empty.v1+json" media type
-                // for the config blob defined in OCI 1.1, so we need to use the Docker
-                // V2 API media type
-                manifest.config.mediaType = 'application/vnd.oci.image.config.v1+json';
             }
             // Upload artifact manifest
             artifactDescriptor = await __classPrivateFieldGet(this, _OCIImage_client, "f").uploadManifest(JSON.stringify(manifest));
@@ -11422,6 +11419,21 @@ class OCIImage {
             });
         }
         return artifactDescriptor;
+    }
+    async getDigest(tag) {
+        try {
+            if (__classPrivateFieldGet(this, _OCIImage_credentials, "f")) {
+                await __classPrivateFieldGet(this, _OCIImage_client, "f").signIn(__classPrivateFieldGet(this, _OCIImage_credentials, "f"));
+            }
+            const imageDescriptor = await __classPrivateFieldGet(this, _OCIImage_client, "f").checkManifest(tag);
+            return imageDescriptor.digest;
+        }
+        catch (err) {
+            throw new error_1.OCIError({
+                message: `Error retrieving image digest from container registry`,
+                cause: err,
+            });
+        }
     }
 }
 exports.OCIImage = OCIImage;
@@ -11495,7 +11507,7 @@ const digestToTag = (digest) => {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.attachArtifactToImage = exports.OCIError = exports.getRegistryCredentials = void 0;
+exports.getImageDigest = exports.attachArtifactToImage = exports.OCIError = exports.getRegistryCredentials = void 0;
 const image_1 = __nccwpck_require__(9539);
 const name_1 = __nccwpck_require__(4520);
 var credentials_1 = __nccwpck_require__(5475);
@@ -11510,6 +11522,12 @@ const attachArtifactToImage = async (opts) => {
     return new image_1.OCIImage(image, opts.credentials, opts.fetchOpts).addArtifact(opts);
 };
 exports.attachArtifactToImage = attachArtifactToImage;
+// Returns the digest of the given image tag in the remote registry.
+const getImageDigest = async (opts) => {
+    const image = (0, name_1.parseImageName)(opts.imageName);
+    return new image_1.OCIImage(image, opts.credentials, opts.fetchOpts).getDigest(opts.imageTag);
+};
+exports.getImageDigest = getImageDigest;
 
 
 /***/ }),
