@@ -2,6 +2,7 @@
 
 Follow the steps below to tag a new release for the `actions/attest` action.
 
+1. Update the `version` field in package.json.
 1. Merge the latest changes to the `main` branch.
 1. Create a new release using a tag of the form `vX.X.X` following SemVer
    conventions:

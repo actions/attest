@@ -1,21 +1,20 @@
 {
-  "name": "typescript-action",
-  "description": "GitHub Actions TypeScript template",
-  "version": "0.0.0",
+  "name": "actions/attest",
+  "description": "Generate signed attestations for workflow artifacts",
+  "version": "0.1.1",
   "author": "",
   "private": true,
-  "homepage": "https://github.com/actions/typescript-action",
+  "homepage": "https://github.com/actions/attest",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/actions/typescript-action.git"
+    "url": "git+https://github.com/actions/attest.git"
   },
   "bugs": {
-    "url": "https://github.com/actions/typescript-action/issues"
+    "url": "https://github.com/actions/attest/issues"
   },
   "keywords": [
     "actions",
-    "node",
-    "setup"
+    "attestation"
   ],
   "exports": {
     ".": "./dist/index.js"
