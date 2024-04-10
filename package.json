@@ -75,12 +75,12 @@
     "@sigstore/oci": "^0.2.0"
   },
   "devDependencies": {
-    "@sigstore/mock": "^0.7.1",
+    "@sigstore/mock": "^0.7.2",
     "@types/jest": "^29.5.12",
     "@types/make-fetch-happen": "^10.0.4",
-    "@types/node": "^20.12.2",
-    "@typescript-eslint/eslint-plugin": "^7.5.0",
-    "@typescript-eslint/parser": "^7.5.0",
+    "@types/node": "^20.12.5",
+    "@typescript-eslint/eslint-plugin": "^7.6.0",
+    "@typescript-eslint/parser": "^7.6.0",
     "@vercel/ncc": "^0.38.1",
     "eslint": "^8.57.0",
     "eslint-plugin-github": "^4.10.2",
@@ -94,6 +94,6 @@
     "prettier": "^3.2.5",
     "prettier-eslint": "^16.3.0",
     "ts-jest": "^29.1.2",
-    "typescript": "^5.4.3"
+    "typescript": "^5.4.4"
   }
 }
