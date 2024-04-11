@@ -30,8 +30,8 @@ attest:
 
    ```yaml
    permissions:
+     attestations: write
      id-token: write
-     contents: write # TODO: Update this
    ```
 
    The `id-token` permission gives the action the ability to mint the OIDC token
@@ -127,8 +127,9 @@ on:
 jobs:
   build:
     permissions:
+      contents: read
+      attestations: write
       id-token: write
-      contents: write
 
     steps:
       - name: Checkout
@@ -184,9 +185,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
+      contents: read
+      attestations: write
       id-token: write
       packages: write
-      contents: write
     env:
       REGISTRY: ghcr.io
       IMAGE_NAME: ${{ github.repository }}
