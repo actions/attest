@@ -128,6 +128,7 @@ jobs:
   build:
     permissions:
       id-token: write
+      contents: read
       attestations: write
 
     steps:
