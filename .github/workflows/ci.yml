@@ -50,6 +50,7 @@ jobs:
     name: Test attest action
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       attestations: write
       id-token: write
     env:
