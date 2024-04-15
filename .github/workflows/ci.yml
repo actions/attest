@@ -50,7 +50,8 @@ jobs:
     name: Test attest action
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
+      attestations: write
       id-token: write
     env:
       SUBJECT: /repos/${{ github.repository }}/tarball/${{ github.sha }}
