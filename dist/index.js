@@ -78014,7 +78014,8 @@ const createAttestation = async (subject, predicate, sigstoreInstance) => {
             artifact: Buffer.from(JSON.stringify(attestation.bundle)),
             mediaType: bundle_1.BUNDLE_V02_MEDIA_TYPE,
             annotations: {
-                'dev.sigstore.bundle/predicateType': core.getInput('predicate-type')
+                'dev.sigstore.bundle.content': 'dsse-envelope',
+                'dev.sigstore.bundle.predicateType': core.getInput('predicate-type')
             }
         });
         core.info(highlight('Attestation uploaded to registry'));
