@@ -11452,7 +11452,7 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
-var _OCIImage_instances, _OCIImage_client, _OCIImage_credentials, _OCIImage_downgrade, _OCIImage_createReferrersIndexByTag;
+var _OCIImage_instances, _OCIImage_client, _OCIImage_credentials, _OCIImage_createReferrersIndexByTag;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.OCIImage = void 0;
 /*
@@ -11474,17 +11474,13 @@ const constants_1 = __nccwpck_require__(61319);
 const error_1 = __nccwpck_require__(60064);
 const registry_1 = __nccwpck_require__(27464);
 const EMPTY_BLOB = Buffer.from('{}');
-const DOWNGRADE_REGISTRIES = ['amazonaws.com'];
 class OCIImage {
     constructor(image, creds, opts) {
         _OCIImage_instances.add(this);
         _OCIImage_client.set(this, void 0);
         _OCIImage_credentials.set(this, void 0);
-        _OCIImage_downgrade.set(this, false);
         __classPrivateFieldSet(this, _OCIImage_client, new registry_1.RegistryClient(image.registry, image.path, opts), "f");
         __classPrivateFieldSet(this, _OCIImage_credentials, creds, "f");
-        // If the registry is not OCI-compliant, downgrade to Docker V2 API
-        __classPrivateFieldSet(this, _OCIImage_downgrade, DOWNGRADE_REGISTRIES.some((r) => image.registry.includes(r)), "f");
     }
     async addArtifact(opts) {
         let artifactDescriptor;
@@ -11512,15 +11508,6 @@ class OCIImage {
                 },
                 annotations,
             });
-            /* istanbul ignore if */
-            if (__classPrivateFieldGet(this, _OCIImage_downgrade, "f")) {
-                // ECR can't handle media types with parameters, so we need to strip the
-                // version parameter from the Sigstore bundle media type.
-                manifest.artifactType = manifest.artifactType
-                    ? manifest.artifactType.replace(/;.*/, '')
-                    : undefined;
-                manifest.layers[0].mediaType = manifest.layers[0].mediaType.replace(/;.*/, '');
-            }
             // Upload artifact manifest
             artifactDescriptor = await __classPrivateFieldGet(this, _OCIImage_client, "f").uploadManifest(JSON.stringify(manifest));
             // Manually update the referrers list if the referrers API is not supported.
@@ -11562,7 +11549,7 @@ class OCIImage {
     }
 }
 exports.OCIImage = OCIImage;
-_OCIImage_client = new WeakMap(), _OCIImage_credentials = new WeakMap(), _OCIImage_downgrade = new WeakMap(), _OCIImage_instances = new WeakSet(), _OCIImage_createReferrersIndexByTag = 
+_OCIImage_client = new WeakMap(), _OCIImage_credentials = new WeakMap(), _OCIImage_instances = new WeakSet(), _OCIImage_createReferrersIndexByTag = 
 // Create a referrers index by tag. This is a fallback for registries that do
 // not support the referrers API.
 // https://github.com/opencontainers/distribution-spec/blob/main/spec.md#pushing-manifests-with-subject
