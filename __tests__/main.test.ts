@@ -11,6 +11,7 @@ import * as github from '@actions/github'
 import { mockFulcio, mockRekor, mockTSA } from '@sigstore/mock'
 import * as oci from '@sigstore/oci'
 import nock from 'nock'
+import { MockAgent, setGlobalDispatcher } from 'undici'
 import { SEARCH_PUBLIC_GOOD_URL } from '../src/endpoints'
 import * as main from '../src/main'
 
@@ -30,6 +31,10 @@ summaryWriteMock.mockImplementation(async () => Promise.resolve(core.summary))
 
 // Mock the action's main function
 const runMock = jest.spyOn(main, 'run')
+
+// MockAgent for mocking @actions/github
+const mockAgent = new MockAgent()
+setGlobalDispatcher(mockAgent)
 
 describe('action', () => {
   // Capture original environment variables and GitHub context so we can restore
@@ -63,8 +68,12 @@ describe('action', () => {
       .query({ audience: 'sigstore' })
       .reply(200, { value: oidcToken })
 
-    nock('https://api.github.com')
-      .post(/^\/repos\/.*\/.*\/attestations$/)
+    mockAgent
+      .get('https://api.github.com')
+      .intercept({
+        path: /^\/repos\/.*\/.*\/attestations$/,
+        method: 'post'
+      })
       .reply(201, { id: attestationID })
 
     process.env = {

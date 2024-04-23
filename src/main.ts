@@ -1,7 +1,6 @@
 import { Attestation, Predicate, Subject, attest } from '@actions/attest'
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import { BUNDLE_V02_MEDIA_TYPE } from '@sigstore/bundle'
 import { attachArtifactToImage, getRegistryCredentials } from '@sigstore/oci'
 import fs from 'fs'
 import os from 'os'
@@ -126,7 +125,7 @@ const createAttestation = async (
       imageName: subject.name,
       imageDigest: subjectDigest(subject),
       artifact: Buffer.from(JSON.stringify(attestation.bundle)),
-      mediaType: BUNDLE_V02_MEDIA_TYPE,
+      mediaType: attestation.bundle.mediaType,
       annotations: {
         'dev.sigstore.bundle.content': 'dsse-envelope',
         'dev.sigstore.bundle.predicateType': core.getInput('predicate-type')
