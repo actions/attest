@@ -79657,6 +79657,7 @@ async function run() {
         ? 'public-good'
         : 'github';
     try {
+        const atts = [];
         if (!process.env.ACTIONS_ID_TOKEN_REQUEST_URL) {
             throw new Error('missing "id-token" permission. Please add "permissions: id-token: write" to your workflow.');
         }
@@ -79673,11 +79674,16 @@ async function run() {
                 flag: 'a'
             });
             if (att.attestationID) {
-                core.summary.addLink(`${subject.name}@${subjectDigest(subject)}`, attestationURL(att.attestationID));
+                atts.push({ subject, attestationID: att.attestationID });
             }
         }
-        if (!core.summary.isEmptyBuffer()) {
-            core.summary.addHeading('Attestation(s) Created', 3);
+        if (atts.length > 0) {
+            core.summary.addHeading(
+            /* istanbul ignore next */
+            atts.length > 1 ? 'Attestations Created' : 'Attestation Created', 3);
+            for (const { subject, attestationID } of atts) {
+                core.summary.addLink(`${subject.name}@${subjectDigest(subject)}`, attestationURL(attestationID));
+            }
             core.summary.write();
         }
         core.setOutput('bundle-path', outputPath);
