@@ -10,6 +10,7 @@ import { predicateFromInputs } from './predicate'
 import { subjectFromInputs } from './subject'
 
 type SigstoreInstance = 'public-good' | 'github'
+type AttestedSubject = { subject: Subject; attestationID: string }
 
 const COLOR_CYAN = '\x1B[36m'
 const COLOR_DEFAULT = '\x1B[39m'
@@ -30,6 +31,7 @@ export async function run(): Promise<void> {
       : 'github'
 
   try {
+    const atts: AttestedSubject[] = []
     if (!process.env.ACTIONS_ID_TOKEN_REQUEST_URL) {
       throw new Error(
         'missing "id-token" permission. Please add "permissions: id-token: write" to your workflow.'
@@ -52,15 +54,23 @@ export async function run(): Promise<void> {
       })
 
       if (att.attestationID) {
-        core.summary.addLink(
-          `${subject.name}@${subjectDigest(subject)}`,
-          attestationURL(att.attestationID)
-        )
+        atts.push({ subject, attestationID: att.attestationID })
       }
     }
 
-    if (!core.summary.isEmptyBuffer()) {
-      core.summary.addHeading('Attestation(s) Created', 3)
+    if (atts.length > 0) {
+      core.summary.addHeading(
+        /* istanbul ignore next */
+        atts.length > 1 ? 'Attestations Created' : 'Attestation Created',
+        3
+      )
+
+      for (const { subject, attestationID } of atts) {
+        core.summary.addLink(
+          `${subject.name}@${subjectDigest(subject)}`,
+          attestationURL(attestationID)
+        )
+      }
       core.summary.write()
     }
 
