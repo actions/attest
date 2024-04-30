@@ -1,6 +1,9 @@
 name: 'Generate Generic Attestations'
 description: 'Generate attestations for build artifacts'
 author: 'GitHub'
+branding:
+  color: 'blue'
+  icon: 'link'
 
 inputs:
   subject-path:
