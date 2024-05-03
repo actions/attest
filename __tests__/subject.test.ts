@@ -142,6 +142,7 @@ describe('subjectFromInputs', () => {
       // Add files for glob testing
       for (let i = 0; i < 3; i++) {
         await fs.writeFile(path.join(dir, `${filename}-${i}`), content)
+        await fs.writeFile(path.join(dir, `other-${i}`), content)
       }
     })
 
@@ -198,6 +199,92 @@ describe('subjectFromInputs', () => {
         subjects.forEach((subject, i) => {
           expect(subject.name).toEqual(`${filename}-${i}`)
           expect(subject.digest).toEqual({ sha256: expectedDigest })
+        })
+      })
+    })
+
+    describe('when a comma-separated list is supplied', () => {
+      beforeEach(async () => {
+        process.env['INPUT_SUBJECT-PATH'] =
+          `${path.join(dir, 'subject-1')},${path.join(dir, 'subject-2')}`
+      })
+
+      it('returns the multiple subjects', async () => {
+        const subjects = await subjectFromInputs()
+
+        expect(subjects).toBeDefined()
+        expect(subjects).toHaveLength(2)
+
+        expect(subjects).toContainEqual({
+          name: 'subject-1',
+          digest: { sha256: expectedDigest }
+        })
+        expect(subjects).toContainEqual({
+          name: 'subject-2',
+          digest: { sha256: expectedDigest }
+        })
+      })
+    })
+
+    describe('when a multi-line list is supplied', () => {
+      beforeEach(async () => {
+        process.env['INPUT_SUBJECT-PATH'] =
+          `${path.join(dir, 'subject-0')}\n${path.join(dir, 'subject-2')}`
+      })
+
+      it('returns the multiple subjects', async () => {
+        const subjects = await subjectFromInputs()
+
+        expect(subjects).toBeDefined()
+        expect(subjects).toHaveLength(2)
+
+        expect(subjects).toContainEqual({
+          name: 'subject-0',
+          digest: { sha256: expectedDigest }
+        })
+        expect(subjects).toContainEqual({
+          name: 'subject-2',
+          digest: { sha256: expectedDigest }
+        })
+      })
+    })
+
+    describe('when a multi-line glob list is supplied', () => {
+      beforeEach(async () => {
+        process.env['INPUT_SUBJECT-PATH'] =
+          `${path.join(dir, 'subject-*')}\n  ${path.join(dir, 'other-*')} `
+      })
+
+      it('returns the multiple subjects', async () => {
+        const subjects = await subjectFromInputs()
+
+        expect(subjects).toBeDefined()
+        expect(subjects).toHaveLength(6)
+
+        expect(subjects).toContainEqual({
+          name: 'subject-0',
+          digest: { sha256: expectedDigest }
+        })
+        expect(subjects).toContainEqual({
+          name: 'subject-1',
+          digest: { sha256: expectedDigest }
+        })
+        expect(subjects).toContainEqual({
+          name: 'subject-2',
+          digest: { sha256: expectedDigest }
+        })
+
+        expect(subjects).toContainEqual({
+          name: 'other-0',
+          digest: { sha256: expectedDigest }
+        })
+        expect(subjects).toContainEqual({
+          name: 'other-1',
+          digest: { sha256: expectedDigest }
+        })
+        expect(subjects).toContainEqual({
+          name: 'other-2',
+          digest: { sha256: expectedDigest }
         })
       })
     })

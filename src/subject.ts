@@ -1,6 +1,7 @@
 import * as core from '@actions/core'
 import * as glob from '@actions/glob'
 import crypto from 'crypto'
+import { parse } from 'csv-parse/sync'
 import fs from 'fs'
 import path from 'path'
 
@@ -44,14 +45,23 @@ const getSubjectFromPath = async (
   subjectPath: string,
   subjectName?: string
 ): Promise<Subject[]> => {
-  /* eslint-disable-next-line github/no-then */
-  const files = await glob.create(subjectPath).then(async g => g.glob())
+  const subjects: Subject[] = []
 
-  const subjects = files.map(async file => {
-    const name = subjectName || path.parse(file).base
-    const digest = await digestFile(DIGEST_ALGORITHM, file)
-    return { name, digest: { [DIGEST_ALGORITHM]: digest } }
-  })
+  // Parse the list of subject paths
+  const subjectPaths = parseList(subjectPath)
+
+  for (const subPath of subjectPaths) {
+    // Expand the globbed path to a list of files
+    /* eslint-disable-next-line github/no-then */
+    const files = await glob.create(subPath).then(async g => g.glob())
+
+    for (const file of files) {
+      const name = subjectName || path.parse(file).base
+      const digest = await digestFile(DIGEST_ALGORITHM, file)
+
+      subjects.push({ name, digest: { [DIGEST_ALGORITHM]: digest } })
+    }
+  }
 
   if (subjects.length === 0) {
     throw new Error(`Could not find subject at path ${subjectPath}`)
@@ -93,4 +103,21 @@ const digestFile = async (
       .pipe(hash)
       .once('finish', () => resolve(hash.read()))
   })
+}
+
+const parseList = (input: string): string[] => {
+  const res: string[] = []
+
+  const records: string[][] = parse(input, {
+    columns: false,
+    relaxQuotes: true,
+    relaxColumnCount: true,
+    skipEmptyLines: true
+  })
+
+  for (const record of records) {
+    res.push(...record)
+  }
+
+  return res.filter(item => item).map(pat => pat.trim())
 }
