@@ -5,12 +5,14 @@
  * Specifically, the inputs listed in `action.yml` should be set as environment
  * variables following the pattern `INPUT_<INPUT_NAME>`.
  */
-
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 import { mockFulcio, mockRekor, mockTSA } from '@sigstore/mock'
 import * as oci from '@sigstore/oci'
+import fs from 'fs/promises'
 import nock from 'nock'
+import os from 'os'
+import path from 'path'
 import { MockAgent, setGlobalDispatcher } from 'undici'
 import { SEARCH_PUBLIC_GOOD_URL } from '../src/endpoints'
 import * as main from '../src/main'
@@ -284,6 +286,52 @@ describe('action', () => {
         expect.stringMatching('attestation.jsonl')
       )
       expect(setFailedMock).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('when too many subjects are specified', () => {
+    let dir = ''
+
+    beforeEach(async () => {
+      const filename = 'subject'
+      const content = 'file content'
+
+      // Set-up temp directory
+      const tmpDir = await fs.realpath(os.tmpdir())
+      dir = await fs.mkdtemp(tmpDir + path.sep)
+
+      // Add files for glob testing
+      for (let i = 0; i < 65; i++) {
+        await fs.writeFile(path.join(dir, `${filename}-${i}`), content)
+      }
+
+      // Set the GH context with private repository visibility and a repo owner.
+      setGHContext({
+        payload: { repository: { visibility: 'private' } },
+        repo: { owner: 'foo', repo: 'bar' }
+      })
+
+      // Mock the action's inputs
+      getInputMock.mockImplementation(
+        mockInput({
+          predicate: '{}',
+          'subject-path': path.join(dir, `${filename}-*`)
+        })
+      )
+    })
+
+    afterEach(async () => {
+      // Clean-up temp directory
+      await fs.rm(dir, { recursive: true })
+    })
+
+    it('sets a failed status', async () => {
+      await main.run()
+
+      expect(runMock).toHaveReturned()
+      expect(setFailedMock).toHaveBeenCalledWith(
+        'Too many subjects specified. The maximum number of subjects is 64.'
+      )
     })
   })
 })

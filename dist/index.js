@@ -79644,6 +79644,7 @@ const subject_1 = __nccwpck_require__(95206);
 const COLOR_CYAN = '\x1B[36m';
 const COLOR_DEFAULT = '\x1B[39m';
 const ATTESTATION_FILE_NAME = 'attestation.jsonl';
+const MAX_SUBJECT_COUNT = 64;
 /**
  * The main function for the action.
  * @returns {Promise<void>} Resolves when the action is complete.
@@ -79661,8 +79662,11 @@ async function run() {
         if (!process.env.ACTIONS_ID_TOKEN_REQUEST_URL) {
             throw new Error('missing "id-token" permission. Please add "permissions: id-token: write" to your workflow.');
         }
-        // Calculate subject from inputs and generate provenance
+        // Gather list of subjets
         const subjects = await (0, subject_1.subjectFromInputs)();
+        if (subjects.length > MAX_SUBJECT_COUNT) {
+            throw new Error(`Too many subjects specified. The maximum number of subjects is ${MAX_SUBJECT_COUNT}.`);
+        }
         const predicate = (0, predicate_1.predicateFromInputs)();
         const outputPath = path_1.default.join(tempDir(), ATTESTATION_FILE_NAME);
         // Generate attestations for each subject serially

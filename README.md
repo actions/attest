@@ -65,7 +65,7 @@ See [action.yml](action.yml)
   with:
     # Path to the artifact serving as the subject of the attestation. Must
     # specify exactly one of "subject-path" or "subject-digest". May contain
-    # a glob pattern or list of paths.
+    # a glob pattern or list of paths (total subject count cannot exceed 64).
     subject-path:
 
     # SHA256 digest of the subject for the attestation. Must be in the form
