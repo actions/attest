@@ -56,6 +56,11 @@ const getSubjectFromPath = async (
     const files = await glob.create(subPath).then(async g => g.glob())
 
     for (const file of files) {
+      // Skip anything that is NOT a file
+      if (!fs.statSync(file).isFile()) {
+        continue
+      }
+
       const name = subjectName || path.parse(file).base
       const digest = await digestFile(DIGEST_ALGORITHM, file)
 

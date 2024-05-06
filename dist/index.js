@@ -79897,6 +79897,10 @@ const getSubjectFromPath = async (subjectPath, subjectName) => {
         /* eslint-disable-next-line github/no-then */
         const files = await glob.create(subPath).then(async (g) => g.glob());
         for (const file of files) {
+            // Skip anything that is NOT a file
+            if (!fs_1.default.statSync(file).isFile()) {
+                continue;
+            }
             const name = subjectName || path_1.default.parse(file).base;
             const digest = await digestFile(DIGEST_ALGORITHM, file);
             subjects.push({ name, digest: { [DIGEST_ALGORITHM]: digest } });
