@@ -51,7 +51,7 @@ attest:
        predicate-path: '<PATH TO PREDICATE>'
    ```
 
-   The `subject-path` parameter should identity the artifact for which you want
+   The `subject-path` parameter should identify the artifact for which you want
    to generate an attestation. The `predicate-type` can be any of the the
    [vetted predicate types][3] or a custom value. The `predicate-path`
    identifies a file containg the JSON-encoded predicate parameters.
@@ -68,7 +68,7 @@ See [action.yml](action.yml)
     # a glob pattern or list of paths.
     subject-path:
 
-    # SHA256 digest of the subject for for the attestation. Must be in the form
+    # SHA256 digest of the subject for the attestation. Must be in the form
     # "sha256:hex_digest" (e.g. "sha256:abc123..."). Must specify exactly one
     # of "subject-path" or "subject-digest".
     subject-digest:
