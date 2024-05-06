@@ -203,6 +203,19 @@ describe('subjectFromInputs', () => {
       })
     })
 
+    describe('when a file glob is supplied which also matches non-files', () => {
+      beforeEach(async () => {
+        process.env['INPUT_SUBJECT-PATH'] = `${dir}*`
+      })
+
+      it('returns the subjects (excluding non-files)', async () => {
+        const subjects = await subjectFromInputs()
+
+        expect(subjects).toBeDefined()
+        expect(subjects).toHaveLength(7)
+      })
+    })
+
     describe('when a comma-separated list is supplied', () => {
       beforeEach(async () => {
         process.env['INPUT_SUBJECT-PATH'] =
