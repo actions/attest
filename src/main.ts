@@ -16,6 +16,8 @@ const COLOR_CYAN = '\x1B[36m'
 const COLOR_DEFAULT = '\x1B[39m'
 const ATTESTATION_FILE_NAME = 'attestation.jsonl'
 
+const MAX_SUBJECT_COUNT = 64
+
 /**
  * The main function for the action.
  * @returns {Promise<void>} Resolves when the action is complete.
@@ -38,8 +40,14 @@ export async function run(): Promise<void> {
       )
     }
 
-    // Calculate subject from inputs and generate provenance
+    // Gather list of subjets
     const subjects = await subjectFromInputs()
+    if (subjects.length > MAX_SUBJECT_COUNT) {
+      throw new Error(
+        `Too many subjects specified. The maximum number of subjects is ${MAX_SUBJECT_COUNT}.`
+      )
+    }
+
     const predicate = predicateFromInputs()
     const outputPath = path.join(tempDir(), ATTESTATION_FILE_NAME)
 
