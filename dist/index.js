@@ -79642,6 +79642,7 @@ const endpoints_1 = __nccwpck_require__(69112);
 const predicate_1 = __nccwpck_require__(72103);
 const subject_1 = __nccwpck_require__(95206);
 const COLOR_CYAN = '\x1B[36m';
+const COLOR_GRAY = '\x1B[38;5;244m';
 const COLOR_DEFAULT = '\x1B[39m';
 const ATTESTATION_FILE_NAME = 'attestation.jsonl';
 const MAX_SUBJECT_COUNT = 64;
@@ -79694,11 +79695,12 @@ async function run() {
     }
     catch (err) {
         // Fail the workflow run if an error occurs
-        core.setFailed(err instanceof Error ? err.message : /* istanbul ignore next */ `${err}`);
+        core.setFailed(err instanceof Error ? err : /* istanbul ignore next */ `${err}`);
+        // Log the cause of the error if one is available
         /* istanbul ignore if */
         if (err instanceof Error && 'cause' in err) {
             const innerErr = err.cause;
-            core.debug(innerErr instanceof Error ? innerErr.message : `${innerErr}}`);
+            core.info(mute(innerErr instanceof Error ? innerErr.toString() : `${innerErr}`));
         }
     }
 }
@@ -79744,7 +79746,11 @@ const createAttestation = async (subject, predicate, sigstoreInstance) => {
     }
     return attestation;
 };
+// Emphasis string using ANSI color codes
 const highlight = (str) => `${COLOR_CYAN}${str}${COLOR_DEFAULT}`;
+// De-emphasize string using ANSI color codes
+/* istanbul ignore next */
+const mute = (str) => `${COLOR_GRAY}${str}${COLOR_DEFAULT}`;
 const tempDir = () => {
     const basePath = process.env['RUNNER_TEMP'];
     /* istanbul ignore if */

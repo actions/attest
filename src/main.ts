@@ -13,6 +13,7 @@ type SigstoreInstance = 'public-good' | 'github'
 type AttestedSubject = { subject: Subject; attestationID: string }
 
 const COLOR_CYAN = '\x1B[36m'
+const COLOR_GRAY = '\x1B[38;5;244m'
 const COLOR_DEFAULT = '\x1B[39m'
 const ATTESTATION_FILE_NAME = 'attestation.jsonl'
 
@@ -86,13 +87,16 @@ export async function run(): Promise<void> {
   } catch (err) {
     // Fail the workflow run if an error occurs
     core.setFailed(
-      err instanceof Error ? err.message : /* istanbul ignore next */ `${err}`
+      err instanceof Error ? err : /* istanbul ignore next */ `${err}`
     )
 
+    // Log the cause of the error if one is available
     /* istanbul ignore if */
     if (err instanceof Error && 'cause' in err) {
       const innerErr = err.cause
-      core.debug(innerErr instanceof Error ? innerErr.message : `${innerErr}}`)
+      core.info(
+        mute(innerErr instanceof Error ? innerErr.toString() : `${innerErr}`)
+      )
     }
   }
 }
@@ -156,7 +160,12 @@ const createAttestation = async (
   return attestation
 }
 
+// Emphasis string using ANSI color codes
 const highlight = (str: string): string => `${COLOR_CYAN}${str}${COLOR_DEFAULT}`
+
+// De-emphasize string using ANSI color codes
+/* istanbul ignore next */
+const mute = (str: string): string => `${COLOR_GRAY}${str}${COLOR_DEFAULT}`
 
 const tempDir = (): string => {
   const basePath = process.env['RUNNER_TEMP']
