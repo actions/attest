@@ -11577,6 +11577,96 @@ exports.OCIError = OCIError;
 
 /***/ }),
 
+/***/ 437:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+/*
+Copyright 2024 The Sigstore Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+const http2_1 = __nccwpck_require__(85158);
+const make_fetch_happen_1 = __importDefault(__nccwpck_require__(9525));
+const proc_log_1 = __nccwpck_require__(56528);
+const promise_retry_1 = __importDefault(__nccwpck_require__(54742));
+const { HTTP_STATUS_INTERNAL_SERVER_ERROR, HTTP_STATUS_TOO_MANY_REQUESTS, HTTP_STATUS_REQUEST_TIMEOUT, } = http2_1.constants;
+const fetchWithRetry = async (url, options = {}) => {
+    return (0, promise_retry_1.default)(async (retry, attemptNum) => {
+        /* eslint-disable @typescript-eslint/no-explicit-any */
+        const logRetry = (reason) => {
+            proc_log_1.log.http('fetch', `${options.method} ${url} attempt ${attemptNum} failed with ${reason}`);
+        };
+        const response = await (0, make_fetch_happen_1.default)(url, {
+            ...options,
+            retry: false, // We're handling retries ourselves
+        }).catch((reason) => {
+            logRetry(reason);
+            return retry(reason);
+        });
+        if (retryable(response.status)) {
+            logRetry(response.status);
+            return retry(response);
+        }
+        return response;
+    }, retryOpts(options.retry)).catch((err) => {
+        // If we got an actual error, throw it
+        if (err instanceof Error) {
+            throw err;
+        }
+        // Otherwise, return the response (this is simply a retry-able response for
+        // which we exceeded the retry limit)
+        return err;
+    });
+};
+// Returns a wrapped fetch function with default options
+fetchWithRetry.defaults = (defaultOptions = {}, wrappedFetch = fetchWithRetry) => {
+    const defaultedFetch = (url, options = {}) => {
+        const finalOptions = {
+            ...defaultOptions,
+            ...options,
+            headers: { ...defaultOptions.headers, ...options.headers },
+        };
+        return wrappedFetch(url, finalOptions);
+    };
+    defaultedFetch.defaults = (newDefaults = {}) => fetchWithRetry.defaults(newDefaults, defaultedFetch);
+    return defaultedFetch;
+};
+// Determine if a status code is retryable. This includes 5xx errors, 408, and
+// 429.
+const retryable = (status) => [HTTP_STATUS_REQUEST_TIMEOUT, HTTP_STATUS_TOO_MANY_REQUESTS].includes(status) || status >= HTTP_STATUS_INTERNAL_SERVER_ERROR;
+// Normalize the retry options to the format expected by promise-retry
+const retryOpts = (retry) => {
+    if (typeof retry === 'boolean') {
+        return { retries: retry ? 1 : 0 };
+    }
+    else if (typeof retry === 'number') {
+        return { retries: retry };
+    }
+    else {
+        return { retries: 0, ...retry };
+    }
+};
+exports["default"] = fetchWithRetry;
+
+
+/***/ }),
+
 /***/ 79539:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -11869,11 +11959,11 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-const make_fetch_happen_1 = __importDefault(__nccwpck_require__(9525));
 const node_crypto_1 = __importDefault(__nccwpck_require__(6005));
 const constants_1 = __nccwpck_require__(61319);
 const credentials_1 = __nccwpck_require__(95475);
 const error_1 = __nccwpck_require__(60064);
+const fetch_1 = __importDefault(__nccwpck_require__(437));
 class RegistryClient {
     constructor(registry, repository, opts) {
         _RegistryClient_instances.add(this);
@@ -11881,7 +11971,7 @@ class RegistryClient {
         _RegistryClient_repository.set(this, void 0);
         _RegistryClient_fetch.set(this, void 0);
         __classPrivateFieldSet(this, _RegistryClient_repository, repository, "f");
-        __classPrivateFieldSet(this, _RegistryClient_fetch, make_fetch_happen_1.default.defaults(opts), "f");
+        __classPrivateFieldSet(this, _RegistryClient_fetch, fetch_1.default.defaults(opts), "f");
         // Use http for localhost registries, https otherwise
         const hostname = new URL(`http://${registry}`).hostname;
         /* istanbul ignore next */
@@ -79853,6 +79943,8 @@ const COLOR_GRAY = '\x1B[38;5;244m';
 const COLOR_DEFAULT = '\x1B[39m';
 const ATTESTATION_FILE_NAME = 'attestation.jsonl';
 const MAX_SUBJECT_COUNT = 64;
+const OCI_TIMEOUT = 2000;
+const OCI_RETRY = 3;
 /* istanbul ignore next */
 const logHandler = (level, ...args) => {
     // Send any HTTP-related log events to the GitHub Actions debug log
@@ -79957,7 +80049,8 @@ const createAttestation = async (subject, predicate, sigstoreInstance) => {
             annotations: {
                 'dev.sigstore.bundle.content': 'dsse-envelope',
                 'dev.sigstore.bundle.predicateType': core.getInput('predicate-type')
-            }
+            },
+            fetchOpts: { timeout: OCI_TIMEOUT, retry: OCI_RETRY }
         });
         core.info(highlight('Attestation uploaded to registry'));
         core.info(`${subject.name}@${artifact.digest}`);

@@ -19,6 +19,9 @@ const ATTESTATION_FILE_NAME = 'attestation.jsonl'
 
 const MAX_SUBJECT_COUNT = 64
 
+const OCI_TIMEOUT = 2000
+const OCI_RETRY = 3
+
 /* istanbul ignore next */
 const logHandler = (level: string, ...args: unknown[]): void => {
   // Send any HTTP-related log events to the GitHub Actions debug log
@@ -163,7 +166,8 @@ const createAttestation = async (
       annotations: {
         'dev.sigstore.bundle.content': 'dsse-envelope',
         'dev.sigstore.bundle.predicateType': core.getInput('predicate-type')
-      }
+      },
+      fetchOpts: { timeout: OCI_TIMEOUT, retry: OCI_RETRY }
     })
     core.info(highlight('Attestation uploaded to registry'))
     core.info(`${subject.name}@${artifact.digest}`)
