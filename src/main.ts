@@ -19,11 +19,21 @@ const ATTESTATION_FILE_NAME = 'attestation.jsonl'
 
 const MAX_SUBJECT_COUNT = 64
 
+/* istanbul ignore next */
+const logHandler = (level: string, ...args: unknown[]): void => {
+  // Send any HTTP-related log events to the GitHub Actions debug log
+  if (level === 'http') {
+    core.debug(args.join(' '))
+  }
+}
+
 /**
  * The main function for the action.
  * @returns {Promise<void>} Resolves when the action is complete.
  */
 export async function run(): Promise<void> {
+  process.on('log', logHandler)
+
   // Provenance visibility will be public ONLY if we can confirm that the
   // repository is public AND the undocumented "private-signing" arg is NOT set.
   // Otherwise, it will be private.
@@ -98,6 +108,8 @@ export async function run(): Promise<void> {
         mute(innerErr instanceof Error ? innerErr.toString() : `${innerErr}`)
       )
     }
+  } finally {
+    process.removeListener('log', logHandler)
   }
 }
 
