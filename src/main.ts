@@ -13,16 +13,27 @@ type SigstoreInstance = 'public-good' | 'github'
 type AttestedSubject = { subject: Subject; attestationID: string }
 
 const COLOR_CYAN = '\x1B[36m'
+const COLOR_GRAY = '\x1B[38;5;244m'
 const COLOR_DEFAULT = '\x1B[39m'
 const ATTESTATION_FILE_NAME = 'attestation.jsonl'
 
 const MAX_SUBJECT_COUNT = 64
+
+/* istanbul ignore next */
+const logHandler = (level: string, ...args: unknown[]): void => {
+  // Send any HTTP-related log events to the GitHub Actions debug log
+  if (level === 'http') {
+    core.debug(args.join(' '))
+  }
+}
 
 /**
  * The main function for the action.
  * @returns {Promise<void>} Resolves when the action is complete.
  */
 export async function run(): Promise<void> {
+  process.on('log', logHandler)
+
   // Provenance visibility will be public ONLY if we can confirm that the
   // repository is public AND the undocumented "private-signing" arg is NOT set.
   // Otherwise, it will be private.
@@ -86,14 +97,19 @@ export async function run(): Promise<void> {
   } catch (err) {
     // Fail the workflow run if an error occurs
     core.setFailed(
-      err instanceof Error ? err.message : /* istanbul ignore next */ `${err}`
+      err instanceof Error ? err : /* istanbul ignore next */ `${err}`
     )
 
+    // Log the cause of the error if one is available
     /* istanbul ignore if */
     if (err instanceof Error && 'cause' in err) {
       const innerErr = err.cause
-      core.debug(innerErr instanceof Error ? innerErr.message : `${innerErr}}`)
+      core.info(
+        mute(innerErr instanceof Error ? innerErr.toString() : `${innerErr}`)
+      )
     }
+  } finally {
+    process.removeListener('log', logHandler)
   }
 }
 
@@ -156,7 +172,12 @@ const createAttestation = async (
   return attestation
 }
 
+// Emphasis string using ANSI color codes
 const highlight = (str: string): string => `${COLOR_CYAN}${str}${COLOR_DEFAULT}`
+
+// De-emphasize string using ANSI color codes
+/* istanbul ignore next */
+const mute = (str: string): string => `${COLOR_GRAY}${str}${COLOR_DEFAULT}`
 
 const tempDir = (): string => {
   const basePath = process.env['RUNNER_TEMP']

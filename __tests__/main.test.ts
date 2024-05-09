@@ -116,7 +116,9 @@ describe('action', () => {
 
       expect(runMock).toHaveReturned()
       expect(setFailedMock).toHaveBeenCalledWith(
-        expect.stringMatching(/missing "id-token" permission/)
+        new Error(
+          'missing "id-token" permission. Please add "permissions: id-token: write" to your workflow.'
+        )
       )
     })
   })
@@ -131,9 +133,7 @@ describe('action', () => {
 
       expect(runMock).toHaveReturned()
       expect(setFailedMock).toHaveBeenCalledWith(
-        expect.stringMatching(
-          /one of subject-path or subject-digest must be provided/i
-        )
+        new Error('One of subject-path or subject-digest must be provided')
       )
     })
   })
@@ -330,7 +330,9 @@ describe('action', () => {
 
       expect(runMock).toHaveReturned()
       expect(setFailedMock).toHaveBeenCalledWith(
-        'Too many subjects specified. The maximum number of subjects is 64.'
+        new Error(
+          'Too many subjects specified. The maximum number of subjects is 64.'
+        )
       )
     })
   })
