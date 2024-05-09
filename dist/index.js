@@ -79645,11 +79645,19 @@ const COLOR_CYAN = '\x1B[36m';
 const COLOR_DEFAULT = '\x1B[39m';
 const ATTESTATION_FILE_NAME = 'attestation.jsonl';
 const MAX_SUBJECT_COUNT = 64;
+/* istanbul ignore next */
+const logHandler = (level, ...args) => {
+    // Send any HTTP-related log events to the GitHub Actions debug log
+    if (level === 'http') {
+        core.debug(args.join(' '));
+    }
+};
 /**
  * The main function for the action.
  * @returns {Promise<void>} Resolves when the action is complete.
  */
 async function run() {
+    process.on('log', logHandler);
     // Provenance visibility will be public ONLY if we can confirm that the
     // repository is public AND the undocumented "private-signing" arg is NOT set.
     // Otherwise, it will be private.
@@ -79700,6 +79708,9 @@ async function run() {
             const innerErr = err.cause;
             core.debug(innerErr instanceof Error ? innerErr.message : `${innerErr}}`);
         }
+    }
+    finally {
+        process.removeListener('log', logHandler);
     }
 }
 exports.run = run;
