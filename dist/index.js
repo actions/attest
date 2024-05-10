@@ -83643,7 +83643,7 @@ exports.LRUCache = LRUCache;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Glob = void 0;
 const minimatch_1 = __nccwpck_require__(7111);
-const path_scurry_1 = __nccwpck_require__(69569);
+const path_scurry_1 = __nccwpck_require__(51081);
 const url_1 = __nccwpck_require__(57310);
 const pattern_js_1 = __nccwpck_require__(92895);
 const walker_js_1 = __nccwpck_require__(45548);
@@ -89351,7 +89351,7 @@ exports.Minipass = Minipass;
 
 /***/ }),
 
-/***/ 69569:
+/***/ 51081:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -89432,21 +89432,21 @@ const IFMT = 0b1111;
 // mask to unset low 4 bits
 const IFMT_UNKNOWN = ~IFMT;
 // set after successfully calling readdir() and getting entries.
-const READDIR_CALLED = 16;
+const READDIR_CALLED = 0b0000_0001_0000;
 // set after a successful lstat()
-const LSTAT_CALLED = 32;
+const LSTAT_CALLED = 0b0000_0010_0000;
 // set if an entry (or one of its parents) is definitely not a dir
-const ENOTDIR = 64;
+const ENOTDIR = 0b0000_0100_0000;
 // set if an entry (or one of its parents) does not exist
 // (can also be set on lstat errors like EACCES or ENAMETOOLONG)
-const ENOENT = 128;
+const ENOENT = 0b0000_1000_0000;
 // cannot have child entries -- also verify &IFMT is either IFDIR or IFLNK
 // set if we fail to readlink
-const ENOREADLINK = 256;
+const ENOREADLINK = 0b0001_0000_0000;
 // set if we know realpath() will fail
-const ENOREALPATH = 512;
+const ENOREALPATH = 0b0010_0000_0000;
 const ENOCHILD = ENOTDIR | ENOENT | ENOREALPATH;
-const TYPEMASK = 1023;
+const TYPEMASK = 0b0011_1111_1111;
 const entToType = (s) => s.isFile()
     ? IFREG
     : s.isDirectory()
@@ -90060,7 +90060,7 @@ class PathBase {
         /* c8 ignore stop */
         try {
             const read = await this.#fs.promises.readlink(this.fullpath());
-            const linkTarget = this.parent.resolve(read);
+            const linkTarget = (await this.parent.realpath())?.resolve(read);
             if (linkTarget) {
                 return (this.#linkTarget = linkTarget);
             }
@@ -90089,7 +90089,7 @@ class PathBase {
         /* c8 ignore stop */
         try {
             const read = this.#fs.readlinkSync(this.fullpath());
-            const linkTarget = this.parent.resolve(read);
+            const linkTarget = (this.parent.realpathSync())?.resolve(read);
             if (linkTarget) {
                 return (this.#linkTarget = linkTarget);
             }
@@ -90104,7 +90104,9 @@ class PathBase {
         this.#type |= READDIR_CALLED;
         // mark all remaining provisional children as ENOENT
         for (let p = children.provisional; p < children.length; p++) {
-            children[p].#markENOENT();
+            const c = children[p];
+            if (c)
+                c.#markENOENT();
         }
     }
     #markENOENT() {
