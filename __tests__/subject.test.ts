@@ -5,6 +5,10 @@ import path from 'path'
 import { subjectFromInputs } from '../src/subject'
 
 describe('subjectFromInputs', () => {
+  beforeEach(() => {
+    process.env['INPUT_PUSH-TO-REGISTRY'] = 'false'
+  })
+
   afterEach(() => {
     process.env['INPUT_SUBJECT-PATH'] = ''
     process.env['INPUT_SUBJECT-DIGEST'] = ''
@@ -45,12 +49,12 @@ describe('subjectFromInputs', () => {
   })
 
   describe('when specifying a subject digest', () => {
-    const name = 'subject'
+    const name = 'Subject'
 
     describe('when the digest is malformed', () => {
       beforeEach(() => {
         process.env['INPUT_SUBJECT-DIGEST'] = 'digest'
-        process.env['INPUT_SUBJECT-NAME'] = 'subject'
+        process.env['INPUT_SUBJECT-NAME'] = name
       })
 
       it('throws an error', async () => {
@@ -63,7 +67,7 @@ describe('subjectFromInputs', () => {
     describe('when the alogrithm is not supported', () => {
       beforeEach(() => {
         process.env['INPUT_SUBJECT-DIGEST'] = 'md5:deadbeef'
-        process.env['INPUT_SUBJECT-NAME'] = 'subject'
+        process.env['INPUT_SUBJECT-NAME'] = name
       })
 
       it('throws an error', async () => {
@@ -76,7 +80,7 @@ describe('subjectFromInputs', () => {
     describe('when the sha256 digest is malformed', () => {
       beforeEach(() => {
         process.env['INPUT_SUBJECT-DIGEST'] = 'sha256:deadbeef'
-        process.env['INPUT_SUBJECT-NAME'] = 'subject'
+        process.env['INPUT_SUBJECT-NAME'] = name
       })
 
       it('throws an error', async () => {
@@ -102,6 +106,28 @@ describe('subjectFromInputs', () => {
         expect(subject).toBeDefined()
         expect(subject).toHaveLength(1)
         expect(subject[0].name).toEqual(name)
+        expect(subject[0].digest).toEqual({ [alg]: digest })
+      })
+    })
+
+    describe('when the push-to-registry is true', () => {
+      const imageName = 'ghcr.io/FOO/bar'
+      const alg = 'sha256'
+      const digest =
+        '7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32'
+
+      beforeEach(() => {
+        process.env['INPUT_SUBJECT-DIGEST'] = `${alg}:${digest}`
+        process.env['INPUT_SUBJECT-NAME'] = imageName
+        process.env['INPUT_PUSH-TO-REGISTRY'] = 'true'
+      })
+
+      it('returns the subject (with name downcased)', async () => {
+        const subject = await subjectFromInputs()
+
+        expect(subject).toBeDefined()
+        expect(subject).toHaveLength(1)
+        expect(subject[0].name).toEqual(imageName.toLowerCase())
         expect(subject[0].digest).toEqual({ [alg]: digest })
       })
     })

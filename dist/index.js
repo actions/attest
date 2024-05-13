@@ -80186,6 +80186,9 @@ const subjectFromInputs = async () => {
     const subjectPath = core.getInput('subject-path', { required: false });
     const subjectDigest = core.getInput('subject-digest', { required: false });
     const subjectName = core.getInput('subject-name', { required: false });
+    const pushToRegistry = core.getBooleanInput('push-to-registry', {
+        required: false
+    });
     if (!subjectPath && !subjectDigest) {
         throw new Error('One of subject-path or subject-digest must be provided');
     }
@@ -80195,11 +80198,14 @@ const subjectFromInputs = async () => {
     if (subjectDigest && !subjectName) {
         throw new Error('subject-name must be provided when using subject-digest');
     }
+    // If push-to-registry is enabled, ensure the subject name is lowercase
+    // to conform to OCI image naming conventions
+    const name = pushToRegistry ? subjectName.toLowerCase() : subjectName;
     if (subjectPath) {
-        return await getSubjectFromPath(subjectPath, subjectName);
+        return await getSubjectFromPath(subjectPath, name);
     }
     else {
-        return [getSubjectFromDigest(subjectDigest, subjectName)];
+        return [getSubjectFromDigest(subjectDigest, name)];
     }
 };
 exports.subjectFromInputs = subjectFromInputs;
