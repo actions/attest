@@ -11433,7 +11433,7 @@ exports.SignedCertificateTimestamp = SignedCertificateTimestamp;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.HEADER_OCI_SUBJECT = exports.HEADER_LOCATION = exports.HEADER_IF_MATCH = exports.HEADER_ETAG = exports.HEADER_DIGEST = exports.HEADER_CONTENT_TYPE = exports.HEADER_CONTENT_LENGTH = exports.HEADER_AUTHORIZATION = exports.HEADER_AUTHENTICATE = exports.HEADER_API_VERSION = exports.HEADER_ACCEPT = exports.CONTENT_TYPE_EMPTY_DESCRIPTOR = exports.CONTENT_TYPE_OCTET_STREAM = exports.CONTENT_TYPE_OCI_MANIFEST = exports.CONTENT_TYPE_OCI_INDEX = void 0;
+exports.HEADER_OCI_SUBJECT = exports.HEADER_LOCATION = exports.HEADER_IF_MATCH = exports.HEADER_ETAG = exports.HEADER_DIGEST = exports.HEADER_CONTENT_TYPE = exports.HEADER_CONTENT_LENGTH = exports.HEADER_AUTHORIZATION = exports.HEADER_AUTHENTICATE = exports.HEADER_API_VERSION = exports.HEADER_ACCEPT = exports.CONTENT_TYPE_EMPTY_DESCRIPTOR = exports.CONTENT_TYPE_OCTET_STREAM = exports.CONTENT_TYPE_DOCKER_MANIFEST_LIST = exports.CONTENT_TYPE_DOCKER_MANIFEST = exports.CONTENT_TYPE_OCI_MANIFEST = exports.CONTENT_TYPE_OCI_INDEX = void 0;
 /*
 Copyright 2023 The Sigstore Authors.
 
@@ -11451,6 +11451,8 @@ limitations under the License.
 */
 exports.CONTENT_TYPE_OCI_INDEX = 'application/vnd.oci.image.index.v1+json';
 exports.CONTENT_TYPE_OCI_MANIFEST = 'application/vnd.oci.image.manifest.v1+json';
+exports.CONTENT_TYPE_DOCKER_MANIFEST = 'application/vnd.docker.distribution.manifest.v2+json';
+exports.CONTENT_TYPE_DOCKER_MANIFEST_LIST = 'application/vnd.docker.distribution.manifest.list.v2+json';
 exports.CONTENT_TYPE_OCTET_STREAM = 'application/octet-stream';
 exports.CONTENT_TYPE_EMPTY_DESCRIPTOR = 'application/vnd.oci.empty.v1+json';
 exports.HEADER_ACCEPT = 'Accept';
@@ -11704,13 +11706,14 @@ limitations under the License.
 const constants_1 = __nccwpck_require__(61319);
 const error_1 = __nccwpck_require__(60064);
 const registry_1 = __nccwpck_require__(27464);
+const DOCKER_DEFAULT_REGISTRY = 'registry-1.docker.io';
 const EMPTY_BLOB = Buffer.from('{}');
 class OCIImage {
     constructor(image, creds, opts) {
         _OCIImage_instances.add(this);
         _OCIImage_client.set(this, void 0);
         _OCIImage_credentials.set(this, void 0);
-        __classPrivateFieldSet(this, _OCIImage_client, new registry_1.RegistryClient(image.registry, image.path, opts), "f");
+        __classPrivateFieldSet(this, _OCIImage_client, new registry_1.RegistryClient(canonicalizeRegistryName(image.registry), image.path, opts), "f");
         __classPrivateFieldSet(this, _OCIImage_credentials, creds, "f");
     }
     async addArtifact(opts) {
@@ -11840,6 +11843,13 @@ const newIndex = () => ({
 const digestToTag = (digest) => {
     return digest.replace(':', '-');
 };
+// Canonicalize the registry name to match the format used by the registry
+// client. This is used primarily to handle the special case of the Docker Hub
+// registry.
+// https://github.com/moby/moby/blob/v24.0.2/registry/config.go#L25-L48
+const canonicalizeRegistryName = (registry) => {
+    return registry.endsWith('docker.io') ? DOCKER_DEFAULT_REGISTRY : registry;
+};
 
 
 /***/ }),
@@ -11964,6 +11974,12 @@ const constants_1 = __nccwpck_require__(61319);
 const credentials_1 = __nccwpck_require__(95475);
 const error_1 = __nccwpck_require__(60064);
 const fetch_1 = __importDefault(__nccwpck_require__(437));
+const ALL_MANIFEST_MEDIA_TYPES = [
+    constants_1.CONTENT_TYPE_OCI_INDEX,
+    constants_1.CONTENT_TYPE_OCI_MANIFEST,
+    constants_1.CONTENT_TYPE_DOCKER_MANIFEST,
+    constants_1.CONTENT_TYPE_DOCKER_MANIFEST_LIST,
+].join(',');
 class RegistryClient {
     constructor(registry, repository, opts) {
         _RegistryClient_instances.add(this);
@@ -12058,9 +12074,7 @@ class RegistryClient {
     async checkManifest(reference) {
         const response = await __classPrivateFieldGet(this, _RegistryClient_fetch, "f").call(this, `${__classPrivateFieldGet(this, _RegistryClient_baseURL, "f")}/v2/${__classPrivateFieldGet(this, _RegistryClient_repository, "f")}/manifests/${reference}`, {
             method: 'HEAD',
-            headers: {
-                [constants_1.HEADER_ACCEPT]: `${constants_1.CONTENT_TYPE_OCI_MANIFEST},${constants_1.CONTENT_TYPE_OCI_INDEX}`,
-            },
+            headers: { [constants_1.HEADER_ACCEPT]: ALL_MANIFEST_MEDIA_TYPES },
         }).then((0, error_1.ensureStatus)(200));
         const mediaType = response.headers.get(constants_1.HEADER_CONTENT_TYPE) ||
             /* istanbul ignore next */ '';
@@ -12072,9 +12086,7 @@ class RegistryClient {
     // Retrieves a manifest by reference
     async getManifest(reference) {
         const response = await __classPrivateFieldGet(this, _RegistryClient_fetch, "f").call(this, `${__classPrivateFieldGet(this, _RegistryClient_baseURL, "f")}/v2/${__classPrivateFieldGet(this, _RegistryClient_repository, "f")}/manifests/${reference}`, {
-            headers: {
-                [constants_1.HEADER_ACCEPT]: `${constants_1.CONTENT_TYPE_OCI_MANIFEST},${constants_1.CONTENT_TYPE_OCI_INDEX}`,
-            },
+            headers: { [constants_1.HEADER_ACCEPT]: ALL_MANIFEST_MEDIA_TYPES },
         }).then((0, error_1.ensureStatus)(200));
         const body = await response.json();
         const mediaType = response.headers.get(constants_1.HEADER_CONTENT_TYPE) ||
