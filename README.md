@@ -175,7 +175,7 @@ fully-qualified image name (e.g. "ghcr.io/user/app" or
 "acme.azurecr.io/user/app"). Do NOT include a tag as part of the image name --
 the specific image being attested is identified by the supplied digest.
 
-> **NOTE**: When pushing to Docker Hub, please use "index.docker.io" as the
+> **NOTE**: When pushing to Docker Hub, please use "docker.io" as the
 > registry portion of the image name.
 
 ```yaml
