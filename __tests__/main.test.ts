@@ -44,6 +44,9 @@ describe('action', () => {
   const originalEnv = process.env
   const originalContext = { ...github.context }
 
+  // Mock OIDC token endpoint
+  const tokenURL = 'https://token.url'
+
   // Fake an OIDC token
   const oidcSubject = 'foo@bar.com'
   const oidcPayload = { sub: oidcSubject, iss: '' }
@@ -61,9 +64,6 @@ describe('action', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-
-    // Mock OIDC token endpoint
-    const tokenURL = 'https://token.url'
 
     nock(tokenURL)
       .get('/')
@@ -289,10 +289,15 @@ describe('action', () => {
     })
   })
 
-  describe('when too many subjects are specified', () => {
+  describe('when the subject count exceeds the batch size', () => {
     let dir = ''
+    let scope: nock.Scope
 
     beforeEach(async () => {
+      // Start from scratch
+      nock.cleanAll()
+
+      const subjectCount = 5
       const filename = 'subject'
       const content = 'file content'
 
@@ -301,9 +306,34 @@ describe('action', () => {
       dir = await fs.mkdtemp(tmpDir + path.sep)
 
       // Add files for glob testing
-      for (let i = 0; i < 65; i++) {
+      for (let i = 0; i < subjectCount; i++) {
         await fs.writeFile(path.join(dir, `${filename}-${i}`), content)
+
+        // Set-up a Fulcio mock for each subject
+        await mockFulcio({
+          baseURL: 'https://fulcio.githubapp.com',
+          strict: false
+        })
+
+        // Set-up a TSA mock for each subject
+        await mockTSA({ baseURL: 'https://timestamp.githubapp.com' })
+
+        // Set-up a GH API mock for each subject
+        mockAgent
+          .get('https://api.github.com')
+          .intercept({
+            path: /^\/repos\/.*\/.*\/attestations$/,
+            method: 'post'
+          })
+          .reply(201, { id: attestationID })
       }
+
+      // Set-up a OIDC token mock for each subject
+      scope = nock(tokenURL)
+        .get('/')
+        .query({ audience: 'sigstore' })
+        .times(subjectCount)
+        .reply(200, { value: oidcToken })
 
       // Set the GH context with private repository visibility and a repo owner.
       setGHContext({
@@ -311,13 +341,16 @@ describe('action', () => {
         repo: { owner: 'foo', repo: 'bar' }
       })
 
-      // Mock the action's inputs
-      getInputMock.mockImplementation(
-        mockInput({
-          predicate: '{}',
-          'subject-path': path.join(dir, `${filename}-*`)
-        })
-      )
+      const inputs = {
+        'subject-path': path.join(dir, `${filename}-*`),
+        'predicate-type': predicateType,
+        predicate,
+        'github-token': 'gh-token',
+        'batch-size': '2',
+        'batch-delay': '500'
+      }
+      getInputMock.mockImplementation(mockInput(inputs))
+      getBooleanInputMock.mockImplementation(() => false)
     })
 
     afterEach(async () => {
@@ -325,15 +358,24 @@ describe('action', () => {
       await fs.rm(dir, { recursive: true })
     })
 
-    it('sets a failed status', async () => {
+    it('invokes the action w/o error', async () => {
       await main.run()
 
       expect(runMock).toHaveReturned()
-      expect(setFailedMock).toHaveBeenCalledWith(
-        new Error(
-          'Too many subjects specified. The maximum number of subjects is 64.'
-        )
+      expect(setFailedMock).not.toHaveBeenCalled()
+      expect(infoMock).toHaveBeenNthCalledWith(
+        1,
+        expect.stringMatching('Processing subject batch 1/3')
       )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        10,
+        expect.stringMatching('Processing subject batch 2/3')
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        19,
+        expect.stringMatching('Processing subject batch 3/3')
+      )
+      expect(scope.isDone()).toBe(true)
     })
   })
 })

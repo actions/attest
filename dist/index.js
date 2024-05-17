@@ -79954,7 +79954,8 @@ const COLOR_CYAN = '\x1B[36m';
 const COLOR_GRAY = '\x1B[38;5;244m';
 const COLOR_DEFAULT = '\x1B[39m';
 const ATTESTATION_FILE_NAME = 'attestation.jsonl';
-const MAX_SUBJECT_COUNT = 64;
+const DEFAULT_BATCH_SIZE = 50;
+const DEFAULT_BATCH_DELAY = 5000;
 const OCI_TIMEOUT = 2000;
 const OCI_RETRY = 3;
 /* istanbul ignore next */
@@ -79982,23 +79983,33 @@ async function run() {
         if (!process.env.ACTIONS_ID_TOKEN_REQUEST_URL) {
             throw new Error('missing "id-token" permission. Please add "permissions: id-token: write" to your workflow.');
         }
-        // Gather list of subjets
         const subjects = await (0, subject_1.subjectFromInputs)();
-        if (subjects.length > MAX_SUBJECT_COUNT) {
-            throw new Error(`Too many subjects specified. The maximum number of subjects is ${MAX_SUBJECT_COUNT}.`);
-        }
         const predicate = (0, predicate_1.predicateFromInputs)();
         const outputPath = path_1.default.join(tempDir(), ATTESTATION_FILE_NAME);
-        // Generate attestations for each subject serially
-        for (const subject of subjects) {
-            const att = await createAttestation(subject, predicate, sigstoreInstance);
-            // Write attestation bundle to output file
-            fs_1.default.writeFileSync(outputPath, JSON.stringify(att.bundle) + os_1.default.EOL, {
-                encoding: 'utf-8',
-                flag: 'a'
-            });
-            if (att.attestationID) {
-                atts.push({ subject, attestationID: att.attestationID });
+        // Batch size and delay for rate limiting
+        const batchSize = parseInt(core.getInput('batch-size')) || DEFAULT_BATCH_SIZE;
+        const batchDelay = parseInt(core.getInput('batch-delay')) || DEFAULT_BATCH_DELAY;
+        const subjectChunks = chunkArray(subjects, batchSize);
+        let chunkCount = 0;
+        // Generate attestations for each subject serially, working in batches
+        for (const subjectChunk of subjectChunks) {
+            // Delay between batches (only when chunkCount > 0)
+            if (chunkCount++) {
+                await new Promise(resolve => setTimeout(resolve, batchDelay));
+            }
+            if (subjectChunks.length > 1) {
+                core.info(`Processing subject batch ${chunkCount}/${subjectChunks.length}`);
+            }
+            for (const subject of subjectChunk) {
+                const att = await createAttestation(subject, predicate, sigstoreInstance);
+                // Write attestation bundle to output file
+                fs_1.default.writeFileSync(outputPath, JSON.stringify(att.bundle) + os_1.default.EOL, {
+                    encoding: 'utf-8',
+                    flag: 'a'
+                });
+                if (att.attestationID) {
+                    atts.push({ subject, attestationID: att.attestationID });
+                }
             }
         }
         if (atts.length > 0) {
@@ -80081,6 +80092,11 @@ const tempDir = () => {
         throw new Error('Missing RUNNER_TEMP environment variable');
     }
     return fs_1.default.mkdtempSync(path_1.default.join(basePath, path_1.default.sep));
+};
+// Transforms an array into an array of arrays, each containing at most
+// `chunkSize` elements.
+const chunkArray = (array, chunkSize) => {
+    return Array.from({ length: Math.ceil(array.length / chunkSize) }, (_, index) => array.slice(index * chunkSize, (index + 1) * chunkSize));
 };
 // Returns the subject's digest as a formatted string of the form
 // "<algorithm>:<digest>".
