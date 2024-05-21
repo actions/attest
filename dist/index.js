@@ -11814,7 +11814,7 @@ async function _OCIImage_createReferrersIndexByTag(opts) {
     if (!referrerManifest.manifests.some((manifest) => manifest.digest === opts.artifact.digest)) {
         // Add the artifact to the index
         referrerManifest.manifests.push(opts.artifact);
-        __classPrivateFieldGet(this, _OCIImage_client, "f").uploadManifest(JSON.stringify(referrerManifest), {
+        await __classPrivateFieldGet(this, _OCIImage_client, "f").uploadManifest(JSON.stringify(referrerManifest), {
             mediaType: constants_1.CONTENT_TYPE_OCI_INDEX,
             reference: referrerTag,
             etag,
