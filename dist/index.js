@@ -13199,7 +13199,7 @@ exports.ClientTrustConfig = exports.SigningConfig = exports.TrustedRoot = export
 /* eslint-disable */
 const sigstore_common_1 = __nccwpck_require__(82193);
 function createBaseTransparencyLogInstance() {
-    return { baseUrl: "", hashAlgorithm: 0, publicKey: undefined, logId: undefined };
+    return { baseUrl: "", hashAlgorithm: 0, publicKey: undefined, logId: undefined, checkpointKeyId: undefined };
 }
 exports.TransparencyLogInstance = {
     fromJSON(object) {
@@ -13208,6 +13208,7 @@ exports.TransparencyLogInstance = {
             hashAlgorithm: isSet(object.hashAlgorithm) ? (0, sigstore_common_1.hashAlgorithmFromJSON)(object.hashAlgorithm) : 0,
             publicKey: isSet(object.publicKey) ? sigstore_common_1.PublicKey.fromJSON(object.publicKey) : undefined,
             logId: isSet(object.logId) ? sigstore_common_1.LogId.fromJSON(object.logId) : undefined,
+            checkpointKeyId: isSet(object.checkpointKeyId) ? sigstore_common_1.LogId.fromJSON(object.checkpointKeyId) : undefined,
         };
     },
     toJSON(message) {
@@ -13217,6 +13218,8 @@ exports.TransparencyLogInstance = {
         message.publicKey !== undefined &&
             (obj.publicKey = message.publicKey ? sigstore_common_1.PublicKey.toJSON(message.publicKey) : undefined);
         message.logId !== undefined && (obj.logId = message.logId ? sigstore_common_1.LogId.toJSON(message.logId) : undefined);
+        message.checkpointKeyId !== undefined &&
+            (obj.checkpointKeyId = message.checkpointKeyId ? sigstore_common_1.LogId.toJSON(message.checkpointKeyId) : undefined);
         return obj;
     },
 };
