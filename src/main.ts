@@ -17,7 +17,8 @@ const COLOR_GRAY = '\x1B[38;5;244m'
 const COLOR_DEFAULT = '\x1B[39m'
 const ATTESTATION_FILE_NAME = 'attestation.jsonl'
 
-const MAX_SUBJECT_COUNT = 64
+const DEFAULT_BATCH_SIZE = 50
+const DEFAULT_BATCH_DELAY = 5000
 
 const OCI_TIMEOUT = 2000
 const OCI_RETRY = 3
@@ -54,29 +55,48 @@ export async function run(): Promise<void> {
       )
     }
 
-    // Gather list of subjets
     const subjects = await subjectFromInputs()
-    if (subjects.length > MAX_SUBJECT_COUNT) {
-      throw new Error(
-        `Too many subjects specified. The maximum number of subjects is ${MAX_SUBJECT_COUNT}.`
-      )
-    }
-
     const predicate = predicateFromInputs()
     const outputPath = path.join(tempDir(), ATTESTATION_FILE_NAME)
 
-    // Generate attestations for each subject serially
-    for (const subject of subjects) {
-      const att = await createAttestation(subject, predicate, sigstoreInstance)
+    // Batch size and delay for rate limiting
+    const batchSize =
+      parseInt(core.getInput('batch-size')) || DEFAULT_BATCH_SIZE
+    const batchDelay =
+      parseInt(core.getInput('batch-delay')) || DEFAULT_BATCH_DELAY
 
-      // Write attestation bundle to output file
-      fs.writeFileSync(outputPath, JSON.stringify(att.bundle) + os.EOL, {
-        encoding: 'utf-8',
-        flag: 'a'
-      })
+    const subjectChunks = chunkArray(subjects, batchSize)
+    let chunkCount = 0
 
-      if (att.attestationID) {
-        atts.push({ subject, attestationID: att.attestationID })
+    // Generate attestations for each subject serially, working in batches
+    for (const subjectChunk of subjectChunks) {
+      // Delay between batches (only when chunkCount > 0)
+      if (chunkCount++) {
+        await new Promise(resolve => setTimeout(resolve, batchDelay))
+      }
+
+      if (subjectChunks.length > 1) {
+        core.info(
+          `Processing subject batch ${chunkCount}/${subjectChunks.length}`
+        )
+      }
+
+      for (const subject of subjectChunk) {
+        const att = await createAttestation(
+          subject,
+          predicate,
+          sigstoreInstance
+        )
+
+        // Write attestation bundle to output file
+        fs.writeFileSync(outputPath, JSON.stringify(att.bundle) + os.EOL, {
+          encoding: 'utf-8',
+          flag: 'a'
+        })
+
+        if (att.attestationID) {
+          atts.push({ subject, attestationID: att.attestationID })
+        }
       }
     }
 
@@ -192,6 +212,15 @@ const tempDir = (): string => {
   }
 
   return fs.mkdtempSync(path.join(basePath, path.sep))
+}
+
+// Transforms an array into an array of arrays, each containing at most
+// `chunkSize` elements.
+const chunkArray = <T>(array: T[], chunkSize: number): T[][] => {
+  return Array.from(
+    { length: Math.ceil(array.length / chunkSize) },
+    (_, index) => array.slice(index * chunkSize, (index + 1) * chunkSize)
+  )
 }
 
 // Returns the subject's digest as a formatted string of the form
