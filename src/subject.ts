@@ -1,4 +1,3 @@
-import * as core from '@actions/core'
 import * as glob from '@actions/glob'
 import crypto from 'crypto'
 import { parse } from 'csv-parse/sync'
@@ -9,17 +8,20 @@ import type { Subject } from '@actions/attest'
 
 const DIGEST_ALGORITHM = 'sha256'
 
+export type SubjectInputs = {
+  subjectPath: string
+  subjectName: string
+  subjectDigest: string
+  downcaseName?: boolean
+}
 // Returns the subject specified by the action's inputs. The subject may be
 // specified as a path to a file or as a digest. If a path is provided, the
 // file's digest is calculated and returned along with the subject's name. If a
 // digest is provided, the name must also be provided.
-export const subjectFromInputs = async (): Promise<Subject[]> => {
-  const subjectPath = core.getInput('subject-path', { required: false })
-  const subjectDigest = core.getInput('subject-digest', { required: false })
-  const subjectName = core.getInput('subject-name', { required: false })
-  const pushToRegistry = core.getBooleanInput('push-to-registry', {
-    required: false
-  })
+export const subjectFromInputs = async (
+  inputs: SubjectInputs
+): Promise<Subject[]> => {
+  const { subjectPath, subjectDigest, subjectName, downcaseName } = inputs
 
   if (!subjectPath && !subjectDigest) {
     throw new Error('One of subject-path or subject-digest must be provided')
@@ -37,7 +39,7 @@ export const subjectFromInputs = async (): Promise<Subject[]> => {
 
   // If push-to-registry is enabled, ensure the subject name is lowercase
   // to conform to OCI image naming conventions
-  const name = pushToRegistry ? subjectName.toLowerCase() : subjectName
+  const name = downcaseName ? subjectName.toLowerCase() : subjectName
 
   if (subjectPath) {
     return await getSubjectFromPath(subjectPath, name)
