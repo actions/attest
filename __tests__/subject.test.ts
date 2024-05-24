@@ -2,47 +2,45 @@ import crypto from 'crypto'
 import fs from 'fs/promises'
 import os from 'os'
 import path from 'path'
-import { subjectFromInputs } from '../src/subject'
+import { subjectFromInputs, SubjectInputs } from '../src/subject'
 
 describe('subjectFromInputs', () => {
-  beforeEach(() => {
-    process.env['INPUT_PUSH-TO-REGISTRY'] = 'false'
-  })
-
-  afterEach(() => {
-    process.env['INPUT_SUBJECT-PATH'] = ''
-    process.env['INPUT_SUBJECT-DIGEST'] = ''
-    process.env['INPUT_SUBJECT-NAME'] = ''
-  })
+  const blankInputs: SubjectInputs = {
+    subjectPath: '',
+    subjectName: '',
+    subjectDigest: ''
+  }
 
   describe('when no inputs are provided', () => {
     it('throws an error', async () => {
-      await expect(subjectFromInputs()).rejects.toThrow(
+      await expect(subjectFromInputs(blankInputs)).rejects.toThrow(
         /one of subject-path or subject-digest must be provided/i
       )
     })
   })
 
   describe('when both subject path and subject digest are provided', () => {
-    beforeEach(() => {
-      process.env['INPUT_SUBJECT-PATH'] = 'path/to/subject'
-      process.env['INPUT_SUBJECT-DIGEST'] = 'digest'
-    })
-
     it('throws an error', async () => {
-      await expect(subjectFromInputs()).rejects.toThrow(
+      const inputs: SubjectInputs = {
+        subjectName: 'foo',
+        subjectPath: 'path/to/subject',
+        subjectDigest: 'digest'
+      }
+
+      await expect(subjectFromInputs(inputs)).rejects.toThrow(
         /only one of subject-path or subject-digest may be provided/i
       )
     })
   })
 
   describe('when subject digest is provided but not the name', () => {
-    beforeEach(() => {
-      process.env['INPUT_SUBJECT-DIGEST'] = 'digest'
-    })
-
     it('throws an error', async () => {
-      await expect(subjectFromInputs()).rejects.toThrow(
+      const inputs: SubjectInputs = {
+        ...blankInputs,
+        subjectDigest: 'digest'
+      }
+
+      await expect(subjectFromInputs(inputs)).rejects.toThrow(
         /subject-name must be provided when using subject-digest/i
       )
     })
@@ -52,39 +50,42 @@ describe('subjectFromInputs', () => {
     const name = 'Subject'
 
     describe('when the digest is malformed', () => {
-      beforeEach(() => {
-        process.env['INPUT_SUBJECT-DIGEST'] = 'digest'
-        process.env['INPUT_SUBJECT-NAME'] = name
-      })
-
       it('throws an error', async () => {
-        await expect(subjectFromInputs()).rejects.toThrow(
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectDigest: 'digest',
+          subjectName: name
+        }
+
+        await expect(subjectFromInputs(inputs)).rejects.toThrow(
           /subject-digest must be in the format "sha256:<hex-digest>"/i
         )
       })
     })
 
     describe('when the alogrithm is not supported', () => {
-      beforeEach(() => {
-        process.env['INPUT_SUBJECT-DIGEST'] = 'md5:deadbeef'
-        process.env['INPUT_SUBJECT-NAME'] = name
-      })
-
       it('throws an error', async () => {
-        await expect(subjectFromInputs()).rejects.toThrow(
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectDigest: 'md5:deadbeef',
+          subjectName: name
+        }
+
+        await expect(subjectFromInputs(inputs)).rejects.toThrow(
           /subject-digest must be in the format "sha256:<hex-digest>"/i
         )
       })
     })
 
     describe('when the sha256 digest is malformed', () => {
-      beforeEach(() => {
-        process.env['INPUT_SUBJECT-DIGEST'] = 'sha256:deadbeef'
-        process.env['INPUT_SUBJECT-NAME'] = name
-      })
-
       it('throws an error', async () => {
-        await expect(subjectFromInputs()).rejects.toThrow(
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectDigest: 'sha256:deadbeef',
+          subjectName: name
+        }
+
+        await expect(subjectFromInputs(inputs)).rejects.toThrow(
           /subject-digest must be in the format "sha256:<hex-digest>"/i
         )
       })
@@ -95,13 +96,14 @@ describe('subjectFromInputs', () => {
       const digest =
         '7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32'
 
-      beforeEach(() => {
-        process.env['INPUT_SUBJECT-DIGEST'] = `${alg}:${digest}`
-        process.env['INPUT_SUBJECT-NAME'] = name
-      })
-
       it('returns the subject', async () => {
-        const subject = await subjectFromInputs()
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectDigest: `${alg}:${digest}`,
+          subjectName: name
+        }
+
+        const subject = await subjectFromInputs(inputs)
 
         expect(subject).toBeDefined()
         expect(subject).toHaveLength(1)
@@ -110,20 +112,21 @@ describe('subjectFromInputs', () => {
       })
     })
 
-    describe('when the push-to-registry is true', () => {
+    describe('when the downcaseName is true', () => {
       const imageName = 'ghcr.io/FOO/bar'
       const alg = 'sha256'
       const digest =
         '7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32'
 
-      beforeEach(() => {
-        process.env['INPUT_SUBJECT-DIGEST'] = `${alg}:${digest}`
-        process.env['INPUT_SUBJECT-NAME'] = imageName
-        process.env['INPUT_PUSH-TO-REGISTRY'] = 'true'
-      })
-
       it('returns the subject (with name downcased)', async () => {
-        const subject = await subjectFromInputs()
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectDigest: `${alg}:${digest}`,
+          subjectName: imageName,
+          downcaseName: true
+        }
+
+        const subject = await subjectFromInputs(inputs)
 
         expect(subject).toBeDefined()
         expect(subject).toHaveLength(1)
@@ -135,12 +138,13 @@ describe('subjectFromInputs', () => {
 
   describe('when specifying a subject path', () => {
     describe('when the file does NOT exist', () => {
-      beforeEach(() => {
-        process.env['INPUT_SUBJECT-PATH'] = '/f/a/k/e'
-      })
-
       it('throws an error', async () => {
-        await expect(subjectFromInputs()).rejects.toThrow(
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectPath: '/f/a/k/e'
+        }
+
+        await expect(subjectFromInputs(inputs)).rejects.toThrow(
           /could not find subject at path/i
         )
       })
@@ -178,12 +182,13 @@ describe('subjectFromInputs', () => {
     })
 
     describe('when no name is provided', () => {
-      beforeEach(() => {
-        process.env['INPUT_SUBJECT-PATH'] = path.join(dir, filename)
-      })
-
       it('returns the subject', async () => {
-        const subject = await subjectFromInputs()
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectPath: path.join(dir, filename)
+        }
+
+        const subject = await subjectFromInputs(inputs)
 
         expect(subject).toBeDefined()
         expect(subject).toHaveLength(1)
@@ -195,13 +200,14 @@ describe('subjectFromInputs', () => {
     describe('when a name is provided', () => {
       const name = 'mysubject'
 
-      beforeEach(() => {
-        process.env['INPUT_SUBJECT-PATH'] = path.join(dir, filename)
-        process.env['INPUT_SUBJECT-NAME'] = name
-      })
-
       it('returns the subject', async () => {
-        const subject = await subjectFromInputs()
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectPath: path.join(dir, filename),
+          subjectName: name
+        }
+
+        const subject = await subjectFromInputs(inputs)
 
         expect(subject).toBeDefined()
         expect(subject).toHaveLength(1)
@@ -211,12 +217,13 @@ describe('subjectFromInputs', () => {
     })
 
     describe('when a file glob is supplied', () => {
-      beforeEach(async () => {
-        process.env['INPUT_SUBJECT-PATH'] = path.join(dir, 'subject-*')
-      })
-
       it('returns the multiple subjects', async () => {
-        const subjects = await subjectFromInputs()
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectPath: path.join(dir, 'subject-*')
+        }
+
+        const subjects = await subjectFromInputs(inputs)
 
         expect(subjects).toBeDefined()
         expect(subjects).toHaveLength(3)
@@ -230,12 +237,13 @@ describe('subjectFromInputs', () => {
     })
 
     describe('when a file glob is supplied which also matches non-files', () => {
-      beforeEach(async () => {
-        process.env['INPUT_SUBJECT-PATH'] = `${dir}*`
-      })
-
       it('returns the subjects (excluding non-files)', async () => {
-        const subjects = await subjectFromInputs()
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectPath: `${dir}*`
+        }
+
+        const subjects = await subjectFromInputs(inputs)
 
         expect(subjects).toBeDefined()
         expect(subjects).toHaveLength(7)
@@ -243,13 +251,13 @@ describe('subjectFromInputs', () => {
     })
 
     describe('when a comma-separated list is supplied', () => {
-      beforeEach(async () => {
-        process.env['INPUT_SUBJECT-PATH'] =
-          `${path.join(dir, 'subject-1')},${path.join(dir, 'subject-2')}`
-      })
-
       it('returns the multiple subjects', async () => {
-        const subjects = await subjectFromInputs()
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectPath: `${path.join(dir, 'subject-1')},${path.join(dir, 'subject-2')}`
+        }
+
+        const subjects = await subjectFromInputs(inputs)
 
         expect(subjects).toBeDefined()
         expect(subjects).toHaveLength(2)
@@ -266,13 +274,13 @@ describe('subjectFromInputs', () => {
     })
 
     describe('when a multi-line list is supplied', () => {
-      beforeEach(async () => {
-        process.env['INPUT_SUBJECT-PATH'] =
-          `${path.join(dir, 'subject-0')}\n${path.join(dir, 'subject-2')}`
-      })
-
       it('returns the multiple subjects', async () => {
-        const subjects = await subjectFromInputs()
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectPath: `${path.join(dir, 'subject-0')}\n${path.join(dir, 'subject-2')}`
+        }
+
+        const subjects = await subjectFromInputs(inputs)
 
         expect(subjects).toBeDefined()
         expect(subjects).toHaveLength(2)
@@ -289,13 +297,13 @@ describe('subjectFromInputs', () => {
     })
 
     describe('when a multi-line glob list is supplied', () => {
-      beforeEach(async () => {
-        process.env['INPUT_SUBJECT-PATH'] =
-          `${path.join(dir, 'subject-*')}\n  ${path.join(dir, 'other-*')} `
-      })
-
       it('returns the multiple subjects', async () => {
-        const subjects = await subjectFromInputs()
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectPath: `${path.join(dir, 'subject-*')}\n  ${path.join(dir, 'other-*')} `
+        }
+
+        const subjects = await subjectFromInputs(inputs)
 
         expect(subjects).toBeDefined()
         expect(subjects).toHaveLength(6)

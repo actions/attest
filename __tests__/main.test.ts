@@ -20,8 +20,6 @@ import * as main from '../src/main'
 // Mock the GitHub Actions core library
 const infoMock = jest.spyOn(core, 'info')
 const startGroupMock = jest.spyOn(core, 'startGroup')
-const getInputMock = jest.spyOn(core, 'getInput')
-const getBooleanInputMock = jest.spyOn(core, 'getBooleanInput')
 const setOutputMock = jest.spyOn(core, 'setOutput')
 const setFailedMock = jest.spyOn(core, 'setFailed')
 
@@ -37,6 +35,20 @@ const runMock = jest.spyOn(main, 'run')
 // MockAgent for mocking @actions/github
 const mockAgent = new MockAgent()
 setGlobalDispatcher(mockAgent)
+
+const defaultInputs: main.RunInputs = {
+  predicate: '',
+  predicateType: '',
+  predicatePath: '',
+  subjectName: '',
+  subjectDigest: '',
+  subjectPath: '',
+  pushToRegistry: false,
+  githubToken: '',
+  privateSigning: false,
+  batchSize: 50,
+  batchDelay: 5000
+}
 
 describe('action', () => {
   // Capture original environment variables and GitHub context so we can restore
@@ -95,24 +107,22 @@ describe('action', () => {
   })
 
   describe('when ACTIONS_ID_TOKEN_REQUEST_URL is not set', () => {
-    const inputs = {
-      'subject-digest': subjectDigest,
-      'subject-name': subjectName,
-      'predicate-type': predicateType,
+    const inputs: main.RunInputs = {
+      ...defaultInputs,
+      subjectDigest,
+      subjectName,
+      predicateType,
       predicate,
-      'github-token': 'gh-token'
+      githubToken: 'gh-token'
     }
 
     beforeEach(() => {
       // Nullify the OIDC token URL
       process.env.ACTIONS_ID_TOKEN_REQUEST_URL = ''
-
-      getInputMock.mockImplementation(mockInput(inputs))
-      getBooleanInputMock.mockImplementation(() => false)
     })
 
     it('sets a failed status', async () => {
-      await main.run()
+      await main.run(inputs)
 
       expect(runMock).toHaveReturned()
       expect(setFailedMock).toHaveBeenCalledWith(
@@ -124,12 +134,8 @@ describe('action', () => {
   })
 
   describe('when no inputs are provided', () => {
-    beforeEach(() => {
-      getInputMock.mockImplementation(() => '')
-    })
-
     it('sets a failed status', async () => {
-      await main.run()
+      await main.run(defaultInputs)
 
       expect(runMock).toHaveReturned()
       expect(setFailedMock).toHaveBeenCalledWith(
@@ -139,12 +145,13 @@ describe('action', () => {
   })
 
   describe('when the repository is private', () => {
-    const inputs = {
-      'subject-digest': subjectDigest,
-      'subject-name': subjectName,
-      'predicate-type': predicateType,
+    const inputs: main.RunInputs = {
+      ...defaultInputs,
+      subjectDigest,
+      subjectName,
+      predicateType,
       predicate,
-      'github-token': 'gh-token'
+      githubToken: 'gh-token'
     }
 
     beforeEach(async () => {
@@ -154,9 +161,6 @@ describe('action', () => {
         repo: { owner: 'foo', repo: 'bar' }
       })
 
-      getInputMock.mockImplementation(mockInput(inputs))
-      getBooleanInputMock.mockImplementation(() => false)
-
       await mockFulcio({
         baseURL: 'https://fulcio.githubapp.com',
         strict: false
@@ -165,7 +169,7 @@ describe('action', () => {
     })
 
     it('invokes the action w/o error', async () => {
-      await main.run()
+      await main.run(inputs)
 
       expect(runMock).toHaveReturned()
       expect(setFailedMock).not.toHaveBeenCalledWith()
@@ -204,12 +208,14 @@ describe('action', () => {
     const getRegCredsSpy = jest.spyOn(oci, 'getRegistryCredentials')
     const attachArtifactSpy = jest.spyOn(oci, 'attachArtifactToImage')
 
-    const inputs = {
-      'subject-digest': subjectDigest,
-      'subject-name': subjectName,
-      'predicate-type': predicateType,
+    const inputs: main.RunInputs = {
+      ...defaultInputs,
+      subjectDigest,
+      subjectName,
+      predicateType,
       predicate,
-      'github-token': 'gh-token'
+      githubToken: 'gh-token',
+      pushToRegistry: true
     }
 
     beforeEach(async () => {
@@ -218,11 +224,6 @@ describe('action', () => {
         payload: { repository: { visibility: 'public' } },
         repo: { owner: 'foo', repo: 'bar' }
       })
-
-      // Mock the action's inputs
-      getInputMock.mockImplementation(mockInput(inputs))
-      // This is where we mock the push-to-registry input
-      getBooleanInputMock.mockImplementation(() => true)
 
       await mockFulcio({
         baseURL: 'https://fulcio.sigstore.dev',
@@ -244,7 +245,7 @@ describe('action', () => {
     })
 
     it('invokes the action w/o error', async () => {
-      await main.run()
+      await main.run(inputs)
 
       expect(runMock).toHaveReturned()
       expect(setFailedMock).not.toHaveBeenCalled()
@@ -291,6 +292,7 @@ describe('action', () => {
 
   describe('when the subject count exceeds the batch size', () => {
     let dir = ''
+    const filename = 'subject'
     let scope: nock.Scope
 
     beforeEach(async () => {
@@ -298,7 +300,6 @@ describe('action', () => {
       nock.cleanAll()
 
       const subjectCount = 5
-      const filename = 'subject'
       const content = 'file content'
 
       // Set-up temp directory
@@ -340,17 +341,6 @@ describe('action', () => {
         payload: { repository: { visibility: 'private' } },
         repo: { owner: 'foo', repo: 'bar' }
       })
-
-      const inputs = {
-        'subject-path': path.join(dir, `${filename}-*`),
-        'predicate-type': predicateType,
-        predicate,
-        'github-token': 'gh-token',
-        'batch-size': '2',
-        'batch-delay': '500'
-      }
-      getInputMock.mockImplementation(mockInput(inputs))
-      getBooleanInputMock.mockImplementation(() => false)
     })
 
     afterEach(async () => {
@@ -359,7 +349,16 @@ describe('action', () => {
     })
 
     it('invokes the action w/o error', async () => {
-      await main.run()
+      const inputs: main.RunInputs = {
+        ...defaultInputs,
+        subjectPath: path.join(dir, `${filename}-*`),
+        predicateType,
+        predicate,
+        githubToken: 'gh-token',
+        batchSize: 2,
+        batchDelay: 500
+      }
+      await main.run(inputs)
 
       expect(runMock).toHaveReturned()
       expect(setFailedMock).not.toHaveBeenCalled()
@@ -379,15 +378,6 @@ describe('action', () => {
     })
   })
 })
-
-function mockInput(inputs: Record<string, string>): typeof core.getInput {
-  return (name: string): string => {
-    if (name in inputs) {
-      return inputs[name]
-    }
-    return ''
-  }
-}
 
 // Stubbing the GitHub context is a bit tricky. We need to use
 // `Object.defineProperty` because `github.context` is read-only.

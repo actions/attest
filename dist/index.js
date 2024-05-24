@@ -79910,6 +79910,63 @@ exports.SEARCH_PUBLIC_GOOD_URL = 'https://search.sigstore.dev';
 
 /***/ }),
 
+/***/ 6144:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+/**
+ * The entrypoint for the action.
+ */
+const core = __importStar(__nccwpck_require__(42186));
+const main_1 = __nccwpck_require__(70399);
+const DEFAULT_BATCH_SIZE = 50;
+const DEFAULT_BATCH_DELAY = 5000;
+const inputs = {
+    subjectPath: core.getInput('subject-path'),
+    subjectName: core.getInput('subject-name'),
+    subjectDigest: core.getInput('subject-digest'),
+    predicateType: core.getInput('predicate-type'),
+    predicate: core.getInput('predicate'),
+    predicatePath: core.getInput('predicate-path'),
+    pushToRegistry: core.getBooleanInput('push-to-registry'),
+    githubToken: core.getInput('github-token'),
+    // undocumented -- not part of public interface
+    privateSigning: core.getBooleanInput('private-signing'),
+    // internal only
+    batchSize: DEFAULT_BATCH_SIZE,
+    batchDelay: DEFAULT_BATCH_DELAY
+};
+// eslint-disable-next-line @typescript-eslint/no-floating-promises
+(0, main_1.run)(inputs);
+
+
+/***/ }),
+
 /***/ 70399:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -79957,8 +80014,6 @@ const COLOR_CYAN = '\x1B[36m';
 const COLOR_GRAY = '\x1B[38;5;244m';
 const COLOR_DEFAULT = '\x1B[39m';
 const ATTESTATION_FILE_NAME = 'attestation.jsonl';
-const DEFAULT_BATCH_SIZE = 50;
-const DEFAULT_BATCH_DELAY = 5000;
 const OCI_TIMEOUT = 2000;
 const OCI_RETRY = 3;
 /* istanbul ignore next */
@@ -79972,13 +80027,13 @@ const logHandler = (level, ...args) => {
  * The main function for the action.
  * @returns {Promise<void>} Resolves when the action is complete.
  */
-async function run() {
+async function run(inputs) {
     process.on('log', logHandler);
     // Provenance visibility will be public ONLY if we can confirm that the
     // repository is public AND the undocumented "private-signing" arg is NOT set.
     // Otherwise, it will be private.
     const sigstoreInstance = github.context.payload.repository?.visibility === 'public' &&
-        core.getInput('private-signing') !== 'true'
+        !inputs.privateSigning
         ? 'public-good'
         : 'github';
     try {
@@ -79986,25 +80041,29 @@ async function run() {
         if (!process.env.ACTIONS_ID_TOKEN_REQUEST_URL) {
             throw new Error('missing "id-token" permission. Please add "permissions: id-token: write" to your workflow.');
         }
-        const subjects = await (0, subject_1.subjectFromInputs)();
-        const predicate = (0, predicate_1.predicateFromInputs)();
+        const subjects = await (0, subject_1.subjectFromInputs)({
+            ...inputs,
+            downcaseName: inputs.pushToRegistry
+        });
+        const predicate = (0, predicate_1.predicateFromInputs)(inputs);
         const outputPath = path_1.default.join(tempDir(), ATTESTATION_FILE_NAME);
-        // Batch size and delay for rate limiting
-        const batchSize = parseInt(core.getInput('batch-size')) || DEFAULT_BATCH_SIZE;
-        const batchDelay = parseInt(core.getInput('batch-delay')) || DEFAULT_BATCH_DELAY;
-        const subjectChunks = chunkArray(subjects, batchSize);
+        const subjectChunks = chunkArray(subjects, inputs.batchSize);
         let chunkCount = 0;
         // Generate attestations for each subject serially, working in batches
         for (const subjectChunk of subjectChunks) {
             // Delay between batches (only when chunkCount > 0)
             if (chunkCount++) {
-                await new Promise(resolve => setTimeout(resolve, batchDelay));
+                await new Promise(resolve => setTimeout(resolve, inputs.batchDelay));
             }
             if (subjectChunks.length > 1) {
                 core.info(`Processing subject batch ${chunkCount}/${subjectChunks.length}`);
             }
             for (const subject of subjectChunk) {
-                const att = await createAttestation(subject, predicate, sigstoreInstance);
+                const att = await createAttestation(subject, predicate, {
+                    sigstoreInstance,
+                    pushToRegistry: inputs.pushToRegistry,
+                    githubToken: inputs.githubToken
+                });
                 // Write attestation bundle to output file
                 fs_1.default.writeFileSync(outputPath, JSON.stringify(att.bundle) + os_1.default.EOL, {
                     encoding: 'utf-8',
@@ -80041,18 +80100,18 @@ async function run() {
     }
 }
 exports.run = run;
-const createAttestation = async (subject, predicate, sigstoreInstance) => {
+const createAttestation = async (subject, predicate, opts) => {
     // Sign provenance w/ Sigstore
     const attestation = await (0, attest_1.attest)({
         subjectName: subject.name,
         subjectDigest: subject.digest,
         predicateType: predicate.type,
         predicate: predicate.params,
-        sigstore: sigstoreInstance,
-        token: core.getInput('github-token')
+        sigstore: opts.sigstoreInstance,
+        token: opts.githubToken
     });
     core.info(`Attestation created for ${subject.name}@${subjectDigest(subject)}`);
-    const instanceName = sigstoreInstance === 'public-good' ? 'Public Good' : 'GitHub';
+    const instanceName = opts.sigstoreInstance === 'public-good' ? 'Public Good' : 'GitHub';
     core.startGroup(highlight(`Attestation signed using certificate from ${instanceName} Sigstore instance`));
     core.info(attestation.certificate);
     core.endGroup();
@@ -80064,7 +80123,7 @@ const createAttestation = async (subject, predicate, sigstoreInstance) => {
         core.info(highlight('Attestation uploaded to repository'));
         core.info(attestationURL(attestation.attestationID));
     }
-    if (core.getBooleanInput('push-to-registry', { required: false })) {
+    if (opts.pushToRegistry) {
         const credentials = (0, oci_1.getRegistryCredentials)(subject.name);
         const artifact = await (0, oci_1.attachArtifactToImage)({
             credentials,
@@ -80117,51 +80176,28 @@ const attestationURL = (id) => `${github.context.serverUrl}/${github.context.rep
 
 "use strict";
 
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.predicateFromInputs = void 0;
-const core = __importStar(__nccwpck_require__(42186));
 const fs_1 = __importDefault(__nccwpck_require__(57147));
 // Returns the predicate specified by the action's inputs. The predicate value
 // may be specified as a path to a file or as a string.
-const predicateFromInputs = () => {
-    const predicateType = core.getInput('predicate-type', { required: true });
-    const predicateStr = core.getInput('predicate', { required: false });
-    const predicatePath = core.getInput('predicate-path', { required: false });
-    if (!predicatePath && !predicateStr) {
+const predicateFromInputs = (inputs) => {
+    const { predicateType, predicate, predicatePath } = inputs;
+    if (!predicateType) {
+        throw new Error('predicate-type must be provided');
+    }
+    if (!predicatePath && !predicate) {
         throw new Error('One of predicate-path or predicate must be provided');
     }
-    if (predicatePath && predicateStr) {
+    if (predicatePath && predicate) {
         throw new Error('Only one of predicate-path or predicate may be provided');
     }
     const params = predicatePath
         ? fs_1.default.readFileSync(predicatePath, 'utf-8')
-        : predicateStr;
+        : predicate;
     return { type: predicateType, params: JSON.parse(params) };
 };
 exports.predicateFromInputs = predicateFromInputs;
@@ -80202,7 +80238,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.subjectFromInputs = void 0;
-const core = __importStar(__nccwpck_require__(42186));
 const glob = __importStar(__nccwpck_require__(28090));
 const crypto_1 = __importDefault(__nccwpck_require__(6113));
 const sync_1 = __nccwpck_require__(74393);
@@ -80213,13 +80248,8 @@ const DIGEST_ALGORITHM = 'sha256';
 // specified as a path to a file or as a digest. If a path is provided, the
 // file's digest is calculated and returned along with the subject's name. If a
 // digest is provided, the name must also be provided.
-const subjectFromInputs = async () => {
-    const subjectPath = core.getInput('subject-path', { required: false });
-    const subjectDigest = core.getInput('subject-digest', { required: false });
-    const subjectName = core.getInput('subject-name', { required: false });
-    const pushToRegistry = core.getBooleanInput('push-to-registry', {
-        required: false
-    });
+const subjectFromInputs = async (inputs) => {
+    const { subjectPath, subjectDigest, subjectName, downcaseName } = inputs;
     if (!subjectPath && !subjectDigest) {
         throw new Error('One of subject-path or subject-digest must be provided');
     }
@@ -80231,7 +80261,7 @@ const subjectFromInputs = async () => {
     }
     // If push-to-registry is enabled, ensure the subject name is lowercase
     // to conform to OCI image naming conventions
-    const name = pushToRegistry ? subjectName.toLowerCase() : subjectName;
+    const name = downcaseName ? subjectName.toLowerCase() : subjectName;
     if (subjectPath) {
         return await getSubjectFromPath(subjectPath, name);
     }
@@ -94365,22 +94395,12 @@ module.exports = {"i8":"3.0.4"};
 /******/ 	if (typeof __nccwpck_require__ !== 'undefined') __nccwpck_require__.ab = __dirname + "/";
 /******/ 	
 /************************************************************************/
-var __webpack_exports__ = {};
-// This entry need to be wrapped in an IIFE because it need to be in strict mode.
-(() => {
-"use strict";
-var exports = __webpack_exports__;
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-/**
- * The entrypoint for the action.
- */
-const main_1 = __nccwpck_require__(70399);
-// eslint-disable-next-line @typescript-eslint/no-floating-promises
-(0, main_1.run)();
-
-})();
-
-module.exports = __webpack_exports__;
+/******/ 	
+/******/ 	// startup
+/******/ 	// Load entry module and return exports
+/******/ 	// This entry module is referenced by other modules so it can't be inlined
+/******/ 	var __webpack_exports__ = __nccwpck_require__(6144);
+/******/ 	module.exports = __webpack_exports__;
+/******/ 	
 /******/ })()
 ;

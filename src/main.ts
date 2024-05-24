@@ -6,8 +6,8 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import { SEARCH_PUBLIC_GOOD_URL } from './endpoints'
-import { predicateFromInputs } from './predicate'
-import { subjectFromInputs } from './subject'
+import { PredicateInputs, predicateFromInputs } from './predicate'
+import { SubjectInputs, subjectFromInputs } from './subject'
 
 type SigstoreInstance = 'public-good' | 'github'
 type AttestedSubject = { subject: Subject; attestationID: string }
@@ -17,11 +17,18 @@ const COLOR_GRAY = '\x1B[38;5;244m'
 const COLOR_DEFAULT = '\x1B[39m'
 const ATTESTATION_FILE_NAME = 'attestation.jsonl'
 
-const DEFAULT_BATCH_SIZE = 50
-const DEFAULT_BATCH_DELAY = 5000
-
 const OCI_TIMEOUT = 2000
 const OCI_RETRY = 3
+
+export type RunInputs = SubjectInputs &
+  PredicateInputs & {
+    pushToRegistry: boolean
+    githubToken: string
+    // undocumented
+    privateSigning: boolean
+    batchSize: number
+    batchDelay: number
+  }
 
 /* istanbul ignore next */
 const logHandler = (level: string, ...args: unknown[]): void => {
@@ -35,7 +42,7 @@ const logHandler = (level: string, ...args: unknown[]): void => {
  * The main function for the action.
  * @returns {Promise<void>} Resolves when the action is complete.
  */
-export async function run(): Promise<void> {
+export async function run(inputs: RunInputs): Promise<void> {
   process.on('log', logHandler)
 
   // Provenance visibility will be public ONLY if we can confirm that the
@@ -43,7 +50,7 @@ export async function run(): Promise<void> {
   // Otherwise, it will be private.
   const sigstoreInstance: SigstoreInstance =
     github.context.payload.repository?.visibility === 'public' &&
-    core.getInput('private-signing') !== 'true'
+    !inputs.privateSigning
       ? 'public-good'
       : 'github'
 
@@ -55,24 +62,21 @@ export async function run(): Promise<void> {
       )
     }
 
-    const subjects = await subjectFromInputs()
-    const predicate = predicateFromInputs()
+    const subjects = await subjectFromInputs({
+      ...inputs,
+      downcaseName: inputs.pushToRegistry
+    })
+    const predicate = predicateFromInputs(inputs)
     const outputPath = path.join(tempDir(), ATTESTATION_FILE_NAME)
 
-    // Batch size and delay for rate limiting
-    const batchSize =
-      parseInt(core.getInput('batch-size')) || DEFAULT_BATCH_SIZE
-    const batchDelay =
-      parseInt(core.getInput('batch-delay')) || DEFAULT_BATCH_DELAY
-
-    const subjectChunks = chunkArray(subjects, batchSize)
+    const subjectChunks = chunkArray(subjects, inputs.batchSize)
     let chunkCount = 0
 
     // Generate attestations for each subject serially, working in batches
     for (const subjectChunk of subjectChunks) {
       // Delay between batches (only when chunkCount > 0)
       if (chunkCount++) {
-        await new Promise(resolve => setTimeout(resolve, batchDelay))
+        await new Promise(resolve => setTimeout(resolve, inputs.batchDelay))
       }
 
       if (subjectChunks.length > 1) {
@@ -82,11 +86,11 @@ export async function run(): Promise<void> {
       }
 
       for (const subject of subjectChunk) {
-        const att = await createAttestation(
-          subject,
-          predicate,
-          sigstoreInstance
-        )
+        const att = await createAttestation(subject, predicate, {
+          sigstoreInstance,
+          pushToRegistry: inputs.pushToRegistry,
+          githubToken: inputs.githubToken
+        })
 
         // Write attestation bundle to output file
         fs.writeFileSync(outputPath, JSON.stringify(att.bundle) + os.EOL, {
@@ -139,7 +143,11 @@ export async function run(): Promise<void> {
 const createAttestation = async (
   subject: Subject,
   predicate: Predicate,
-  sigstoreInstance: SigstoreInstance
+  opts: {
+    sigstoreInstance: SigstoreInstance
+    pushToRegistry: boolean
+    githubToken: string
+  }
 ): Promise<Attestation> => {
   // Sign provenance w/ Sigstore
   const attestation = await attest({
@@ -147,14 +155,14 @@ const createAttestation = async (
     subjectDigest: subject.digest,
     predicateType: predicate.type,
     predicate: predicate.params,
-    sigstore: sigstoreInstance,
-    token: core.getInput('github-token')
+    sigstore: opts.sigstoreInstance,
+    token: opts.githubToken
   })
 
   core.info(`Attestation created for ${subject.name}@${subjectDigest(subject)}`)
 
   const instanceName =
-    sigstoreInstance === 'public-good' ? 'Public Good' : 'GitHub'
+    opts.sigstoreInstance === 'public-good' ? 'Public Good' : 'GitHub'
   core.startGroup(
     highlight(
       `Attestation signed using certificate from ${instanceName} Sigstore instance`
@@ -175,7 +183,7 @@ const createAttestation = async (
     core.info(attestationURL(attestation.attestationID))
   }
 
-  if (core.getBooleanInput('push-to-registry', { required: false })) {
+  if (opts.pushToRegistry) {
     const credentials = getRegistryCredentials(subject.name)
     const artifact = await attachArtifactToImage({
       credentials,
