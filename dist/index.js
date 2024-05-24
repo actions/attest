@@ -79898,6 +79898,63 @@ function wrappy (fn, cb) {
 
 /***/ }),
 
+/***/ 26056:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.createAttestation = void 0;
+const attest_1 = __nccwpck_require__(74113);
+const oci_1 = __nccwpck_require__(47353);
+const OCI_TIMEOUT = 2000;
+const OCI_RETRY = 3;
+const createAttestation = async (subject, predicate, opts) => {
+    // Sign provenance w/ Sigstore
+    const attestation = await (0, attest_1.attest)({
+        subjectName: subject.name,
+        subjectDigest: subject.digest,
+        predicateType: predicate.type,
+        predicate: predicate.params,
+        sigstore: opts.sigstoreInstance,
+        token: opts.githubToken
+    });
+    const subDigest = subjectDigest(subject);
+    const result = {
+        ...attestation,
+        subjectName: subject.name,
+        subjectDigest: subDigest
+    };
+    if (opts.pushToRegistry) {
+        const credentials = (0, oci_1.getRegistryCredentials)(subject.name);
+        const artifact = await (0, oci_1.attachArtifactToImage)({
+            credentials,
+            imageName: subject.name,
+            imageDigest: subDigest,
+            artifact: Buffer.from(JSON.stringify(attestation.bundle)),
+            mediaType: attestation.bundle.mediaType,
+            annotations: {
+                'dev.sigstore.bundle.content': 'dsse-envelope',
+                'dev.sigstore.bundle.predicateType': predicate.type
+            },
+            fetchOpts: { timeout: OCI_TIMEOUT, retry: OCI_RETRY }
+        });
+        // Add the attestation's digest to the result
+        result.attestationDigest = artifact.digest;
+    }
+    return result;
+};
+exports.createAttestation = createAttestation;
+// Returns the subject's digest as a formatted string of the form
+// "<algorithm>:<digest>".
+const subjectDigest = (subject) => {
+    const alg = Object.keys(subject.digest).sort()[0];
+    return `${alg}:${subject.digest[alg]}`;
+};
+
+
+/***/ }),
+
 /***/ 69112:
 /***/ ((__unused_webpack_module, exports) => {
 
@@ -80000,22 +80057,17 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = void 0;
-const attest_1 = __nccwpck_require__(74113);
 const core = __importStar(__nccwpck_require__(42186));
 const github = __importStar(__nccwpck_require__(95438));
-const oci_1 = __nccwpck_require__(47353);
 const fs_1 = __importDefault(__nccwpck_require__(57147));
 const os_1 = __importDefault(__nccwpck_require__(22037));
 const path_1 = __importDefault(__nccwpck_require__(71017));
+const attest_1 = __nccwpck_require__(26056);
 const endpoints_1 = __nccwpck_require__(69112);
 const predicate_1 = __nccwpck_require__(72103);
+const style = __importStar(__nccwpck_require__(41583));
 const subject_1 = __nccwpck_require__(95206);
-const COLOR_CYAN = '\x1B[36m';
-const COLOR_GRAY = '\x1B[38;5;244m';
-const COLOR_DEFAULT = '\x1B[39m';
 const ATTESTATION_FILE_NAME = 'attestation.jsonl';
-const OCI_TIMEOUT = 2000;
-const OCI_RETRY = 3;
 /* istanbul ignore next */
 const logHandler = (level, ...args) => {
     // Send any HTTP-related log events to the GitHub Actions debug log
@@ -80047,6 +80099,7 @@ async function run(inputs) {
         });
         const predicate = (0, predicate_1.predicateFromInputs)(inputs);
         const outputPath = path_1.default.join(tempDir(), ATTESTATION_FILE_NAME);
+        core.setOutput('bundle-path', outputPath);
         const subjectChunks = chunkArray(subjects, inputs.batchSize);
         let chunkCount = 0;
         // Generate attestations for each subject serially, working in batches
@@ -80059,31 +80112,21 @@ async function run(inputs) {
                 core.info(`Processing subject batch ${chunkCount}/${subjectChunks.length}`);
             }
             for (const subject of subjectChunk) {
-                const att = await createAttestation(subject, predicate, {
+                const att = await (0, attest_1.createAttestation)(subject, predicate, {
                     sigstoreInstance,
                     pushToRegistry: inputs.pushToRegistry,
                     githubToken: inputs.githubToken
                 });
+                atts.push(att);
+                logAttestation(att, sigstoreInstance);
                 // Write attestation bundle to output file
                 fs_1.default.writeFileSync(outputPath, JSON.stringify(att.bundle) + os_1.default.EOL, {
                     encoding: 'utf-8',
                     flag: 'a'
                 });
-                if (att.attestationID) {
-                    atts.push({ subject, attestationID: att.attestationID });
-                }
             }
         }
-        if (atts.length > 0) {
-            core.summary.addHeading(
-            /* istanbul ignore next */
-            atts.length > 1 ? 'Attestations Created' : 'Attestation Created', 3);
-            for (const { subject, attestationID } of atts) {
-                core.summary.addLink(`${subject.name}@${subjectDigest(subject)}`, attestationURL(attestationID));
-            }
-            core.summary.write();
-        }
-        core.setOutput('bundle-path', outputPath);
+        logSummary(atts);
     }
     catch (err) {
         // Fail the workflow run if an error occurs
@@ -80092,7 +80135,7 @@ async function run(inputs) {
         /* istanbul ignore if */
         if (err instanceof Error && 'cause' in err) {
             const innerErr = err.cause;
-            core.info(mute(innerErr instanceof Error ? innerErr.toString() : `${innerErr}`));
+            core.info(style.mute(innerErr instanceof Error ? innerErr.toString() : `${innerErr}`));
         }
     }
     finally {
@@ -80100,53 +80143,40 @@ async function run(inputs) {
     }
 }
 exports.run = run;
-const createAttestation = async (subject, predicate, opts) => {
-    // Sign provenance w/ Sigstore
-    const attestation = await (0, attest_1.attest)({
-        subjectName: subject.name,
-        subjectDigest: subject.digest,
-        predicateType: predicate.type,
-        predicate: predicate.params,
-        sigstore: opts.sigstoreInstance,
-        token: opts.githubToken
-    });
-    core.info(`Attestation created for ${subject.name}@${subjectDigest(subject)}`);
-    const instanceName = opts.sigstoreInstance === 'public-good' ? 'Public Good' : 'GitHub';
-    core.startGroup(highlight(`Attestation signed using certificate from ${instanceName} Sigstore instance`));
+// Log details about the attestation to the GitHub Actions run
+const logAttestation = (attestation, sigstoreInstance) => {
+    core.info(`Attestation created for ${attestation.subjectName}@${attestation.subjectDigest}`);
+    const instanceName = sigstoreInstance === 'public-good' ? 'Public Good' : 'GitHub';
+    core.startGroup(style.highlight(`Attestation signed using certificate from ${instanceName} Sigstore instance`));
     core.info(attestation.certificate);
     core.endGroup();
     if (attestation.tlogID) {
-        core.info(highlight('Attestation signature uploaded to Rekor transparency log'));
+        core.info(style.highlight('Attestation signature uploaded to Rekor transparency log'));
         core.info(`${endpoints_1.SEARCH_PUBLIC_GOOD_URL}?logIndex=${attestation.tlogID}`);
     }
     if (attestation.attestationID) {
-        core.info(highlight('Attestation uploaded to repository'));
+        core.info(style.highlight('Attestation uploaded to repository'));
         core.info(attestationURL(attestation.attestationID));
     }
-    if (opts.pushToRegistry) {
-        const credentials = (0, oci_1.getRegistryCredentials)(subject.name);
-        const artifact = await (0, oci_1.attachArtifactToImage)({
-            credentials,
-            imageName: subject.name,
-            imageDigest: subjectDigest(subject),
-            artifact: Buffer.from(JSON.stringify(attestation.bundle)),
-            mediaType: attestation.bundle.mediaType,
-            annotations: {
-                'dev.sigstore.bundle.content': 'dsse-envelope',
-                'dev.sigstore.bundle.predicateType': core.getInput('predicate-type')
-            },
-            fetchOpts: { timeout: OCI_TIMEOUT, retry: OCI_RETRY }
-        });
-        core.info(highlight('Attestation uploaded to registry'));
-        core.info(`${subject.name}@${artifact.digest}`);
+    if (attestation.attestationDigest) {
+        core.info(style.highlight('Attestation uploaded to registry'));
+        core.info(`${attestation.subjectName}@${attestation.attestationDigest}`);
     }
-    return attestation;
 };
-// Emphasis string using ANSI color codes
-const highlight = (str) => `${COLOR_CYAN}${str}${COLOR_DEFAULT}`;
-// De-emphasize string using ANSI color codes
-/* istanbul ignore next */
-const mute = (str) => `${COLOR_GRAY}${str}${COLOR_DEFAULT}`;
+// Attach summary information to the GitHub Actions run
+const logSummary = (attestations) => {
+    if (attestations.length > 0) {
+        core.summary.addHeading(
+        /* istanbul ignore next */
+        attestations.length > 1 ? 'Attestations Created' : 'Attestation Created', 3);
+        for (const { subjectName, subjectDigest, attestationID } of attestations) {
+            if (attestationID) {
+                core.summary.addLink(`${subjectName}@${subjectDigest}`, attestationURL(attestationID));
+            }
+        }
+        core.summary.write();
+    }
+};
 const tempDir = () => {
     const basePath = process.env['RUNNER_TEMP'];
     /* istanbul ignore if */
@@ -80159,12 +80189,6 @@ const tempDir = () => {
 // `chunkSize` elements.
 const chunkArray = (array, chunkSize) => {
     return Array.from({ length: Math.ceil(array.length / chunkSize) }, (_, index) => array.slice(index * chunkSize, (index + 1) * chunkSize));
-};
-// Returns the subject's digest as a formatted string of the form
-// "<algorithm>:<digest>".
-const subjectDigest = (subject) => {
-    const alg = Object.keys(subject.digest).sort()[0];
-    return `${alg}:${subject.digest[alg]}`;
 };
 const attestationURL = (id) => `${github.context.serverUrl}/${github.context.repo.owner}/${github.context.repo.repo}/attestations/${id}`;
 
@@ -80201,6 +80225,26 @@ const predicateFromInputs = (inputs) => {
     return { type: predicateType, params: JSON.parse(params) };
 };
 exports.predicateFromInputs = predicateFromInputs;
+
+
+/***/ }),
+
+/***/ 41583:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.mute = exports.highlight = void 0;
+const COLOR_CYAN = '\x1B[36m';
+const COLOR_GRAY = '\x1B[38;5;244m';
+const COLOR_DEFAULT = '\x1B[39m';
+// Emphasis string using ANSI color codes
+const highlight = (str) => `${COLOR_CYAN}${str}${COLOR_DEFAULT}`;
+exports.highlight = highlight;
+// De-emphasize string using ANSI color codes
+const mute = (str) => `${COLOR_GRAY}${str}${COLOR_DEFAULT}`;
+exports.mute = mute;
 
 
 /***/ }),
