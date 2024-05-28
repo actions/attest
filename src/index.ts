@@ -17,7 +17,9 @@ const inputs: RunInputs = {
   pushToRegistry: core.getBooleanInput('push-to-registry'),
   githubToken: core.getInput('github-token'),
   // undocumented -- not part of public interface
-  privateSigning: core.getBooleanInput('private-signing'),
+  privateSigning: ['true', 'True', 'TRUE', '1'].includes(
+    core.getInput('private-signing')
+  ),
   // internal only
   batchSize: DEFAULT_BATCH_SIZE,
   batchDelay: DEFAULT_BATCH_DELAY
