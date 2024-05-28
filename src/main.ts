@@ -1,30 +1,20 @@
-import { Attestation, Predicate, Subject, attest } from '@actions/attest'
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import { attachArtifactToImage, getRegistryCredentials } from '@sigstore/oci'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
+import { AttestResult, SigstoreInstance, createAttestation } from './attest'
 import { SEARCH_PUBLIC_GOOD_URL } from './endpoints'
 import { PredicateInputs, predicateFromInputs } from './predicate'
+import * as style from './style'
 import { SubjectInputs, subjectFromInputs } from './subject'
 
-type SigstoreInstance = 'public-good' | 'github'
-type AttestedSubject = { subject: Subject; attestationID: string }
-
-const COLOR_CYAN = '\x1B[36m'
-const COLOR_GRAY = '\x1B[38;5;244m'
-const COLOR_DEFAULT = '\x1B[39m'
 const ATTESTATION_FILE_NAME = 'attestation.jsonl'
-
-const OCI_TIMEOUT = 2000
-const OCI_RETRY = 3
 
 export type RunInputs = SubjectInputs &
   PredicateInputs & {
     pushToRegistry: boolean
     githubToken: string
-    // undocumented
     privateSigning: boolean
     batchSize: number
     batchDelay: number
@@ -55,7 +45,7 @@ export async function run(inputs: RunInputs): Promise<void> {
       : 'github'
 
   try {
-    const atts: AttestedSubject[] = []
+    const atts: AttestResult[] = []
     if (!process.env.ACTIONS_ID_TOKEN_REQUEST_URL) {
       throw new Error(
         'missing "id-token" permission. Please add "permissions: id-token: write" to your workflow.'
@@ -67,7 +57,9 @@ export async function run(inputs: RunInputs): Promise<void> {
       downcaseName: inputs.pushToRegistry
     })
     const predicate = predicateFromInputs(inputs)
+
     const outputPath = path.join(tempDir(), ATTESTATION_FILE_NAME)
+    core.setOutput('bundle-path', outputPath)
 
     const subjectChunks = chunkArray(subjects, inputs.batchSize)
     let chunkCount = 0
@@ -91,36 +83,19 @@ export async function run(inputs: RunInputs): Promise<void> {
           pushToRegistry: inputs.pushToRegistry,
           githubToken: inputs.githubToken
         })
+        atts.push(att)
+
+        logAttestation(att, sigstoreInstance)
 
         // Write attestation bundle to output file
         fs.writeFileSync(outputPath, JSON.stringify(att.bundle) + os.EOL, {
           encoding: 'utf-8',
           flag: 'a'
         })
-
-        if (att.attestationID) {
-          atts.push({ subject, attestationID: att.attestationID })
-        }
       }
     }
 
-    if (atts.length > 0) {
-      core.summary.addHeading(
-        /* istanbul ignore next */
-        atts.length > 1 ? 'Attestations Created' : 'Attestation Created',
-        3
-      )
-
-      for (const { subject, attestationID } of atts) {
-        core.summary.addLink(
-          `${subject.name}@${subjectDigest(subject)}`,
-          attestationURL(attestationID)
-        )
-      }
-      core.summary.write()
-    }
-
-    core.setOutput('bundle-path', outputPath)
+    logSummary(atts)
   } catch (err) {
     // Fail the workflow run if an error occurs
     core.setFailed(
@@ -132,7 +107,9 @@ export async function run(inputs: RunInputs): Promise<void> {
     if (err instanceof Error && 'cause' in err) {
       const innerErr = err.cause
       core.info(
-        mute(innerErr instanceof Error ? innerErr.toString() : `${innerErr}`)
+        style.mute(
+          innerErr instanceof Error ? innerErr.toString() : `${innerErr}`
+        )
       )
     }
   } finally {
@@ -140,31 +117,19 @@ export async function run(inputs: RunInputs): Promise<void> {
   }
 }
 
-const createAttestation = async (
-  subject: Subject,
-  predicate: Predicate,
-  opts: {
-    sigstoreInstance: SigstoreInstance
-    pushToRegistry: boolean
-    githubToken: string
-  }
-): Promise<Attestation> => {
-  // Sign provenance w/ Sigstore
-  const attestation = await attest({
-    subjectName: subject.name,
-    subjectDigest: subject.digest,
-    predicateType: predicate.type,
-    predicate: predicate.params,
-    sigstore: opts.sigstoreInstance,
-    token: opts.githubToken
-  })
-
-  core.info(`Attestation created for ${subject.name}@${subjectDigest(subject)}`)
+// Log details about the attestation to the GitHub Actions run
+const logAttestation = (
+  attestation: AttestResult,
+  sigstoreInstance: SigstoreInstance
+): void => {
+  core.info(
+    `Attestation created for ${attestation.subjectName}@${attestation.subjectDigest}`
+  )
 
   const instanceName =
-    opts.sigstoreInstance === 'public-good' ? 'Public Good' : 'GitHub'
+    sigstoreInstance === 'public-good' ? 'Public Good' : 'GitHub'
   core.startGroup(
-    highlight(
+    style.highlight(
       `Attestation signed using certificate from ${instanceName} Sigstore instance`
     )
   )
@@ -173,43 +138,44 @@ const createAttestation = async (
 
   if (attestation.tlogID) {
     core.info(
-      highlight('Attestation signature uploaded to Rekor transparency log')
+      style.highlight(
+        'Attestation signature uploaded to Rekor transparency log'
+      )
     )
     core.info(`${SEARCH_PUBLIC_GOOD_URL}?logIndex=${attestation.tlogID}`)
   }
 
   if (attestation.attestationID) {
-    core.info(highlight('Attestation uploaded to repository'))
+    core.info(style.highlight('Attestation uploaded to repository'))
     core.info(attestationURL(attestation.attestationID))
   }
 
-  if (opts.pushToRegistry) {
-    const credentials = getRegistryCredentials(subject.name)
-    const artifact = await attachArtifactToImage({
-      credentials,
-      imageName: subject.name,
-      imageDigest: subjectDigest(subject),
-      artifact: Buffer.from(JSON.stringify(attestation.bundle)),
-      mediaType: attestation.bundle.mediaType,
-      annotations: {
-        'dev.sigstore.bundle.content': 'dsse-envelope',
-        'dev.sigstore.bundle.predicateType': core.getInput('predicate-type')
-      },
-      fetchOpts: { timeout: OCI_TIMEOUT, retry: OCI_RETRY }
-    })
-    core.info(highlight('Attestation uploaded to registry'))
-    core.info(`${subject.name}@${artifact.digest}`)
+  if (attestation.attestationDigest) {
+    core.info(style.highlight('Attestation uploaded to registry'))
+    core.info(`${attestation.subjectName}@${attestation.attestationDigest}`)
   }
-
-  return attestation
 }
 
-// Emphasis string using ANSI color codes
-const highlight = (str: string): string => `${COLOR_CYAN}${str}${COLOR_DEFAULT}`
+// Attach summary information to the GitHub Actions run
+const logSummary = (attestations: AttestResult[]): void => {
+  if (attestations.length > 0) {
+    core.summary.addHeading(
+      /* istanbul ignore next */
+      attestations.length > 1 ? 'Attestations Created' : 'Attestation Created',
+      3
+    )
 
-// De-emphasize string using ANSI color codes
-/* istanbul ignore next */
-const mute = (str: string): string => `${COLOR_GRAY}${str}${COLOR_DEFAULT}`
+    for (const { subjectName, subjectDigest, attestationID } of attestations) {
+      if (attestationID) {
+        core.summary.addLink(
+          `${subjectName}@${subjectDigest}`,
+          attestationURL(attestationID)
+        )
+      }
+    }
+    core.summary.write()
+  }
+}
 
 const tempDir = (): string => {
   const basePath = process.env['RUNNER_TEMP']
@@ -229,13 +195,6 @@ const chunkArray = <T>(array: T[], chunkSize: number): T[][] => {
     { length: Math.ceil(array.length / chunkSize) },
     (_, index) => array.slice(index * chunkSize, (index + 1) * chunkSize)
   )
-}
-
-// Returns the subject's digest as a formatted string of the form
-// "<algorithm>:<digest>".
-const subjectDigest = (subject: Subject): string => {
-  const alg = Object.keys(subject.digest).sort()[0]
-  return `${alg}:${subject.digest[alg]}`
 }
 
 const attestationURL = (id: string): string =>
