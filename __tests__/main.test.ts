@@ -46,8 +46,7 @@ const defaultInputs: main.RunInputs = {
   pushToRegistry: false,
   githubToken: '',
   privateSigning: false,
-  batchSize: 50,
-  batchDelay: 5000
+  batchSize: 50
 }
 
 describe('action', () => {
@@ -355,8 +354,7 @@ describe('action', () => {
         predicateType,
         predicate,
         githubToken: 'gh-token',
-        batchSize: 2,
-        batchDelay: 500
+        batchSize: 2
       }
       await main.run(inputs)
 
@@ -375,6 +373,54 @@ describe('action', () => {
         expect.stringMatching('Processing subject batch 3/3')
       )
       expect(scope.isDone()).toBe(true)
+    })
+  })
+
+  describe('when the subject count exceeds the max', () => {
+    let dir = ''
+    const filename = 'subject'
+
+    beforeEach(async () => {
+      const subjectCount = 2501
+      const content = 'file content'
+
+      // Set-up temp directory
+      const tmpDir = await fs.realpath(os.tmpdir())
+      dir = await fs.mkdtemp(tmpDir + path.sep)
+
+      // Add files for glob testing
+      for (let i = 0; i < subjectCount; i++) {
+        await fs.writeFile(path.join(dir, `${filename}-${i}`), content)
+      }
+
+      // Set the GH context with private repository visibility and a repo owner.
+      setGHContext({
+        payload: { repository: { visibility: 'private' } },
+        repo: { owner: 'foo', repo: 'bar' }
+      })
+    })
+
+    afterEach(async () => {
+      // Clean-up temp directory
+      await fs.rm(dir, { recursive: true })
+    })
+
+    it('sets a failed status', async () => {
+      const inputs: main.RunInputs = {
+        ...defaultInputs,
+        subjectPath: path.join(dir, `${filename}-*`),
+        predicateType,
+        predicate,
+        githubToken: 'gh-token'
+      }
+      await main.run(inputs)
+
+      expect(runMock).toHaveReturned()
+      expect(setFailedMock).toHaveBeenCalledWith(
+        new Error(
+          'Too many subjects specified. The maximum number of subjects is 2500.'
+        )
+      )
     })
   })
 })

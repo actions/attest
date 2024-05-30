@@ -80002,7 +80002,6 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(42186));
 const main_1 = __nccwpck_require__(70399);
 const DEFAULT_BATCH_SIZE = 50;
-const DEFAULT_BATCH_DELAY = 5000;
 const inputs = {
     subjectPath: core.getInput('subject-path'),
     subjectName: core.getInput('subject-name'),
@@ -80015,8 +80014,7 @@ const inputs = {
     // undocumented -- not part of public interface
     privateSigning: ['true', 'True', 'TRUE', '1'].includes(core.getInput('private-signing')),
     // internal only
-    batchSize: DEFAULT_BATCH_SIZE,
-    batchDelay: DEFAULT_BATCH_DELAY
+    batchSize: DEFAULT_BATCH_SIZE
 };
 // eslint-disable-next-line @typescript-eslint/no-floating-promises
 (0, main_1.run)(inputs);
@@ -80068,6 +80066,8 @@ const predicate_1 = __nccwpck_require__(72103);
 const style = __importStar(__nccwpck_require__(41583));
 const subject_1 = __nccwpck_require__(95206);
 const ATTESTATION_FILE_NAME = 'attestation.jsonl';
+const DELAY_INTERVAL_MS = 75;
+const DELAY_MAX_MS = 1200;
 /* istanbul ignore next */
 const logHandler = (level, ...args) => {
     // Send any HTTP-related log events to the GitHub Actions debug log
@@ -80101,17 +80101,18 @@ async function run(inputs) {
         const outputPath = path_1.default.join(tempDir(), ATTESTATION_FILE_NAME);
         core.setOutput('bundle-path', outputPath);
         const subjectChunks = chunkArray(subjects, inputs.batchSize);
-        let chunkCount = 0;
         // Generate attestations for each subject serially, working in batches
-        for (const subjectChunk of subjectChunks) {
-            // Delay between batches (only when chunkCount > 0)
-            if (chunkCount++) {
-                await new Promise(resolve => setTimeout(resolve, inputs.batchDelay));
-            }
+        for (let i = 0; i < subjectChunks.length; i++) {
             if (subjectChunks.length > 1) {
-                core.info(`Processing subject batch ${chunkCount}/${subjectChunks.length}`);
+                core.info(`Processing subject batch ${i + 1}/${subjectChunks.length}`);
             }
-            for (const subject of subjectChunk) {
+            // Calculate the delay time for this batch
+            const delayTime = delay(i);
+            for (const subject of subjectChunks[i]) {
+                // Delay between attestations (only when chunk size > 1)
+                if (i > 0) {
+                    await new Promise(resolve => setTimeout(resolve, delayTime));
+                }
                 const att = await (0, attest_1.createAttestation)(subject, predicate, {
                     sigstoreInstance,
                     pushToRegistry: inputs.pushToRegistry,
@@ -80190,6 +80191,8 @@ const tempDir = () => {
 const chunkArray = (array, chunkSize) => {
     return Array.from({ length: Math.ceil(array.length / chunkSize) }, (_, index) => array.slice(index * chunkSize, (index + 1) * chunkSize));
 };
+// Calculate the delay time for a given iteration
+const delay = (iteration) => Math.min(DELAY_INTERVAL_MS * 2 ** iteration, DELAY_MAX_MS);
 const attestationURL = (id) => `${github.context.serverUrl}/${github.context.repo.owner}/${github.context.repo.repo}/attestations/${id}`;
 
 
@@ -80287,6 +80290,7 @@ const crypto_1 = __importDefault(__nccwpck_require__(6113));
 const sync_1 = __nccwpck_require__(74393);
 const fs_1 = __importDefault(__nccwpck_require__(57147));
 const path_1 = __importDefault(__nccwpck_require__(71017));
+const MAX_SUBJECT_COUNT = 2500;
 const DIGEST_ALGORITHM = 'sha256';
 // Returns the subject specified by the action's inputs. The subject may be
 // specified as a path to a file or as a digest. If a path is provided, the
@@ -80317,27 +80321,31 @@ exports.subjectFromInputs = subjectFromInputs;
 // Returns the subject specified by the path to a file. The file's digest is
 // calculated and returned along with the subject's name.
 const getSubjectFromPath = async (subjectPath, subjectName) => {
-    const subjects = [];
+    const digestedSubjects = [];
+    const files = [];
     // Parse the list of subject paths
     const subjectPaths = parseList(subjectPath);
+    // Expand the globbed paths to a list of files
     for (const subPath of subjectPaths) {
-        // Expand the globbed path to a list of files
         /* eslint-disable-next-line github/no-then */
-        const files = await glob.create(subPath).then(async (g) => g.glob());
-        for (const file of files) {
-            // Skip anything that is NOT a file
-            if (!fs_1.default.statSync(file).isFile()) {
-                continue;
-            }
-            const name = subjectName || path_1.default.parse(file).base;
-            const digest = await digestFile(DIGEST_ALGORITHM, file);
-            subjects.push({ name, digest: { [DIGEST_ALGORITHM]: digest } });
-        }
+        files.push(...(await glob.create(subPath).then(async (g) => g.glob())));
     }
-    if (subjects.length === 0) {
+    if (files.length > MAX_SUBJECT_COUNT) {
+        throw new Error(`Too many subjects specified. The maximum number of subjects is ${MAX_SUBJECT_COUNT}.`);
+    }
+    for (const file of files) {
+        // Skip anything that is NOT a file
+        if (!fs_1.default.statSync(file).isFile()) {
+            continue;
+        }
+        const name = subjectName || path_1.default.parse(file).base;
+        const digest = await digestFile(DIGEST_ALGORITHM, file);
+        digestedSubjects.push({ name, digest: { [DIGEST_ALGORITHM]: digest } });
+    }
+    if (digestedSubjects.length === 0) {
         throw new Error(`Could not find subject at path ${subjectPath}`);
     }
-    return Promise.all(subjects);
+    return digestedSubjects;
 };
 // Returns the subject specified by the digest of a file. The digest is returned
 // along with the subject's name.
