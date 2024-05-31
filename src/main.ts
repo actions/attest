@@ -19,6 +19,7 @@ export type RunInputs = SubjectInputs &
     githubToken: string
     showSummary: boolean
     privateSigning: boolean
+    skipAttestationStore: boolean
     batchSize: number
   }
 
@@ -83,7 +84,8 @@ export async function run(inputs: RunInputs): Promise<void> {
         const att = await createAttestation(subject, predicate, {
           sigstoreInstance,
           pushToRegistry: inputs.pushToRegistry,
-          githubToken: inputs.githubToken
+          githubToken: inputs.githubToken,
+          skipAttestationStore: inputs.skipAttestationStore
         })
         atts.push(att)
 

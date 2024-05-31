@@ -20,6 +20,9 @@ const inputs: RunInputs = {
   privateSigning: ['true', 'True', 'TRUE', '1'].includes(
     core.getInput('private-signing')
   ),
+  skipAttestationStore: ['true', 'True', 'TRUE', '1'].includes(
+    core.getInput('skip-attestation-store')
+  ),
   // internal only
   batchSize: DEFAULT_BATCH_SIZE
 }

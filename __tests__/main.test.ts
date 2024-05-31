@@ -47,7 +47,8 @@ const defaultInputs: main.RunInputs = {
   showSummary: true,
   githubToken: '',
   privateSigning: false,
-  batchSize: 50
+  batchSize: 50,
+  skipAttestationStore: false
 }
 
 describe('action', () => {

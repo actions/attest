@@ -71811,7 +71811,8 @@ const createAttestation = async (subject, predicate, opts) => {
         predicateType: predicate.type,
         predicate: predicate.params,
         sigstore: opts.sigstoreInstance,
-        token: opts.githubToken
+        token: opts.githubToken,
+        skipWrite: opts.skipAttestationStore
     });
     const subDigest = subjectDigest(subject);
     const result = {
@@ -71908,6 +71909,7 @@ const inputs = {
     githubToken: core.getInput('github-token'),
     // undocumented -- not part of public interface
     privateSigning: ['true', 'True', 'TRUE', '1'].includes(core.getInput('private-signing')),
+    skipAttestationStore: ['true', 'True', 'TRUE', '1'].includes(core.getInput('skip-attestation-store')),
     // internal only
     batchSize: DEFAULT_BATCH_SIZE
 };
@@ -72011,7 +72013,8 @@ async function run(inputs) {
                 const att = await (0, attest_1.createAttestation)(subject, predicate, {
                     sigstoreInstance,
                     pushToRegistry: inputs.pushToRegistry,
-                    githubToken: inputs.githubToken
+                    githubToken: inputs.githubToken,
+                    skipAttestationStore: inputs.skipAttestationStore
                 });
                 atts.push(att);
                 logAttestation(att, sigstoreInstance);
