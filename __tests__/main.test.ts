@@ -46,6 +46,7 @@ const defaultInputs: main.RunInputs = {
   pushToRegistry: false,
   githubToken: '',
   privateSigning: false,
+  skipAttestationStore: false,
   batchSize: 50,
   batchDelay: 5000
 }
