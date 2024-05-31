@@ -47,7 +47,8 @@ const defaultInputs: main.RunInputs = {
   pushToRegistry: false,
   showSummary: true,
   githubToken: '',
-  privateSigning: false
+  privateSigning: false,
+  skipAttestationStore: false
 }
 
 describe('action', () => {

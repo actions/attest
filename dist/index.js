@@ -70755,7 +70755,8 @@ const createAttestation = async (subjects, predicate, opts) => {
         predicateType: predicate.type,
         predicate: predicate.params,
         sigstore: opts.sigstoreInstance,
-        token: opts.githubToken
+        token: opts.githubToken,
+        skipWrite: opts.skipAttestationStore
     });
     const result = attestation;
     if (subjects.length === 1 && opts.pushToRegistry) {
@@ -70851,7 +70852,8 @@ const inputs = {
     showSummary: core.getBooleanInput('show-summary'),
     githubToken: core.getInput('github-token'),
     // undocumented -- not part of public interface
-    privateSigning: ['true', 'True', 'TRUE', '1'].includes(core.getInput('private-signing'))
+    privateSigning: ['true', 'True', 'TRUE', '1'].includes(core.getInput('private-signing')),
+    skipAttestationStore: ['true', 'True', 'TRUE', '1'].includes(core.getInput('skip-attestation-store'))
 };
 /* eslint-disable-next-line @typescript-eslint/no-floating-promises */
 (0, main_1.run)(inputs);
@@ -70947,7 +70949,8 @@ async function run(inputs) {
         const att = await (0, attest_1.createAttestation)(subjects, predicate, {
             sigstoreInstance,
             pushToRegistry: inputs.pushToRegistry,
-            githubToken: inputs.githubToken
+            githubToken: inputs.githubToken,
+            skipAttestationStore: inputs.skipAttestationStore
         });
         logAttestation(subjects, att, sigstoreInstance);
         // Write attestation bundle to output file
