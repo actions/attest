@@ -151,7 +151,7 @@ describe('subjectFromInputs', () => {
     })
   })
 
-  describe('when the file eixts', () => {
+  describe('when the file exists', () => {
     let dir = ''
     const filename = 'subject'
     const content = 'file content'

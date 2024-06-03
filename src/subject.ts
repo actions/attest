@@ -6,6 +6,7 @@ import path from 'path'
 
 import type { Subject } from '@actions/attest'
 
+const MAX_SUBJECT_COUNT = 2500
 const DIGEST_ALGORITHM = 'sha256'
 
 export type SubjectInputs = {
@@ -54,34 +55,41 @@ const getSubjectFromPath = async (
   subjectPath: string,
   subjectName?: string
 ): Promise<Subject[]> => {
-  const subjects: Subject[] = []
+  const digestedSubjects: Subject[] = []
+  const files: string[] = []
 
   // Parse the list of subject paths
   const subjectPaths = parseList(subjectPath)
 
+  // Expand the globbed paths to a list of files
   for (const subPath of subjectPaths) {
-    // Expand the globbed path to a list of files
     /* eslint-disable-next-line github/no-then */
-    const files = await glob.create(subPath).then(async g => g.glob())
-
-    for (const file of files) {
-      // Skip anything that is NOT a file
-      if (!fs.statSync(file).isFile()) {
-        continue
-      }
-
-      const name = subjectName || path.parse(file).base
-      const digest = await digestFile(DIGEST_ALGORITHM, file)
-
-      subjects.push({ name, digest: { [DIGEST_ALGORITHM]: digest } })
-    }
+    files.push(...(await glob.create(subPath).then(async g => g.glob())))
   }
 
-  if (subjects.length === 0) {
+  if (files.length > MAX_SUBJECT_COUNT) {
+    throw new Error(
+      `Too many subjects specified. The maximum number of subjects is ${MAX_SUBJECT_COUNT}.`
+    )
+  }
+
+  for (const file of files) {
+    // Skip anything that is NOT a file
+    if (!fs.statSync(file).isFile()) {
+      continue
+    }
+
+    const name = subjectName || path.parse(file).base
+    const digest = await digestFile(DIGEST_ALGORITHM, file)
+
+    digestedSubjects.push({ name, digest: { [DIGEST_ALGORITHM]: digest } })
+  }
+
+  if (digestedSubjects.length === 0) {
     throw new Error(`Could not find subject at path ${subjectPath}`)
   }
 
-  return Promise.all(subjects)
+  return digestedSubjects
 }
 
 // Returns the subject specified by the digest of a file. The digest is returned

@@ -65,7 +65,7 @@ See [action.yml](action.yml)
   with:
     # Path to the artifact serving as the subject of the attestation. Must
     # specify exactly one of "subject-path" or "subject-digest". May contain
-    # a glob pattern or list of paths (total subject count cannot exceed 64).
+    # a glob pattern or list of paths (total subject count cannot exceed 2500).
     subject-path:
 
     # SHA256 digest of the subject for the attestation. Must be in the form
@@ -114,6 +114,15 @@ Attestations are saved in the JSON-serialized [Sigstore bundle][6] format.
 If multiple subjects are being attested at the same time, each attestation will
 be written to the output file on a separate line (using the [JSON Lines][7]
 format).
+
+## Attestation Limits
+
+### Subject Limits
+
+No more than 2500 subjects can be attested at the same time. Subjects will be
+processed in batches 50. After the initial group of 50, each subsequent batch
+will incur an exponentially increasing amount of delay (capped at 1 minute of
+delay per batch) to avoid overwhelming the attestation API.
 
 ## Examples
 
@@ -175,8 +184,8 @@ fully-qualified image name (e.g. "ghcr.io/user/app" or
 "acme.azurecr.io/user/app"). Do NOT include a tag as part of the image name --
 the specific image being attested is identified by the supplied digest.
 
-> **NOTE**: When pushing to Docker Hub, please use "docker.io" as the
-> registry portion of the image name.
+> **NOTE**: When pushing to Docker Hub, please use "docker.io" as the registry
+> portion of the image name.
 
 ```yaml
 name: build-attested-image

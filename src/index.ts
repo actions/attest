@@ -5,7 +5,6 @@ import * as core from '@actions/core'
 import { run, RunInputs } from './main'
 
 const DEFAULT_BATCH_SIZE = 50
-const DEFAULT_BATCH_DELAY = 5000
 
 const inputs: RunInputs = {
   subjectPath: core.getInput('subject-path'),
@@ -21,8 +20,7 @@ const inputs: RunInputs = {
     core.getInput('private-signing')
   ),
   // internal only
-  batchSize: DEFAULT_BATCH_SIZE,
-  batchDelay: DEFAULT_BATCH_DELAY
+  batchSize: DEFAULT_BATCH_SIZE
 }
 
 // eslint-disable-next-line @typescript-eslint/no-floating-promises

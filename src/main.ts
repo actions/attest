@@ -10,6 +10,8 @@ import * as style from './style'
 import { SubjectInputs, subjectFromInputs } from './subject'
 
 const ATTESTATION_FILE_NAME = 'attestation.jsonl'
+const DELAY_INTERVAL_MS = 75
+const DELAY_MAX_MS = 1200
 
 export type RunInputs = SubjectInputs &
   PredicateInputs & {
@@ -17,7 +19,6 @@ export type RunInputs = SubjectInputs &
     githubToken: string
     privateSigning: boolean
     batchSize: number
-    batchDelay: number
   }
 
 /* istanbul ignore next */
@@ -62,22 +63,22 @@ export async function run(inputs: RunInputs): Promise<void> {
     core.setOutput('bundle-path', outputPath)
 
     const subjectChunks = chunkArray(subjects, inputs.batchSize)
-    let chunkCount = 0
 
     // Generate attestations for each subject serially, working in batches
-    for (const subjectChunk of subjectChunks) {
-      // Delay between batches (only when chunkCount > 0)
-      if (chunkCount++) {
-        await new Promise(resolve => setTimeout(resolve, inputs.batchDelay))
-      }
-
+    for (let i = 0; i < subjectChunks.length; i++) {
       if (subjectChunks.length > 1) {
-        core.info(
-          `Processing subject batch ${chunkCount}/${subjectChunks.length}`
-        )
+        core.info(`Processing subject batch ${i + 1}/${subjectChunks.length}`)
       }
 
-      for (const subject of subjectChunk) {
+      // Calculate the delay time for this batch
+      const delayTime = delay(i)
+
+      for (const subject of subjectChunks[i]) {
+        // Delay between attestations (only when chunk size > 1)
+        if (i > 0) {
+          await new Promise(resolve => setTimeout(resolve, delayTime))
+        }
+
         const att = await createAttestation(subject, predicate, {
           sigstoreInstance,
           pushToRegistry: inputs.pushToRegistry,
@@ -196,6 +197,10 @@ const chunkArray = <T>(array: T[], chunkSize: number): T[][] => {
     (_, index) => array.slice(index * chunkSize, (index + 1) * chunkSize)
   )
 }
+
+// Calculate the delay time for a given iteration
+const delay = (iteration: number): number =>
+  Math.min(DELAY_INTERVAL_MS * 2 ** iteration, DELAY_MAX_MS)
 
 const attestationURL = (id: string): string =>
   `${github.context.serverUrl}/${github.context.repo.owner}/${github.context.repo.repo}/attestations/${id}`
