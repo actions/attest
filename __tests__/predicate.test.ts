@@ -78,6 +78,20 @@ describe('subjectFromInputs', () => {
     })
   })
 
+  describe('when specifying a predicate path that does not exist', () => {
+    const predicateType = 'https://example.com/predicate'
+    const predicatePath = 'foo'
+
+    it('returns the predicate', () => {
+      const inputs: PredicateInputs = {
+        ...blankInputs,
+        predicateType,
+        predicatePath
+      }
+      expect(() => predicateFromInputs(inputs)).toThrow(/file not found/)
+    })
+  })
+
   describe('when specifying a predicate value', () => {
     const predicateType = 'https://example.com/predicate'
     const content = '{}'
@@ -93,6 +107,23 @@ describe('subjectFromInputs', () => {
         type: predicateType,
         params: JSON.parse(content)
       })
+    })
+  })
+
+  describe('when specifying a predicate value exceeding the max size', () => {
+    const predicateType = 'https://example.com/predicate'
+    const content = JSON.stringify({ a: 'a'.repeat(16 * 1024 * 1024) })
+
+    it('throws an error', () => {
+      const inputs: PredicateInputs = {
+        ...blankInputs,
+        predicateType,
+        predicate: content
+      }
+
+      expect(() => predicateFromInputs(inputs)).toThrow(
+        /predicate string exceeds maximum/
+      )
     })
   })
 })

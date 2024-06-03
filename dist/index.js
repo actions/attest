@@ -80209,6 +80209,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.predicateFromInputs = void 0;
 const fs_1 = __importDefault(__nccwpck_require__(57147));
+const MAX_PREDICATE_SIZE_BYTES = 16 * 1024 * 1024;
 // Returns the predicate specified by the action's inputs. The predicate value
 // may be specified as a path to a file or as a string.
 const predicateFromInputs = (inputs) => {
@@ -80222,9 +80223,23 @@ const predicateFromInputs = (inputs) => {
     if (predicatePath && predicate) {
         throw new Error('Only one of predicate-path or predicate may be provided');
     }
-    const params = predicatePath
-        ? fs_1.default.readFileSync(predicatePath, 'utf-8')
-        : predicate;
+    let params = predicate;
+    if (predicatePath) {
+        if (!fs_1.default.existsSync(predicatePath)) {
+            throw new Error(`predicate file not found: ${predicatePath}`);
+        }
+        /* istanbul ignore next */
+        if (fs_1.default.statSync(predicatePath).size > MAX_PREDICATE_SIZE_BYTES) {
+            throw new Error(`predicate file exceeds maximum allowed size: ${MAX_PREDICATE_SIZE_BYTES} bytes`);
+        }
+        params = fs_1.default.readFileSync(predicatePath, 'utf-8');
+    }
+    else {
+        if (predicate.length > MAX_PREDICATE_SIZE_BYTES) {
+            throw new Error(`predicate string exceeds maximum allowed size: ${MAX_PREDICATE_SIZE_BYTES} bytes`);
+        }
+        params = predicate;
+    }
     return { type: predicateType, params: JSON.parse(params) };
 };
 exports.predicateFromInputs = predicateFromInputs;

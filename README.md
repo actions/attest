@@ -81,12 +81,14 @@ See [action.yml](action.yml)
     # URI identifying the type of the predicate.
     predicate-type:
 
-    # JSON string containing the value for the attestation predicate. Must
-    # supply exactly one of "predicate-path" or "predicate".
+    # String containing the value for the attestation predicate. String length
+    # cannot exceed 16MB. Must supply exactly one of "predicate-path" or
+    # "predicate".
     predicate:
 
-    # Path to the file which contains the JSON content for the attestation
-    # predicate. Must supply exactly one of "predicate-path" or "predicate".
+    # Path to the file which contains the content for the attestation predicate.
+    # File size cannot exceed 16MB. Must supply exactly one of "predicate-path"
+    # or "predicate".
     predicate-path:
 
     # Whether to push the attestation to the image registry. Requires that the
@@ -123,6 +125,11 @@ No more than 2500 subjects can be attested at the same time. Subjects will be
 processed in batches 50. After the initial group of 50, each subsequent batch
 will incur an exponentially increasing amount of delay (capped at 1 minute of
 delay per batch) to avoid overwhelming the attestation API.
+
+### Predicate Limits
+
+Whether supplied via the `predicate` or `predicatePath` input, the predicate
+string cannot exceed 16MB.
 
 ## Examples
 
