@@ -30,13 +30,15 @@ inputs:
     required: true
   predicate:
     description: >
-      String containing the value for the attestation predicate. Must supply
-      exactly one of "predicate-path" or "predicate".
+      String containing the value for the attestation predicate. String length
+      cannot exceed 16MB. Must supply exactly one of "predicate-path" or
+      "predicate".
     required: false
   predicate-path:
     description: >
       Path to the file which contains the content for the attestation predicate.
-      Must supply exactly one of "predicate-path" or "predicate".
+      File size cannot exceed 16MB. Must supply exactly one of "predicate-path"
+      or "predicate".
     required: false
   push-to-registry:
     description: >
