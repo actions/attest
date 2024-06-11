@@ -11744,13 +11744,20 @@ class OCIImage {
             });
             // Upload artifact manifest
             artifactDescriptor = await __classPrivateFieldGet(this, _OCIImage_client, "f").uploadManifest(JSON.stringify(manifest));
+            // Check to see if registry supports the referrers API. For most
+            // registries the presence of a subjectDigest response header when
+            // uploading the artifact manifest indicates that the referrers API IS
+            // supported -- however, this is not a guarantee (AWS ECR does NOT support
+            // the referrers API but still reports a subjectDigest).
+            const referrersSupported = await __classPrivateFieldGet(this, _OCIImage_client, "f").pingReferrers();
             // Manually update the referrers list if the referrers API is not supported.
-            // The lack of a subjectDigest indicates that the referrers API is not
-            // supported.
-            if (artifactDescriptor.subjectDigest === undefined) {
+            if (!referrersSupported) {
+                // Strip subjectDigest from the artifact descriptor (in case it was returned)
+                /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
+                const { subjectDigest, ...descriptor } = artifactDescriptor;
                 await __classPrivateFieldGet(this, _OCIImage_instances, "m", _OCIImage_createReferrersIndexByTag).call(this, {
                     artifact: {
-                        ...artifactDescriptor,
+                        ...descriptor,
                         artifactType: opts.mediaType,
                         annotations,
                     },
@@ -11953,7 +11960,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 var _RegistryClient_instances, _RegistryClient_baseURL, _RegistryClient_repository, _RegistryClient_fetch, _RegistryClient_fetchDistributionToken, _RegistryClient_fetchOAuth2Token;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.RegistryClient = void 0;
+exports.RegistryClient = exports.ZERO_DIGEST = void 0;
 /*
 Copyright 2023 The Sigstore Authors.
 
@@ -11980,6 +11987,7 @@ const ALL_MANIFEST_MEDIA_TYPES = [
     constants_1.CONTENT_TYPE_DOCKER_MANIFEST,
     constants_1.CONTENT_TYPE_DOCKER_MANIFEST_LIST,
 ].join(',');
+exports.ZERO_DIGEST = 'sha256:0000000000000000000000000000000000000000000000000000000000000000';
 class RegistryClient {
     constructor(registry, repository, opts) {
         _RegistryClient_instances.add(this);
@@ -12114,6 +12122,11 @@ class RegistryClient {
             size: manifest.length,
             subjectDigest,
         };
+    }
+    // Returns true if the registry supports the referrers API
+    async pingReferrers() {
+        const response = await __classPrivateFieldGet(this, _RegistryClient_fetch, "f").call(this, `${__classPrivateFieldGet(this, _RegistryClient_baseURL, "f")}/v2/${__classPrivateFieldGet(this, _RegistryClient_repository, "f")}/referrers/${exports.ZERO_DIGEST}`);
+        return response.status === 200;
     }
     static digest(blob) {
         const hash = node_crypto_1.default.createHash('sha256');
