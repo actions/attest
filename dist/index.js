@@ -116,21 +116,15 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.signingEndpoints = exports.SIGSTORE_GITHUB = exports.SIGSTORE_PUBLIC_GOOD = void 0;
+exports.signingEndpoints = exports.SIGSTORE_PUBLIC_GOOD = void 0;
 const github = __importStar(__nccwpck_require__(95438));
 const PUBLIC_GOOD_ID = 'public-good';
 const GITHUB_ID = 'github';
 const FULCIO_PUBLIC_GOOD_URL = 'https://fulcio.sigstore.dev';
 const REKOR_PUBLIC_GOOD_URL = 'https://rekor.sigstore.dev';
-const FULCIO_INTERNAL_URL = 'https://fulcio.githubapp.com';
-const TSA_INTERNAL_URL = 'https://timestamp.githubapp.com';
 exports.SIGSTORE_PUBLIC_GOOD = {
     fulcioURL: FULCIO_PUBLIC_GOOD_URL,
     rekorURL: REKOR_PUBLIC_GOOD_URL
-};
-exports.SIGSTORE_GITHUB = {
-    fulcioURL: FULCIO_INTERNAL_URL,
-    tsaServerURL: TSA_INTERNAL_URL
 };
 const signingEndpoints = (sigstore) => {
     var _a;
@@ -150,10 +144,21 @@ const signingEndpoints = (sigstore) => {
         case PUBLIC_GOOD_ID:
             return exports.SIGSTORE_PUBLIC_GOOD;
         case GITHUB_ID:
-            return exports.SIGSTORE_GITHUB;
+            return buildGitHubEndpoints();
     }
 };
 exports.signingEndpoints = signingEndpoints;
+function buildGitHubEndpoints() {
+    const serverURL = process.env.GITHUB_SERVER_URL || 'https://github.com';
+    let host = new URL(serverURL).hostname;
+    if (host === 'github.com') {
+        host = 'githubapp.com';
+    }
+    return {
+        fulcioURL: `https://fulcio.${host}`,
+        tsaServerURL: `https://timestamp.${host}`
+    };
+}
 //# sourceMappingURL=endpoints.js.map
 
 /***/ }),
@@ -254,6 +259,7 @@ const REQUIRED_CLAIMS = [
     'sha',
     'repository',
     'event_name',
+    'job_workflow_ref',
     'workflow_ref',
     'repository_id',
     'repository_owner_id',
@@ -346,8 +352,7 @@ exports.attestProvenance = exports.buildSLSAProvenancePredicate = void 0;
 const attest_1 = __nccwpck_require__(46373);
 const oidc_1 = __nccwpck_require__(95847);
 const SLSA_PREDICATE_V1_TYPE = 'https://slsa.dev/provenance/v1';
-const GITHUB_BUILDER_ID_PREFIX = 'https://github.com/actions/runner';
-const GITHUB_BUILD_TYPE = 'https://slsa-framework.github.io/github-actions-buildtypes/workflow/v1';
+const GITHUB_BUILD_TYPE = 'https://actions.github.io/buildtypes/workflow/v1';
 const DEFAULT_ISSUER = 'https://token.actions.githubusercontent.com';
 /**
  * Builds an SLSA (Supply Chain Levels for Software Artifacts) provenance
@@ -383,7 +388,8 @@ const buildSLSAProvenancePredicate = (issuer = DEFAULT_ISSUER) => __awaiter(void
                     github: {
                         event_name: claims.event_name,
                         repository_id: claims.repository_id,
-                        repository_owner_id: claims.repository_owner_id
+                        repository_owner_id: claims.repository_owner_id,
+                        runner_environment: claims.runner_environment
                     }
                 },
                 resolvedDependencies: [
@@ -397,7 +403,7 @@ const buildSLSAProvenancePredicate = (issuer = DEFAULT_ISSUER) => __awaiter(void
             },
             runDetails: {
                 builder: {
-                    id: `${GITHUB_BUILDER_ID_PREFIX}/${claims.runner_environment}`
+                    id: `${serverURL}/${claims.job_workflow_ref}`
                 },
                 metadata: {
                     invocationId: `${serverURL}/${claims.repository}/actions/runs/${claims.run_id}/attempts/${claims.run_attempt}`
@@ -478,6 +484,7 @@ const initBundleBuilder = (opts) => {
         witnesses.push(new sign_1.RekorWitness({
             rekorBaseURL: opts.rekorURL,
             entryType: 'dsse',
+            fetchOnConflict: true,
             timeout,
             retry
         }));
@@ -94351,7 +94358,7 @@ exports.parse = parse;
 /***/ ((module) => {
 
 "use strict";
-module.exports = {"i8":"2.3.1"};
+module.exports = {"i8":"2.3.2"};
 
 /***/ }),
 
