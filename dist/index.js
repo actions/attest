@@ -11758,7 +11758,7 @@ class OCIImage {
             // the referrers API but still reports a subjectDigest).
             const referrersSupported = await __classPrivateFieldGet(this, _OCIImage_client, "f").pingReferrers();
             // Manually update the referrers list if the referrers API is not supported.
-            if (!referrersSupported) {
+            if (!artifactDescriptor.subjectDigest || !referrersSupported) {
                 // Strip subjectDigest from the artifact descriptor (in case it was returned)
                 /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
                 const { subjectDigest, ...descriptor } = artifactDescriptor;
