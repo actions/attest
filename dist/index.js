@@ -79927,7 +79927,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.createAttestation = void 0;
 const attest_1 = __nccwpck_require__(74113);
 const oci_1 = __nccwpck_require__(47353);
-const OCI_TIMEOUT = 2000;
+const OCI_TIMEOUT = 30000;
 const OCI_RETRY = 3;
 const createAttestation = async (subject, predicate, opts) => {
     // Sign provenance w/ Sigstore
