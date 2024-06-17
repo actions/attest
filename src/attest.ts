@@ -1,7 +1,7 @@
 import { Attestation, Predicate, Subject, attest } from '@actions/attest'
 import { attachArtifactToImage, getRegistryCredentials } from '@sigstore/oci'
 
-const OCI_TIMEOUT = 2000
+const OCI_TIMEOUT = 30000
 const OCI_RETRY = 3
 
 export type SigstoreInstance = 'public-good' | 'github'
