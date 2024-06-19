@@ -190,7 +190,7 @@ newline delimited list:
 ```
 
 ```yaml
-- uses: actions/attest-build-provenance@v1
+- uses: actions/attest@v1
   with:
     subject-path: |
       dist/foo
