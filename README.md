@@ -184,7 +184,7 @@ Alternatively, you can explicitly list multiple subjects with either a comma or
 newline delimited list:
 
 ```yaml
-- uses: actions/attest-build-provenance@v1
+- uses: actions/attest@v1
   with:
     subject-path: 'dist/foo, dist/bar'
 ```
