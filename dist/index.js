@@ -80074,7 +80074,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.run = void 0;
+exports.run = run;
 const core = __importStar(__nccwpck_require__(42186));
 const github = __importStar(__nccwpck_require__(95438));
 const fs_1 = __importDefault(__nccwpck_require__(57147));
@@ -80163,7 +80163,6 @@ async function run(inputs) {
         process.removeListener('log', logHandler);
     }
 }
-exports.run = run;
 // Log details about the attestation to the GitHub Actions run
 const logAttestation = (attestation, sigstoreInstance) => {
     core.info(`Attestation created for ${attestation.subjectName}@${attestation.subjectDigest}`);
