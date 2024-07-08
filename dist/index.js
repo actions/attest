@@ -80356,14 +80356,11 @@ exports.subjectFromInputs = subjectFromInputs;
 // calculated and returned along with the subject's name.
 const getSubjectFromPath = async (subjectPath, subjectName) => {
     const digestedSubjects = [];
-    const files = [];
     // Parse the list of subject paths
-    const subjectPaths = parseList(subjectPath);
+    const subjectPaths = parseList(subjectPath).join('\n');
     // Expand the globbed paths to a list of files
-    for (const subPath of subjectPaths) {
-        /* eslint-disable-next-line github/no-then */
-        files.push(...(await glob.create(subPath).then(async (g) => g.glob())));
-    }
+    /* eslint-disable-next-line github/no-then */
+    const files = await glob.create(subjectPaths).then(async (g) => g.glob());
     if (files.length > MAX_SUBJECT_COUNT) {
         throw new Error(`Too many subjects specified. The maximum number of subjects is ${MAX_SUBJECT_COUNT}.`);
     }
