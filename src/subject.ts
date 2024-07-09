@@ -56,16 +56,13 @@ const getSubjectFromPath = async (
   subjectName?: string
 ): Promise<Subject[]> => {
   const digestedSubjects: Subject[] = []
-  const files: string[] = []
 
   // Parse the list of subject paths
-  const subjectPaths = parseList(subjectPath)
+  const subjectPaths = parseList(subjectPath).join('\n')
 
   // Expand the globbed paths to a list of files
-  for (const subPath of subjectPaths) {
-    /* eslint-disable-next-line github/no-then */
-    files.push(...(await glob.create(subPath).then(async g => g.glob())))
-  }
+  /* eslint-disable-next-line github/no-then */
+  const files = await glob.create(subjectPaths).then(async g => g.glob())
 
   if (files.length > MAX_SUBJECT_COUNT) {
     throw new Error(

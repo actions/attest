@@ -296,6 +296,29 @@ describe('subjectFromInputs', () => {
       })
     })
 
+    describe('when an excluding glob is supplied', () => {
+      it('returns the multiple subjects', async () => {
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectPath: `${path.join(dir, 'subject-*')},!${path.join(dir, 'subject-1')}`
+        }
+
+        const subjects = await subjectFromInputs(inputs)
+
+        expect(subjects).toBeDefined()
+        expect(subjects).toHaveLength(2)
+
+        expect(subjects).toContainEqual({
+          name: 'subject-0',
+          digest: { sha256: expectedDigest }
+        })
+        expect(subjects).toContainEqual({
+          name: 'subject-2',
+          digest: { sha256: expectedDigest }
+        })
+      })
+    })
+
     describe('when a multi-line glob list is supplied', () => {
       it('returns the multiple subjects', async () => {
         const inputs: SubjectInputs = {
