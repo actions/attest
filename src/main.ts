@@ -166,14 +166,16 @@ const logSummary = (attestations: AttestResult[]): void => {
       3
     )
 
+    const listItems = []
     for (const { subjectName, subjectDigest, attestationID } of attestations) {
       if (attestationID) {
-        core.summary.addLink(
-          `${subjectName}@${subjectDigest}`,
-          attestationURL(attestationID)
+        listItems.push(
+          `<a href="${attestationURL(attestationID)}">${subjectName}@${subjectDigest}</a>`
         )
       }
     }
+
+    core.summary.addList(listItems)
     core.summary.write()
   }
 }

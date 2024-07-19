@@ -80189,11 +80189,13 @@ const logSummary = (attestations) => {
         core.summary.addHeading(
         /* istanbul ignore next */
         attestations.length > 1 ? 'Attestations Created' : 'Attestation Created', 3);
+        const listItems = [];
         for (const { subjectName, subjectDigest, attestationID } of attestations) {
             if (attestationID) {
-                core.summary.addLink(`${subjectName}@${subjectDigest}`, attestationURL(attestationID));
+                listItems.push(`<a href="${attestationURL(attestationID)}">${subjectName}@${subjectDigest}</a>`);
             }
         }
+        core.summary.addList(listItems);
         core.summary.write();
     }
 };
