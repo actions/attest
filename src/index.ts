@@ -14,6 +14,7 @@ const inputs: RunInputs = {
   predicate: core.getInput('predicate'),
   predicatePath: core.getInput('predicate-path'),
   pushToRegistry: core.getBooleanInput('push-to-registry'),
+  showSummary: core.getBooleanInput('show-summary'),
   githubToken: core.getInput('github-token'),
   // undocumented -- not part of public interface
   privateSigning: ['true', 'True', 'TRUE', '1'].includes(

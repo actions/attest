@@ -44,6 +44,7 @@ const defaultInputs: main.RunInputs = {
   subjectDigest: '',
   subjectPath: '',
   pushToRegistry: false,
+  showSummary: true,
   githubToken: '',
   privateSigning: false,
   batchSize: 50
