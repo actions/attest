@@ -17,6 +17,7 @@ export type RunInputs = SubjectInputs &
   PredicateInputs & {
     pushToRegistry: boolean
     githubToken: string
+    showSummary: boolean
     privateSigning: boolean
     batchSize: number
   }
@@ -96,7 +97,9 @@ export async function run(inputs: RunInputs): Promise<void> {
       }
     }
 
-    logSummary(atts)
+    if (inputs.showSummary) {
+      logSummary(atts)
+    }
   } catch (err) {
     // Fail the workflow run if an error occurs
     core.setFailed(

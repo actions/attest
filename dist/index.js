@@ -80030,6 +80030,7 @@ const inputs = {
     predicate: core.getInput('predicate'),
     predicatePath: core.getInput('predicate-path'),
     pushToRegistry: core.getBooleanInput('push-to-registry'),
+    showSummary: core.getBooleanInput('show-summary'),
     githubToken: core.getInput('github-token'),
     // undocumented -- not part of public interface
     privateSigning: ['true', 'True', 'TRUE', '1'].includes(core.getInput('private-signing')),
@@ -80147,7 +80148,9 @@ async function run(inputs) {
                 });
             }
         }
-        logSummary(atts);
+        if (inputs.showSummary) {
+            logSummary(atts);
+        }
     }
     catch (err) {
         // Fail the workflow run if an error occurs
