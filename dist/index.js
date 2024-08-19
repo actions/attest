@@ -540,6 +540,7 @@ const writeAttestation = (attestation, token, options = {}) => __awaiter(void 0,
         const response = yield octokit.request(CREATE_ATTESTATION_REQUEST, {
             owner: github.context.repo.owner,
             repo: github.context.repo.repo,
+            headers: { 'X-GitHub-Publish-Action': 'true' },
             data: { bundle: attestation }
         });
         const data = typeof response.data == 'string'
