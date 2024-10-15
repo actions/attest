@@ -28478,7 +28478,7 @@ exports.possibleElisions = possibleElisions;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.cryptoRuntime = exports.base64url = exports.generateSecret = exports.generateKeyPair = exports.errors = exports.decodeJwt = exports.decodeProtectedHeader = exports.importJWK = exports.importX509 = exports.importPKCS8 = exports.importSPKI = exports.exportJWK = exports.exportSPKI = exports.exportPKCS8 = exports.UnsecuredJWT = exports.createRemoteJWKSet = exports.createLocalJWKSet = exports.EmbeddedJWK = exports.calculateJwkThumbprintUri = exports.calculateJwkThumbprint = exports.EncryptJWT = exports.SignJWT = exports.GeneralSign = exports.FlattenedSign = exports.CompactSign = exports.FlattenedEncrypt = exports.CompactEncrypt = exports.jwtDecrypt = exports.jwtVerify = exports.generalVerify = exports.flattenedVerify = exports.compactVerify = exports.GeneralEncrypt = exports.generalDecrypt = exports.flattenedDecrypt = exports.compactDecrypt = void 0;
+exports.cryptoRuntime = exports.base64url = exports.generateSecret = exports.generateKeyPair = exports.errors = exports.decodeJwt = exports.decodeProtectedHeader = exports.importJWK = exports.importX509 = exports.importPKCS8 = exports.importSPKI = exports.exportJWK = exports.exportSPKI = exports.exportPKCS8 = exports.UnsecuredJWT = exports.experimental_jwksCache = exports.jwksCache = exports.createRemoteJWKSet = exports.createLocalJWKSet = exports.EmbeddedJWK = exports.calculateJwkThumbprintUri = exports.calculateJwkThumbprint = exports.EncryptJWT = exports.SignJWT = exports.GeneralSign = exports.FlattenedSign = exports.CompactSign = exports.FlattenedEncrypt = exports.CompactEncrypt = exports.jwtDecrypt = exports.jwtVerify = exports.generalVerify = exports.flattenedVerify = exports.compactVerify = exports.GeneralEncrypt = exports.generalDecrypt = exports.flattenedDecrypt = exports.compactDecrypt = void 0;
 var decrypt_js_1 = __nccwpck_require__(14298);
 Object.defineProperty(exports, "compactDecrypt", ({ enumerable: true, get: function () { return decrypt_js_1.compactDecrypt; } }));
 var decrypt_js_2 = __nccwpck_require__(59344);
@@ -28520,6 +28520,8 @@ var local_js_1 = __nccwpck_require__(25275);
 Object.defineProperty(exports, "createLocalJWKSet", ({ enumerable: true, get: function () { return local_js_1.createLocalJWKSet; } }));
 var remote_js_1 = __nccwpck_require__(69260);
 Object.defineProperty(exports, "createRemoteJWKSet", ({ enumerable: true, get: function () { return remote_js_1.createRemoteJWKSet; } }));
+Object.defineProperty(exports, "jwksCache", ({ enumerable: true, get: function () { return remote_js_1.jwksCache; } }));
+Object.defineProperty(exports, "experimental_jwksCache", ({ enumerable: true, get: function () { return remote_js_1.experimental_jwksCache; } }));
 var unsecured_js_1 = __nccwpck_require__(40560);
 Object.defineProperty(exports, "UnsecuredJWT", ({ enumerable: true, get: function () { return unsecured_js_1.UnsecuredJWT; } }));
 var export_js_1 = __nccwpck_require__(48108);
@@ -28804,15 +28806,15 @@ exports.flattenedDecrypt = flattenedDecrypt;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.FlattenedEncrypt = exports.unprotected = void 0;
+exports.FlattenedEncrypt = void 0;
 const base64url_js_1 = __nccwpck_require__(12635);
+const private_symbols_js_1 = __nccwpck_require__(46433);
 const encrypt_js_1 = __nccwpck_require__(36286);
 const encrypt_key_management_js_1 = __nccwpck_require__(96539);
 const errors_js_1 = __nccwpck_require__(15974);
 const is_disjoint_js_1 = __nccwpck_require__(21853);
 const buffer_utils_js_1 = __nccwpck_require__(45734);
 const validate_crit_js_1 = __nccwpck_require__(15595);
-exports.unprotected = Symbol();
 class FlattenedEncrypt {
     _plaintext;
     _protectedHeader;
@@ -28906,7 +28908,7 @@ class FlattenedEncrypt {
             let parameters;
             ({ cek, encryptedKey, parameters } = await (0, encrypt_key_management_js_1.default)(alg, enc, key, this._cek, this._keyManagementParameters));
             if (parameters) {
-                if (options && exports.unprotected in options) {
+                if (options && private_symbols_js_1.unprotected in options) {
                     if (!this._unprotectedHeader) {
                         this.setUnprotectedHeader(parameters);
                     }
@@ -29022,6 +29024,7 @@ exports.generalDecrypt = generalDecrypt;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.GeneralEncrypt = void 0;
 const encrypt_js_1 = __nccwpck_require__(62372);
+const private_symbols_js_1 = __nccwpck_require__(46433);
 const errors_js_1 = __nccwpck_require__(15974);
 const cek_js_1 = __nccwpck_require__(87937);
 const is_disjoint_js_1 = __nccwpck_require__(21853);
@@ -29176,7 +29179,7 @@ class GeneralEncrypt {
                     .setKeyManagementParameters({ p2c })
                     .encrypt(recipient.key, {
                     ...recipient.options,
-                    [encrypt_js_1.unprotected]: true,
+                    [private_symbols_js_1.unprotected]: true,
                 });
                 jwe.ciphertext = flattened.ciphertext;
                 jwe.iv = flattened.iv;
@@ -29308,7 +29311,7 @@ exports.calculateJwkThumbprintUri = calculateJwkThumbprintUri;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.createLocalJWKSet = exports.LocalJWKSet = void 0;
+exports.createLocalJWKSet = void 0;
 const import_js_1 = __nccwpck_require__(45647);
 const errors_js_1 = __nccwpck_require__(15974);
 const is_object_js_1 = __nccwpck_require__(92242);
@@ -29407,7 +29410,6 @@ class LocalJWKSet {
         return importWithAlgCache(this._cached, jwk, alg);
     }
 }
-exports.LocalJWKSet = LocalJWKSet;
 async function importWithAlgCache(cache, jwk, alg) {
     const cached = cache.get(jwk) || cache.set(jwk, {}).get(jwk);
     if (cached[alg] === undefined) {
@@ -29443,10 +29445,11 @@ exports.createLocalJWKSet = createLocalJWKSet;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.createRemoteJWKSet = void 0;
+exports.experimental_jwksCache = exports.createRemoteJWKSet = exports.jwksCache = void 0;
 const fetch_jwks_js_1 = __nccwpck_require__(20311);
 const errors_js_1 = __nccwpck_require__(15974);
 const local_js_1 = __nccwpck_require__(25275);
+const is_object_js_1 = __nccwpck_require__(92242);
 function isCloudflareWorkers() {
     return (typeof WebSocketPair !== 'undefined' ||
         (typeof navigator !== 'undefined' && navigator.userAgent === 'Cloudflare-Workers') ||
@@ -29455,8 +29458,24 @@ function isCloudflareWorkers() {
 let USER_AGENT;
 if (typeof navigator === 'undefined' || !navigator.userAgent?.startsWith?.('Mozilla/5.0 ')) {
     const NAME = 'jose';
-    const VERSION = 'v5.4.0';
+    const VERSION = 'v5.9.4';
     USER_AGENT = `${NAME}/${VERSION}`;
+}
+exports.jwksCache = Symbol();
+function isFreshJwksCache(input, cacheMaxAge) {
+    if (typeof input !== 'object' || input === null) {
+        return false;
+    }
+    if (!('uat' in input) || typeof input.uat !== 'number' || Date.now() - input.uat >= cacheMaxAge) {
+        return false;
+    }
+    if (!('jwks' in input) ||
+        !(0, is_object_js_1.default)(input.jwks) ||
+        !Array.isArray(input.jwks.keys) ||
+        !Array.prototype.every.call(input.jwks.keys, is_object_js_1.default)) {
+        return false;
+    }
+    return true;
 }
 class RemoteJWKSet {
     _url;
@@ -29467,6 +29486,7 @@ class RemoteJWKSet {
     _pendingFetch;
     _options;
     _local;
+    _cache;
     constructor(url, options) {
         if (!(url instanceof URL)) {
             throw new TypeError('url must be an instance of URL');
@@ -29478,6 +29498,13 @@ class RemoteJWKSet {
         this._cooldownDuration =
             typeof options?.cooldownDuration === 'number' ? options?.cooldownDuration : 30000;
         this._cacheMaxAge = typeof options?.cacheMaxAge === 'number' ? options?.cacheMaxAge : 600000;
+        if (options?.[exports.jwksCache] !== undefined) {
+            this._cache = options?.[exports.jwksCache];
+            if (isFreshJwksCache(options?.[exports.jwksCache], this._cacheMaxAge)) {
+                this._jwksTimestamp = this._cache.uat;
+                this._local = (0, local_js_1.createLocalJWKSet)(this._cache.jwks);
+            }
+        }
     }
     coolingDown() {
         return typeof this._jwksTimestamp === 'number'
@@ -29518,6 +29545,10 @@ class RemoteJWKSet {
         this._pendingFetch ||= (0, fetch_jwks_js_1.default)(this._url, this._timeoutDuration, this._options)
             .then((json) => {
             this._local = (0, local_js_1.createLocalJWKSet)(json);
+            if (this._cache) {
+                this._cache.uat = Date.now();
+                this._cache.jwks = json;
+            }
             this._jwksTimestamp = Date.now();
             this._pendingFetch = undefined;
         })
@@ -29563,6 +29594,7 @@ function createRemoteJWKSet(url, options) {
     return remoteJWKSet;
 }
 exports.createRemoteJWKSet = createRemoteJWKSet;
+exports.experimental_jwksCache = exports.jwksCache;
 
 
 /***/ }),
@@ -29691,7 +29723,7 @@ class FlattenedSign {
         if (typeof alg !== 'string' || !alg) {
             throw new errors_js_1.JWSInvalid('JWS "alg" (Algorithm) Header Parameter missing or invalid');
         }
-        (0, check_key_type_js_1.default)(alg, key, 'sign');
+        (0, check_key_type_js_1.checkKeyTypeWithJwk)(alg, key, 'sign');
         let payload = this._payload;
         if (b64) {
             payload = buffer_utils_js_1.encoder.encode((0, base64url_js_1.encode)(payload));
@@ -29742,6 +29774,8 @@ const is_object_js_1 = __nccwpck_require__(92242);
 const check_key_type_js_1 = __nccwpck_require__(29555);
 const validate_crit_js_1 = __nccwpck_require__(15595);
 const validate_algorithms_js_1 = __nccwpck_require__(19917);
+const is_jwk_js_1 = __nccwpck_require__(91229);
+const import_js_1 = __nccwpck_require__(45647);
 async function flattenedVerify(jws, key, options) {
     if (!(0, is_object_js_1.default)(jws)) {
         throw new errors_js_1.JWSInvalid('Flattened JWS must be an object');
@@ -29806,8 +29840,14 @@ async function flattenedVerify(jws, key, options) {
     if (typeof key === 'function') {
         key = await key(parsedProt, jws);
         resolvedKey = true;
+        (0, check_key_type_js_1.checkKeyTypeWithJwk)(alg, key, 'verify');
+        if ((0, is_jwk_js_1.isJWK)(key)) {
+            key = await (0, import_js_1.importJWK)(key, alg);
+        }
     }
-    (0, check_key_type_js_1.default)(alg, key, 'verify');
+    else {
+        (0, check_key_type_js_1.checkKeyTypeWithJwk)(alg, key, 'verify');
+    }
     const data = (0, buffer_utils_js_1.concat)(buffer_utils_js_1.encoder.encode(jws.protected ?? ''), buffer_utils_js_1.encoder.encode('.'), typeof jws.payload === 'string' ? buffer_utils_js_1.encoder.encode(jws.payload) : jws.payload);
     let signature;
     try {
@@ -30558,51 +30598,84 @@ exports["default"] = checkIvLength;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.checkKeyTypeWithJwk = void 0;
 const invalid_key_input_js_1 = __nccwpck_require__(16632);
 const is_key_like_js_1 = __nccwpck_require__(7433);
-const symmetricTypeCheck = (alg, key) => {
+const jwk = __nccwpck_require__(91229);
+const tag = (key) => key?.[Symbol.toStringTag];
+const jwkMatchesOp = (alg, key, usage) => {
+    if (key.use !== undefined && key.use !== 'sig') {
+        throw new TypeError('Invalid key for this operation, when present its use must be sig');
+    }
+    if (key.key_ops !== undefined && key.key_ops.includes?.(usage) !== true) {
+        throw new TypeError(`Invalid key for this operation, when present its key_ops must include ${usage}`);
+    }
+    if (key.alg !== undefined && key.alg !== alg) {
+        throw new TypeError(`Invalid key for this operation, when present its alg must be ${alg}`);
+    }
+    return true;
+};
+const symmetricTypeCheck = (alg, key, usage, allowJwk) => {
     if (key instanceof Uint8Array)
         return;
+    if (allowJwk && jwk.isJWK(key)) {
+        if (jwk.isSecretJWK(key) && jwkMatchesOp(alg, key, usage))
+            return;
+        throw new TypeError(`JSON Web Key for symmetric algorithms must have JWK "kty" (Key Type) equal to "oct" and the JWK "k" (Key Value) present`);
+    }
     if (!(0, is_key_like_js_1.default)(key)) {
-        throw new TypeError((0, invalid_key_input_js_1.withAlg)(alg, key, ...is_key_like_js_1.types, 'Uint8Array'));
+        throw new TypeError((0, invalid_key_input_js_1.withAlg)(alg, key, ...is_key_like_js_1.types, 'Uint8Array', allowJwk ? 'JSON Web Key' : null));
     }
     if (key.type !== 'secret') {
-        throw new TypeError(`${is_key_like_js_1.types.join(' or ')} instances for symmetric algorithms must be of type "secret"`);
+        throw new TypeError(`${tag(key)} instances for symmetric algorithms must be of type "secret"`);
     }
 };
-const asymmetricTypeCheck = (alg, key, usage) => {
+const asymmetricTypeCheck = (alg, key, usage, allowJwk) => {
+    if (allowJwk && jwk.isJWK(key)) {
+        switch (usage) {
+            case 'sign':
+                if (jwk.isPrivateJWK(key) && jwkMatchesOp(alg, key, usage))
+                    return;
+                throw new TypeError(`JSON Web Key for this operation be a private JWK`);
+            case 'verify':
+                if (jwk.isPublicJWK(key) && jwkMatchesOp(alg, key, usage))
+                    return;
+                throw new TypeError(`JSON Web Key for this operation be a public JWK`);
+        }
+    }
     if (!(0, is_key_like_js_1.default)(key)) {
-        throw new TypeError((0, invalid_key_input_js_1.withAlg)(alg, key, ...is_key_like_js_1.types));
+        throw new TypeError((0, invalid_key_input_js_1.withAlg)(alg, key, ...is_key_like_js_1.types, allowJwk ? 'JSON Web Key' : null));
     }
     if (key.type === 'secret') {
-        throw new TypeError(`${is_key_like_js_1.types.join(' or ')} instances for asymmetric algorithms must not be of type "secret"`);
+        throw new TypeError(`${tag(key)} instances for asymmetric algorithms must not be of type "secret"`);
     }
     if (usage === 'sign' && key.type === 'public') {
-        throw new TypeError(`${is_key_like_js_1.types.join(' or ')} instances for asymmetric algorithm signing must be of type "private"`);
+        throw new TypeError(`${tag(key)} instances for asymmetric algorithm signing must be of type "private"`);
     }
     if (usage === 'decrypt' && key.type === 'public') {
-        throw new TypeError(`${is_key_like_js_1.types.join(' or ')} instances for asymmetric algorithm decryption must be of type "private"`);
+        throw new TypeError(`${tag(key)} instances for asymmetric algorithm decryption must be of type "private"`);
     }
     if (key.algorithm && usage === 'verify' && key.type === 'private') {
-        throw new TypeError(`${is_key_like_js_1.types.join(' or ')} instances for asymmetric algorithm verifying must be of type "public"`);
+        throw new TypeError(`${tag(key)} instances for asymmetric algorithm verifying must be of type "public"`);
     }
     if (key.algorithm && usage === 'encrypt' && key.type === 'private') {
-        throw new TypeError(`${is_key_like_js_1.types.join(' or ')} instances for asymmetric algorithm encryption must be of type "public"`);
+        throw new TypeError(`${tag(key)} instances for asymmetric algorithm encryption must be of type "public"`);
     }
 };
-const checkKeyType = (alg, key, usage) => {
+function checkKeyType(allowJwk, alg, key, usage) {
     const symmetric = alg.startsWith('HS') ||
         alg === 'dir' ||
         alg.startsWith('PBES2') ||
         /^A\d{3}(?:GCM)?KW$/.test(alg);
     if (symmetric) {
-        symmetricTypeCheck(alg, key);
+        symmetricTypeCheck(alg, key, usage, allowJwk);
     }
     else {
-        asymmetricTypeCheck(alg, key, usage);
+        asymmetricTypeCheck(alg, key, usage, allowJwk);
     }
-};
-exports["default"] = checkKeyType;
+}
+exports["default"] = checkKeyType.bind(undefined, false);
+exports.checkKeyTypeWithJwk = checkKeyType.bind(undefined, true);
 
 
 /***/ }),
@@ -30800,6 +30873,7 @@ const ECDH = __nccwpck_require__(43359);
 const pbes2kw_js_1 = __nccwpck_require__(52741);
 const rsaes_js_1 = __nccwpck_require__(61129);
 const base64url_js_1 = __nccwpck_require__(12635);
+const normalize_key_js_1 = __nccwpck_require__(51276);
 const errors_js_1 = __nccwpck_require__(15974);
 const cek_js_1 = __nccwpck_require__(87937);
 const import_js_1 = __nccwpck_require__(45647);
@@ -30808,6 +30882,7 @@ const is_object_js_1 = __nccwpck_require__(92242);
 const aesgcmkw_js_1 = __nccwpck_require__(95864);
 async function decryptKeyManagement(alg, key, encryptedKey, joseHeader, options) {
     (0, check_key_type_js_1.default)(alg, key, 'decrypt');
+    key = (await normalize_key_js_1.default.normalizePrivateKey?.(key, alg)) || key;
     switch (alg) {
         case 'dir': {
             if (encryptedKey !== undefined)
@@ -30937,6 +31012,7 @@ const ECDH = __nccwpck_require__(43359);
 const pbes2kw_js_1 = __nccwpck_require__(52741);
 const rsaes_js_1 = __nccwpck_require__(61129);
 const base64url_js_1 = __nccwpck_require__(12635);
+const normalize_key_js_1 = __nccwpck_require__(51276);
 const cek_js_1 = __nccwpck_require__(87937);
 const errors_js_1 = __nccwpck_require__(15974);
 const export_js_1 = __nccwpck_require__(48108);
@@ -30947,6 +31023,7 @@ async function encryptKeyManagement(alg, enc, key, providedCek, providedParamete
     let parameters;
     let cek;
     (0, check_key_type_js_1.default)(alg, key, 'encrypt');
+    key = (await normalize_key_js_1.default.normalizePublicKey?.(key, alg)) || key;
     switch (alg) {
         case 'dir': {
             cek = key;
@@ -31042,6 +31119,7 @@ exports["default"] = (date) => Math.floor(date.getTime() / 1000);
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.withAlg = void 0;
 function message(msg, actual, ...types) {
+    types = types.filter(Boolean);
     if (types.length > 2) {
         const last = types.pop();
         msg += `one of type ${types.join(', ')}, or ${last}.`;
@@ -31104,6 +31182,34 @@ const isDisjoint = (...headers) => {
     return true;
 };
 exports["default"] = isDisjoint;
+
+
+/***/ }),
+
+/***/ 91229:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.isSecretJWK = exports.isPublicJWK = exports.isPrivateJWK = exports.isJWK = void 0;
+const is_object_js_1 = __nccwpck_require__(92242);
+function isJWK(key) {
+    return (0, is_object_js_1.default)(key) && typeof key.kty === 'string';
+}
+exports.isJWK = isJWK;
+function isPrivateJWK(key) {
+    return key.kty !== 'oct' && typeof key.d === 'string';
+}
+exports.isPrivateJWK = isPrivateJWK;
+function isPublicJWK(key) {
+    return key.kty !== 'oct' && typeof key.d === 'undefined';
+}
+exports.isPublicJWK = isPublicJWK;
+function isSecretJWK(key) {
+    return isJWK(key) && key.kty === 'oct' && typeof key.k === 'string';
+}
+exports.isSecretJWK = isSecretJWK;
 
 
 /***/ }),
@@ -31219,7 +31325,8 @@ exports["default"] = (protectedHeader, encodedPayload, options = {}) => {
             throw new errors_js_1.JWTClaimValidationFailed(`missing required "${claim}" claim`, payload, claim, 'missing');
         }
     }
-    if (issuer && !(Array.isArray(issuer) ? issuer : [issuer]).includes(payload.iss)) {
+    if (issuer &&
+        !(Array.isArray(issuer) ? issuer : [issuer]).includes(payload.iss)) {
         throw new errors_js_1.JWTClaimValidationFailed('unexpected "iss" claim value', payload, 'iss', 'check_failed');
     }
     if (subject && payload.sub !== subject) {
@@ -31276,6 +31383,18 @@ exports["default"] = (protectedHeader, encodedPayload, options = {}) => {
     }
     return payload;
 };
+
+
+/***/ }),
+
+/***/ 46433:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.unprotected = void 0;
+exports.unprotected = Symbol();
 
 
 /***/ }),
@@ -31557,7 +31676,7 @@ const decodeBase64 = (input) => new Uint8Array(node_buffer_1.Buffer.from(input, 
 exports.decodeBase64 = decodeBase64;
 const encodeBase64 = (input) => node_buffer_1.Buffer.from(input).toString('base64');
 exports.encodeBase64 = encodeBase64;
-const decode = (input) => new Uint8Array(node_buffer_1.Buffer.from(normalize(input), 'base64'));
+const decode = (input) => new Uint8Array(node_buffer_1.Buffer.from(normalize(input), 'base64url'));
 exports.decode = decode;
 
 
@@ -31628,13 +31747,23 @@ exports["default"] = checkCekLength;
 /***/ }),
 
 /***/ 65142:
-/***/ ((__unused_webpack_module, exports) => {
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+const node_crypto_1 = __nccwpck_require__(77598);
 exports["default"] = (key, alg) => {
-    const { modulusLength } = key.asymmetricKeyDetails;
+    let modulusLength;
+    try {
+        if (key instanceof node_crypto_1.KeyObject) {
+            modulusLength = key.asymmetricKeyDetails?.modulusLength;
+        }
+        else {
+            modulusLength = Buffer.from(key.n, 'base64url').byteLength << 3;
+        }
+    }
+    catch { }
     if (typeof modulusLength !== 'number' || modulusLength < 2048) {
         throw new TypeError(`${alg} requires key modulusLength to be 2048 bits or larger`);
     }
@@ -32158,6 +32287,7 @@ const webcrypto_js_1 = __nccwpck_require__(59044);
 const is_key_object_js_1 = __nccwpck_require__(68685);
 const invalid_key_input_js_1 = __nccwpck_require__(16632);
 const is_key_like_js_1 = __nccwpck_require__(7433);
+const is_jwk_js_1 = __nccwpck_require__(91229);
 exports.weakMap = new WeakMap();
 const namedCurveToJOSE = (namedCurve) => {
     switch (namedCurve) {
@@ -32180,6 +32310,9 @@ const getNamedCurve = (kee, raw) => {
     }
     else if ((0, is_key_object_js_1.default)(kee)) {
         key = kee;
+    }
+    else if ((0, is_jwk_js_1.isJWK)(kee)) {
+        return kee.crv;
     }
     else {
         throw new TypeError((0, invalid_key_input_js_1.default)(kee, ...is_key_like_js_1.types));
@@ -32221,6 +32354,7 @@ const webcrypto_js_1 = __nccwpck_require__(59044);
 const crypto_key_js_1 = __nccwpck_require__(26319);
 const invalid_key_input_js_1 = __nccwpck_require__(16632);
 const is_key_like_js_1 = __nccwpck_require__(7433);
+const jwk = __nccwpck_require__(91229);
 function getSignVerifyKey(alg, key, usage) {
     if (key instanceof Uint8Array) {
         if (!alg.startsWith('HS')) {
@@ -32235,7 +32369,13 @@ function getSignVerifyKey(alg, key, usage) {
         (0, crypto_key_js_1.checkSigCryptoKey)(key, alg, usage);
         return node_crypto_1.KeyObject.from(key);
     }
-    throw new TypeError((0, invalid_key_input_js_1.default)(key, ...is_key_like_js_1.types, 'Uint8Array'));
+    if (jwk.isJWK(key)) {
+        if (alg.startsWith('HS')) {
+            return (0, node_crypto_1.createSecretKey)(Buffer.from(key.k, 'base64url'));
+        }
+        return key;
+    }
+    throw new TypeError((0, invalid_key_input_js_1.default)(key, ...is_key_like_js_1.types, 'Uint8Array', 'JSON Web Key'));
 }
 exports["default"] = getSignVerifyKey;
 
@@ -32304,8 +32444,11 @@ exports["default"] = (obj) => util.types.isKeyObject(obj);
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const node_crypto_1 = __nccwpck_require__(77598);
-const parse = (jwk) => {
-    return (jwk.d ? node_crypto_1.createPrivateKey : node_crypto_1.createPublicKey)({ format: 'jwk', key: jwk });
+const parse = (key) => {
+    if (key.d) {
+        return (0, node_crypto_1.createPrivateKey)({ format: 'jwk', key });
+    }
+    return (0, node_crypto_1.createPublicKey)({ format: 'jwk', key });
 };
 exports["default"] = parse;
 
@@ -32366,10 +32509,6 @@ const node_crypto_1 = __nccwpck_require__(77598);
 const get_named_curve_js_1 = __nccwpck_require__(65661);
 const errors_js_1 = __nccwpck_require__(15974);
 const check_key_length_js_1 = __nccwpck_require__(65142);
-const PSS = {
-    padding: node_crypto_1.constants.RSA_PKCS1_PSS_PADDING,
-    saltLength: node_crypto_1.constants.RSA_PSS_SALTLEN_DIGEST,
-};
 const ecCurveAlgMap = new Map([
     ['ES256', 'P-256'],
     ['ES256K', 'secp256k1'],
@@ -32377,25 +32516,57 @@ const ecCurveAlgMap = new Map([
     ['ES512', 'P-521'],
 ]);
 function keyForCrypto(alg, key) {
+    let asymmetricKeyType;
+    let asymmetricKeyDetails;
+    let isJWK;
+    if (key instanceof node_crypto_1.KeyObject) {
+        asymmetricKeyType = key.asymmetricKeyType;
+        asymmetricKeyDetails = key.asymmetricKeyDetails;
+    }
+    else {
+        isJWK = true;
+        switch (key.kty) {
+            case 'RSA':
+                asymmetricKeyType = 'rsa';
+                break;
+            case 'EC':
+                asymmetricKeyType = 'ec';
+                break;
+            case 'OKP': {
+                if (key.crv === 'Ed25519') {
+                    asymmetricKeyType = 'ed25519';
+                    break;
+                }
+                if (key.crv === 'Ed448') {
+                    asymmetricKeyType = 'ed448';
+                    break;
+                }
+                throw new TypeError('Invalid key for this operation, its crv must be Ed25519 or Ed448');
+            }
+            default:
+                throw new TypeError('Invalid key for this operation, its kty must be RSA, OKP, or EC');
+        }
+    }
+    let options;
     switch (alg) {
         case 'EdDSA':
-            if (!['ed25519', 'ed448'].includes(key.asymmetricKeyType)) {
+            if (!['ed25519', 'ed448'].includes(asymmetricKeyType)) {
                 throw new TypeError('Invalid key for this operation, its asymmetricKeyType must be ed25519 or ed448');
             }
-            return key;
+            break;
         case 'RS256':
         case 'RS384':
         case 'RS512':
-            if (key.asymmetricKeyType !== 'rsa') {
+            if (asymmetricKeyType !== 'rsa') {
                 throw new TypeError('Invalid key for this operation, its asymmetricKeyType must be rsa');
             }
             (0, check_key_length_js_1.default)(key, alg);
-            return key;
+            break;
         case 'PS256':
         case 'PS384':
         case 'PS512':
-            if (key.asymmetricKeyType === 'rsa-pss') {
-                const { hashAlgorithm, mgf1HashAlgorithm, saltLength } = key.asymmetricKeyDetails;
+            if (asymmetricKeyType === 'rsa-pss') {
+                const { hashAlgorithm, mgf1HashAlgorithm, saltLength } = asymmetricKeyDetails;
                 const length = parseInt(alg.slice(-3), 10);
                 if (hashAlgorithm !== undefined &&
                     (hashAlgorithm !== `sha${length}` || mgf1HashAlgorithm !== hashAlgorithm)) {
@@ -32405,16 +32576,20 @@ function keyForCrypto(alg, key) {
                     throw new TypeError(`Invalid key for this operation, its RSA-PSS parameter saltLength does not meet the requirements of "alg" ${alg}`);
                 }
             }
-            else if (key.asymmetricKeyType !== 'rsa') {
+            else if (asymmetricKeyType !== 'rsa') {
                 throw new TypeError('Invalid key for this operation, its asymmetricKeyType must be rsa or rsa-pss');
             }
             (0, check_key_length_js_1.default)(key, alg);
-            return { key, ...PSS };
+            options = {
+                padding: node_crypto_1.constants.RSA_PKCS1_PSS_PADDING,
+                saltLength: node_crypto_1.constants.RSA_PSS_SALTLEN_DIGEST,
+            };
+            break;
         case 'ES256':
         case 'ES256K':
         case 'ES384':
         case 'ES512': {
-            if (key.asymmetricKeyType !== 'ec') {
+            if (asymmetricKeyType !== 'ec') {
                 throw new TypeError('Invalid key for this operation, its asymmetricKeyType must be ec');
             }
             const actual = (0, get_named_curve_js_1.default)(key);
@@ -32422,13 +32597,29 @@ function keyForCrypto(alg, key) {
             if (actual !== expected) {
                 throw new TypeError(`Invalid key curve for the algorithm, its curve must be ${expected}, got ${actual}`);
             }
-            return { dsaEncoding: 'ieee-p1363', key };
+            options = { dsaEncoding: 'ieee-p1363' };
+            break;
         }
         default:
             throw new errors_js_1.JOSENotSupported(`alg ${alg} is not supported either by JOSE or your javascript runtime`);
     }
+    if (isJWK) {
+        return { format: 'jwk', key, ...options };
+    }
+    return options ? { ...options, key } : key;
 }
 exports["default"] = keyForCrypto;
+
+
+/***/ }),
+
+/***/ 51276:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports["default"] = {};
 
 
 /***/ }),
@@ -32606,13 +32797,13 @@ const node_key_js_1 = __nccwpck_require__(70363);
 const get_sign_verify_key_js_1 = __nccwpck_require__(80723);
 const oneShotSign = (0, node_util_1.promisify)(crypto.sign);
 const sign = async (alg, key, data) => {
-    const keyObject = (0, get_sign_verify_key_js_1.default)(alg, key, 'sign');
+    const k = (0, get_sign_verify_key_js_1.default)(alg, key, 'sign');
     if (alg.startsWith('HS')) {
-        const hmac = crypto.createHmac((0, hmac_digest_js_1.default)(alg), keyObject);
+        const hmac = crypto.createHmac((0, hmac_digest_js_1.default)(alg), k);
         hmac.update(data);
         return hmac.digest();
     }
-    return oneShotSign((0, dsa_digest_js_1.default)(alg), data, (0, node_key_js_1.default)(alg, keyObject));
+    return oneShotSign((0, dsa_digest_js_1.default)(alg), data, (0, node_key_js_1.default)(alg, k));
 };
 exports["default"] = sign;
 
@@ -32646,9 +32837,9 @@ const sign_js_1 = __nccwpck_require__(26966);
 const get_sign_verify_key_js_1 = __nccwpck_require__(80723);
 const oneShotVerify = (0, node_util_1.promisify)(crypto.verify);
 const verify = async (alg, key, signature, data) => {
-    const keyObject = (0, get_sign_verify_key_js_1.default)(alg, key, 'verify');
+    const k = (0, get_sign_verify_key_js_1.default)(alg, key, 'verify');
     if (alg.startsWith('HS')) {
-        const expected = await (0, sign_js_1.default)(alg, keyObject, data);
+        const expected = await (0, sign_js_1.default)(alg, k, data);
         const actual = signature;
         try {
             return crypto.timingSafeEqual(actual, expected);
@@ -32658,7 +32849,7 @@ const verify = async (alg, key, signature, data) => {
         }
     }
     const algorithm = (0, dsa_digest_js_1.default)(alg);
-    const keyInput = (0, node_key_js_1.default)(alg, keyObject);
+    const keyInput = (0, node_key_js_1.default)(alg, k);
     try {
         return await oneShotVerify(algorithm, data, keyInput, signature);
     }
@@ -32800,27 +32991,23 @@ exports.decodeProtectedHeader = decodeProtectedHeader;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.JWSSignatureVerificationFailed = exports.JWKSTimeout = exports.JWKSMultipleMatchingKeys = exports.JWKSNoMatchingKey = exports.JWKSInvalid = exports.JWKInvalid = exports.JWTInvalid = exports.JWSInvalid = exports.JWEInvalid = exports.JWEDecryptionFailed = exports.JOSENotSupported = exports.JOSEAlgNotAllowed = exports.JWTExpired = exports.JWTClaimValidationFailed = exports.JOSEError = void 0;
 class JOSEError extends Error {
-    static get code() {
-        return 'ERR_JOSE_GENERIC';
-    }
+    static code = 'ERR_JOSE_GENERIC';
     code = 'ERR_JOSE_GENERIC';
-    constructor(message) {
-        super(message);
+    constructor(message, options) {
+        super(message, options);
         this.name = this.constructor.name;
         Error.captureStackTrace?.(this, this.constructor);
     }
 }
 exports.JOSEError = JOSEError;
 class JWTClaimValidationFailed extends JOSEError {
-    static get code() {
-        return 'ERR_JWT_CLAIM_VALIDATION_FAILED';
-    }
+    static code = 'ERR_JWT_CLAIM_VALIDATION_FAILED';
     code = 'ERR_JWT_CLAIM_VALIDATION_FAILED';
     claim;
     reason;
     payload;
     constructor(message, payload, claim = 'unspecified', reason = 'unspecified') {
-        super(message);
+        super(message, { cause: { claim, reason, payload } });
         this.claim = claim;
         this.reason = reason;
         this.payload = payload;
@@ -32828,15 +33015,13 @@ class JWTClaimValidationFailed extends JOSEError {
 }
 exports.JWTClaimValidationFailed = JWTClaimValidationFailed;
 class JWTExpired extends JOSEError {
-    static get code() {
-        return 'ERR_JWT_EXPIRED';
-    }
+    static code = 'ERR_JWT_EXPIRED';
     code = 'ERR_JWT_EXPIRED';
     claim;
     reason;
     payload;
     constructor(message, payload, claim = 'unspecified', reason = 'unspecified') {
-        super(message);
+        super(message, { cause: { claim, reason, payload } });
         this.claim = claim;
         this.reason = reason;
         this.payload = payload;
@@ -32844,93 +33029,79 @@ class JWTExpired extends JOSEError {
 }
 exports.JWTExpired = JWTExpired;
 class JOSEAlgNotAllowed extends JOSEError {
-    static get code() {
-        return 'ERR_JOSE_ALG_NOT_ALLOWED';
-    }
+    static code = 'ERR_JOSE_ALG_NOT_ALLOWED';
     code = 'ERR_JOSE_ALG_NOT_ALLOWED';
 }
 exports.JOSEAlgNotAllowed = JOSEAlgNotAllowed;
 class JOSENotSupported extends JOSEError {
-    static get code() {
-        return 'ERR_JOSE_NOT_SUPPORTED';
-    }
+    static code = 'ERR_JOSE_NOT_SUPPORTED';
     code = 'ERR_JOSE_NOT_SUPPORTED';
 }
 exports.JOSENotSupported = JOSENotSupported;
 class JWEDecryptionFailed extends JOSEError {
-    static get code() {
-        return 'ERR_JWE_DECRYPTION_FAILED';
-    }
+    static code = 'ERR_JWE_DECRYPTION_FAILED';
     code = 'ERR_JWE_DECRYPTION_FAILED';
-    message = 'decryption operation failed';
+    constructor(message = 'decryption operation failed', options) {
+        super(message, options);
+    }
 }
 exports.JWEDecryptionFailed = JWEDecryptionFailed;
 class JWEInvalid extends JOSEError {
-    static get code() {
-        return 'ERR_JWE_INVALID';
-    }
+    static code = 'ERR_JWE_INVALID';
     code = 'ERR_JWE_INVALID';
 }
 exports.JWEInvalid = JWEInvalid;
 class JWSInvalid extends JOSEError {
-    static get code() {
-        return 'ERR_JWS_INVALID';
-    }
+    static code = 'ERR_JWS_INVALID';
     code = 'ERR_JWS_INVALID';
 }
 exports.JWSInvalid = JWSInvalid;
 class JWTInvalid extends JOSEError {
-    static get code() {
-        return 'ERR_JWT_INVALID';
-    }
+    static code = 'ERR_JWT_INVALID';
     code = 'ERR_JWT_INVALID';
 }
 exports.JWTInvalid = JWTInvalid;
 class JWKInvalid extends JOSEError {
-    static get code() {
-        return 'ERR_JWK_INVALID';
-    }
+    static code = 'ERR_JWK_INVALID';
     code = 'ERR_JWK_INVALID';
 }
 exports.JWKInvalid = JWKInvalid;
 class JWKSInvalid extends JOSEError {
-    static get code() {
-        return 'ERR_JWKS_INVALID';
-    }
+    static code = 'ERR_JWKS_INVALID';
     code = 'ERR_JWKS_INVALID';
 }
 exports.JWKSInvalid = JWKSInvalid;
 class JWKSNoMatchingKey extends JOSEError {
-    static get code() {
-        return 'ERR_JWKS_NO_MATCHING_KEY';
-    }
+    static code = 'ERR_JWKS_NO_MATCHING_KEY';
     code = 'ERR_JWKS_NO_MATCHING_KEY';
-    message = 'no applicable key found in the JSON Web Key Set';
+    constructor(message = 'no applicable key found in the JSON Web Key Set', options) {
+        super(message, options);
+    }
 }
 exports.JWKSNoMatchingKey = JWKSNoMatchingKey;
 class JWKSMultipleMatchingKeys extends JOSEError {
     [Symbol.asyncIterator];
-    static get code() {
-        return 'ERR_JWKS_MULTIPLE_MATCHING_KEYS';
-    }
+    static code = 'ERR_JWKS_MULTIPLE_MATCHING_KEYS';
     code = 'ERR_JWKS_MULTIPLE_MATCHING_KEYS';
-    message = 'multiple matching keys found in the JSON Web Key Set';
+    constructor(message = 'multiple matching keys found in the JSON Web Key Set', options) {
+        super(message, options);
+    }
 }
 exports.JWKSMultipleMatchingKeys = JWKSMultipleMatchingKeys;
 class JWKSTimeout extends JOSEError {
-    static get code() {
-        return 'ERR_JWKS_TIMEOUT';
-    }
+    static code = 'ERR_JWKS_TIMEOUT';
     code = 'ERR_JWKS_TIMEOUT';
-    message = 'request timed out';
+    constructor(message = 'request timed out', options) {
+        super(message, options);
+    }
 }
 exports.JWKSTimeout = JWKSTimeout;
 class JWSSignatureVerificationFailed extends JOSEError {
-    static get code() {
-        return 'ERR_JWS_SIGNATURE_VERIFICATION_FAILED';
-    }
+    static code = 'ERR_JWS_SIGNATURE_VERIFICATION_FAILED';
     code = 'ERR_JWS_SIGNATURE_VERIFICATION_FAILED';
-    message = 'signature verification failed';
+    constructor(message = 'signature verification failed', options) {
+        super(message, options);
+    }
 }
 exports.JWSSignatureVerificationFailed = JWSSignatureVerificationFailed;
 
