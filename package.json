@@ -77,9 +77,9 @@
   },
   "devDependencies": {
     "@sigstore/mock": "^0.8.0",
-    "@types/jest": "^29.5.13",
+    "@types/jest": "^29.5.14",
     "@types/make-fetch-happen": "^10.0.4",
-    "@types/node": "^22.7.7",
+    "@types/node": "^22.8.2",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
     "@vercel/ncc": "^0.38.2",
