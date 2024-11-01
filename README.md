@@ -117,18 +117,14 @@ See [action.yml](action.yml)
 
 Attestations are saved in the JSON-serialized [Sigstore bundle][6] format.
 
-If multiple subjects are being attested at the same time, each attestation will
-be written to the output file on a separate line (using the [JSON Lines][7]
-format).
+If multiple subjects are being attested at the same time, a single attestation
+will be created with references to each of the supplied subjects.
 
 ## Attestation Limits
 
 ### Subject Limits
 
-No more than 2500 subjects can be attested at the same time. Subjects will be
-processed in batches 50. After the initial group of 50, each subsequent batch
-will incur an exponentially increasing amount of delay (capped at 1 minute of
-delay per batch) to avoid overwhelming the attestation API.
+No more than 1024 subjects can be attested at the same time.
 
 ### Predicate Limits
 
@@ -269,7 +265,6 @@ jobs:
 [5]: https://cli.github.com/manual/gh_attestation_verify
 [6]:
   https://github.com/sigstore/protobuf-specs/blob/main/protos/sigstore_bundle.proto
-[7]: https://jsonlines.org/
 [8]: https://github.com/actions/toolkit/tree/main/packages/glob#patterns
 [9]:
   https://docs.github.com/en/actions/security-guides/using-artifact-attestations-to-establish-provenance-for-builds

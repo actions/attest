@@ -79783,30 +79783,26 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.createAttestation = void 0;
 const attest_1 = __nccwpck_require__(11485);
 const oci_1 = __nccwpck_require__(81057);
+const subject_1 = __nccwpck_require__(36303);
 const OCI_TIMEOUT = 30000;
 const OCI_RETRY = 3;
-const createAttestation = async (subject, predicate, opts) => {
+const createAttestation = async (subjects, predicate, opts) => {
     // Sign provenance w/ Sigstore
     const attestation = await (0, attest_1.attest)({
-        subjectName: subject.name,
-        subjectDigest: subject.digest,
+        subjects,
         predicateType: predicate.type,
         predicate: predicate.params,
         sigstore: opts.sigstoreInstance,
         token: opts.githubToken
     });
-    const subDigest = subjectDigest(subject);
-    const result = {
-        ...attestation,
-        subjectName: subject.name,
-        subjectDigest: subDigest
-    };
-    if (opts.pushToRegistry) {
+    const result = attestation;
+    if (subjects.length === 1 && opts.pushToRegistry) {
+        const subject = subjects[0];
         const credentials = (0, oci_1.getRegistryCredentials)(subject.name);
         const artifact = await (0, oci_1.attachArtifactToImage)({
             credentials,
             imageName: subject.name,
-            imageDigest: subDigest,
+            imageDigest: (0, subject_1.formatSubjectDigest)(subject),
             artifact: Buffer.from(JSON.stringify(attestation.bundle)),
             mediaType: attestation.bundle.mediaType,
             annotations: {
@@ -79821,12 +79817,6 @@ const createAttestation = async (subject, predicate, opts) => {
     return result;
 };
 exports.createAttestation = createAttestation;
-// Returns the subject's digest as a formatted string of the form
-// "<algorithm>:<digest>".
-const subjectDigest = (subject) => {
-    const alg = Object.keys(subject.digest).sort()[0];
-    return `${alg}:${subject.digest[alg]}`;
-};
 
 
 /***/ }),
@@ -79877,7 +79867,6 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
  */
 const core = __importStar(__nccwpck_require__(37484));
 const main_1 = __nccwpck_require__(41730);
-const DEFAULT_BATCH_SIZE = 50;
 const inputs = {
     subjectPath: core.getInput('subject-path'),
     subjectName: core.getInput('subject-name'),
@@ -79889,9 +79878,7 @@ const inputs = {
     showSummary: core.getBooleanInput('show-summary'),
     githubToken: core.getInput('github-token'),
     // undocumented -- not part of public interface
-    privateSigning: ['true', 'True', 'TRUE', '1'].includes(core.getInput('private-signing')),
-    // internal only
-    batchSize: DEFAULT_BATCH_SIZE
+    privateSigning: ['true', 'True', 'TRUE', '1'].includes(core.getInput('private-signing'))
 };
 // eslint-disable-next-line @typescript-eslint/no-floating-promises
 (0, main_1.run)(inputs);
@@ -79943,8 +79930,6 @@ const predicate_1 = __nccwpck_require__(84982);
 const style = __importStar(__nccwpck_require__(64542));
 const subject_1 = __nccwpck_require__(36303);
 const ATTESTATION_FILE_NAME = 'attestation.jsonl';
-const DELAY_INTERVAL_MS = 75;
-const DELAY_MAX_MS = 1200;
 /* istanbul ignore next */
 const logHandler = (level, ...args) => {
     // Send any HTTP-related log events to the GitHub Actions debug log
@@ -79966,7 +79951,6 @@ async function run(inputs) {
         ? 'public-good'
         : 'github';
     try {
-        const atts = [];
         if (!process.env.ACTIONS_ID_TOKEN_REQUEST_URL) {
             throw new Error('missing "id-token" permission. Please add "permissions: id-token: write" to your workflow.');
         }
@@ -79977,35 +79961,19 @@ async function run(inputs) {
         const predicate = (0, predicate_1.predicateFromInputs)(inputs);
         const outputPath = path_1.default.join(tempDir(), ATTESTATION_FILE_NAME);
         core.setOutput('bundle-path', outputPath);
-        const subjectChunks = chunkArray(subjects, inputs.batchSize);
-        // Generate attestations for each subject serially, working in batches
-        for (let i = 0; i < subjectChunks.length; i++) {
-            if (subjectChunks.length > 1) {
-                core.info(`Processing subject batch ${i + 1}/${subjectChunks.length}`);
-            }
-            // Calculate the delay time for this batch
-            const delayTime = delay(i);
-            for (const subject of subjectChunks[i]) {
-                // Delay between attestations (only when chunk size > 1)
-                if (i > 0) {
-                    await new Promise(resolve => setTimeout(resolve, delayTime));
-                }
-                const att = await (0, attest_1.createAttestation)(subject, predicate, {
-                    sigstoreInstance,
-                    pushToRegistry: inputs.pushToRegistry,
-                    githubToken: inputs.githubToken
-                });
-                atts.push(att);
-                logAttestation(att, sigstoreInstance);
-                // Write attestation bundle to output file
-                fs_1.default.writeFileSync(outputPath, JSON.stringify(att.bundle) + os_1.default.EOL, {
-                    encoding: 'utf-8',
-                    flag: 'a'
-                });
-            }
-        }
+        const att = await (0, attest_1.createAttestation)(subjects, predicate, {
+            sigstoreInstance,
+            pushToRegistry: inputs.pushToRegistry,
+            githubToken: inputs.githubToken
+        });
+        logAttestation(subjects, att, sigstoreInstance);
+        // Write attestation bundle to output file
+        fs_1.default.writeFileSync(outputPath, JSON.stringify(att.bundle) + os_1.default.EOL, {
+            encoding: 'utf-8',
+            flag: 'a'
+        });
         if (inputs.showSummary) {
-            logSummary(atts);
+            logSummary(att);
         }
     }
     catch (err) {
@@ -80023,8 +79991,13 @@ async function run(inputs) {
     }
 }
 // Log details about the attestation to the GitHub Actions run
-const logAttestation = (attestation, sigstoreInstance) => {
-    core.info(`Attestation created for ${attestation.subjectName}@${attestation.subjectDigest}`);
+const logAttestation = (subjects, attestation, sigstoreInstance) => {
+    if (subjects.length === 1) {
+        core.info(`Attestation created for ${subjects[0].name}@${(0, subject_1.formatSubjectDigest)(subjects[0])}`);
+    }
+    else {
+        core.info(`Attestation created for ${subjects.length} subjects`);
+    }
     const instanceName = sigstoreInstance === 'public-good' ? 'Public Good' : 'GitHub';
     core.startGroup(style.highlight(`Attestation signed using certificate from ${instanceName} Sigstore instance`));
     core.info(attestation.certificate);
@@ -80039,22 +80012,16 @@ const logAttestation = (attestation, sigstoreInstance) => {
     }
     if (attestation.attestationDigest) {
         core.info(style.highlight('Attestation uploaded to registry'));
-        core.info(`${attestation.subjectName}@${attestation.attestationDigest}`);
+        core.info(`${subjects[0].name}@${attestation.attestationDigest}`);
     }
 };
 // Attach summary information to the GitHub Actions run
-const logSummary = (attestations) => {
-    if (attestations.length > 0) {
-        core.summary.addHeading(
-        /* istanbul ignore next */
-        attestations.length > 1 ? 'Attestations Created' : 'Attestation Created', 3);
-        const listItems = [];
-        for (const { subjectName, subjectDigest, attestationID } of attestations) {
-            if (attestationID) {
-                listItems.push(`<a href="${attestationURL(attestationID)}">${subjectName}@${subjectDigest}</a>`);
-            }
-        }
-        core.summary.addList(listItems);
+const logSummary = (attestation) => {
+    const { attestationID } = attestation;
+    if (attestationID) {
+        const url = attestationURL(attestationID);
+        core.summary.addHeading('Attestation Created', 3);
+        core.summary.addList([`<a href="${url}">${url}</a>`]);
         core.summary.write();
     }
 };
@@ -80066,13 +80033,6 @@ const tempDir = () => {
     }
     return fs_1.default.mkdtempSync(path_1.default.join(basePath, path_1.default.sep));
 };
-// Transforms an array into an array of arrays, each containing at most
-// `chunkSize` elements.
-const chunkArray = (array, chunkSize) => {
-    return Array.from({ length: Math.ceil(array.length / chunkSize) }, (_, index) => array.slice(index * chunkSize, (index + 1) * chunkSize));
-};
-// Calculate the delay time for a given iteration
-const delay = (iteration) => Math.min(DELAY_INTERVAL_MS * 2 ** iteration, DELAY_MAX_MS);
 const attestationURL = (id) => `${github.context.serverUrl}/${github.context.repo.owner}/${github.context.repo.repo}/attestations/${id}`;
 
 
@@ -80179,13 +80139,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.subjectFromInputs = void 0;
+exports.formatSubjectDigest = exports.subjectFromInputs = void 0;
 const glob = __importStar(__nccwpck_require__(47206));
 const crypto_1 = __importDefault(__nccwpck_require__(76982));
 const sync_1 = __nccwpck_require__(61110);
 const fs_1 = __importDefault(__nccwpck_require__(79896));
 const path_1 = __importDefault(__nccwpck_require__(16928));
-const MAX_SUBJECT_COUNT = 2500;
+const MAX_SUBJECT_COUNT = 1024;
 const DIGEST_ALGORITHM = 'sha256';
 // Returns the subject specified by the action's inputs. The subject may be
 // specified as a path to a file or as a digest. If a path is provided, the
@@ -80213,23 +80173,28 @@ const subjectFromInputs = async (inputs) => {
     }
 };
 exports.subjectFromInputs = subjectFromInputs;
+// Returns the subject's digest as a formatted string of the form
+// "<algorithm>:<digest>".
+const formatSubjectDigest = (subject) => {
+    const alg = Object.keys(subject.digest).sort()[0];
+    return `${alg}:${subject.digest[alg]}`;
+};
+exports.formatSubjectDigest = formatSubjectDigest;
 // Returns the subject specified by the path to a file. The file's digest is
 // calculated and returned along with the subject's name.
 const getSubjectFromPath = async (subjectPath, subjectName) => {
     const digestedSubjects = [];
     // Parse the list of subject paths
     const subjectPaths = parseList(subjectPath).join('\n');
-    // Expand the globbed paths to a list of files
+    // Expand the globbed paths to a list of actual paths
     /* eslint-disable-next-line github/no-then */
-    const files = await glob.create(subjectPaths).then(async (g) => g.glob());
+    const paths = await glob.create(subjectPaths).then(async (g) => g.glob());
+    // Filter path list to just the files (not directories)
+    const files = paths.filter(p => fs_1.default.statSync(p).isFile());
     if (files.length > MAX_SUBJECT_COUNT) {
         throw new Error(`Too many subjects specified. The maximum number of subjects is ${MAX_SUBJECT_COUNT}.`);
     }
     for (const file of files) {
-        // Skip anything that is NOT a file
-        if (!fs_1.default.statSync(file).isFile()) {
-            continue;
-        }
         const name = subjectName || path_1.default.parse(file).base;
         const digest = await digestFile(DIGEST_ALGORITHM, file);
         digestedSubjects.push({ name, digest: { [DIGEST_ALGORITHM]: digest } });

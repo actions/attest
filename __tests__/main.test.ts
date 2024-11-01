@@ -46,8 +46,7 @@ const defaultInputs: main.RunInputs = {
   pushToRegistry: false,
   showSummary: true,
   githubToken: '',
-  privateSigning: false,
-  batchSize: 50
+  privateSigning: false
 }
 
 describe('action', () => {
@@ -290,15 +289,11 @@ describe('action', () => {
     })
   })
 
-  describe('when the subject count exceeds the batch size', () => {
+  describe('when the subject count is greater than 1', () => {
     let dir = ''
     const filename = 'subject'
-    let scope: nock.Scope
 
     beforeEach(async () => {
-      // Start from scratch
-      nock.cleanAll()
-
       const subjectCount = 5
       const content = 'file content'
 
@@ -309,38 +304,22 @@ describe('action', () => {
       // Add files for glob testing
       for (let i = 0; i < subjectCount; i++) {
         await fs.writeFile(path.join(dir, `${filename}-${i}`), content)
-
-        // Set-up a Fulcio mock for each subject
-        await mockFulcio({
-          baseURL: 'https://fulcio.githubapp.com',
-          strict: false
-        })
-
-        // Set-up a TSA mock for each subject
-        await mockTSA({ baseURL: 'https://timestamp.githubapp.com' })
-
-        // Set-up a GH API mock for each subject
-        mockAgent
-          .get('https://api.github.com')
-          .intercept({
-            path: /^\/repos\/.*\/.*\/attestations$/,
-            method: 'post'
-          })
-          .reply(201, { id: attestationID })
       }
-
-      // Set-up a OIDC token mock for each subject
-      scope = nock(tokenURL)
-        .get('/')
-        .query({ audience: 'sigstore' })
-        .times(subjectCount)
-        .reply(200, { value: oidcToken })
 
       // Set the GH context with private repository visibility and a repo owner.
       setGHContext({
         payload: { repository: { visibility: 'private' } },
         repo: { owner: 'foo', repo: 'bar' }
       })
+
+      // Set-up a Fulcio mock for each subject
+      await mockFulcio({
+        baseURL: 'https://fulcio.githubapp.com',
+        strict: false
+      })
+
+      // Set-up a TSA mock for each subject
+      await mockTSA({ baseURL: 'https://timestamp.githubapp.com' })
     })
 
     afterEach(async () => {
@@ -354,8 +333,7 @@ describe('action', () => {
         subjectPath: path.join(dir, `${filename}-*`),
         predicateType,
         predicate,
-        githubToken: 'gh-token',
-        batchSize: 2
+        githubToken: 'gh-token'
       }
       await main.run(inputs)
 
@@ -363,17 +341,8 @@ describe('action', () => {
       expect(setFailedMock).not.toHaveBeenCalled()
       expect(infoMock).toHaveBeenNthCalledWith(
         1,
-        expect.stringMatching('Processing subject batch 1/3')
+        expect.stringMatching('Attestation created for 5 subjects')
       )
-      expect(infoMock).toHaveBeenNthCalledWith(
-        10,
-        expect.stringMatching('Processing subject batch 2/3')
-      )
-      expect(infoMock).toHaveBeenNthCalledWith(
-        19,
-        expect.stringMatching('Processing subject batch 3/3')
-      )
-      expect(scope.isDone()).toBe(true)
     })
   })
 
@@ -382,7 +351,7 @@ describe('action', () => {
     const filename = 'subject'
 
     beforeEach(async () => {
-      const subjectCount = 2501
+      const subjectCount = 1025
       const content = 'file content'
 
       // Set-up temp directory
@@ -419,7 +388,7 @@ describe('action', () => {
       expect(runMock).toHaveReturned()
       expect(setFailedMock).toHaveBeenCalledWith(
         new Error(
-          'Too many subjects specified. The maximum number of subjects is 2500.'
+          'Too many subjects specified. The maximum number of subjects is 1024.'
         )
       )
     })
