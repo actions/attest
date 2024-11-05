@@ -7,11 +7,15 @@ import { AttestResult, SigstoreInstance, createAttestation } from './attest'
 import { SEARCH_PUBLIC_GOOD_URL } from './endpoints'
 import { PredicateInputs, predicateFromInputs } from './predicate'
 import * as style from './style'
-import { SubjectInputs, subjectFromInputs } from './subject'
+import {
+  SubjectInputs,
+  formatSubjectDigest,
+  subjectFromInputs
+} from './subject'
+
+import type { Subject } from '@actions/attest'
 
 const ATTESTATION_FILE_NAME = 'attestation.jsonl'
-const DELAY_INTERVAL_MS = 75
-const DELAY_MAX_MS = 1200
 
 export type RunInputs = SubjectInputs &
   PredicateInputs & {
@@ -19,7 +23,6 @@ export type RunInputs = SubjectInputs &
     githubToken: string
     showSummary: boolean
     privateSigning: boolean
-    batchSize: number
   }
 
 /* istanbul ignore next */
@@ -47,7 +50,6 @@ export async function run(inputs: RunInputs): Promise<void> {
       : 'github'
 
   try {
-    const atts: AttestResult[] = []
     if (!process.env.ACTIONS_ID_TOKEN_REQUEST_URL) {
       throw new Error(
         'missing "id-token" permission. Please add "permissions: id-token: write" to your workflow.'
@@ -63,42 +65,22 @@ export async function run(inputs: RunInputs): Promise<void> {
     const outputPath = path.join(tempDir(), ATTESTATION_FILE_NAME)
     core.setOutput('bundle-path', outputPath)
 
-    const subjectChunks = chunkArray(subjects, inputs.batchSize)
+    const att = await createAttestation(subjects, predicate, {
+      sigstoreInstance,
+      pushToRegistry: inputs.pushToRegistry,
+      githubToken: inputs.githubToken
+    })
 
-    // Generate attestations for each subject serially, working in batches
-    for (let i = 0; i < subjectChunks.length; i++) {
-      if (subjectChunks.length > 1) {
-        core.info(`Processing subject batch ${i + 1}/${subjectChunks.length}`)
-      }
+    logAttestation(subjects, att, sigstoreInstance)
 
-      // Calculate the delay time for this batch
-      const delayTime = delay(i)
-
-      for (const subject of subjectChunks[i]) {
-        // Delay between attestations (only when chunk size > 1)
-        if (i > 0) {
-          await new Promise(resolve => setTimeout(resolve, delayTime))
-        }
-
-        const att = await createAttestation(subject, predicate, {
-          sigstoreInstance,
-          pushToRegistry: inputs.pushToRegistry,
-          githubToken: inputs.githubToken
-        })
-        atts.push(att)
-
-        logAttestation(att, sigstoreInstance)
-
-        // Write attestation bundle to output file
-        fs.writeFileSync(outputPath, JSON.stringify(att.bundle) + os.EOL, {
-          encoding: 'utf-8',
-          flag: 'a'
-        })
-      }
-    }
+    // Write attestation bundle to output file
+    fs.writeFileSync(outputPath, JSON.stringify(att.bundle) + os.EOL, {
+      encoding: 'utf-8',
+      flag: 'a'
+    })
 
     if (inputs.showSummary) {
-      logSummary(atts)
+      logSummary(att)
     }
   } catch (err) {
     // Fail the workflow run if an error occurs
@@ -123,12 +105,17 @@ export async function run(inputs: RunInputs): Promise<void> {
 
 // Log details about the attestation to the GitHub Actions run
 const logAttestation = (
+  subjects: Subject[],
   attestation: AttestResult,
   sigstoreInstance: SigstoreInstance
 ): void => {
-  core.info(
-    `Attestation created for ${attestation.subjectName}@${attestation.subjectDigest}`
-  )
+  if (subjects.length === 1) {
+    core.info(
+      `Attestation created for ${subjects[0].name}@${formatSubjectDigest(subjects[0])}`
+    )
+  } else {
+    core.info(`Attestation created for ${subjects.length} subjects`)
+  }
 
   const instanceName =
     sigstoreInstance === 'public-good' ? 'Public Good' : 'GitHub'
@@ -156,29 +143,18 @@ const logAttestation = (
 
   if (attestation.attestationDigest) {
     core.info(style.highlight('Attestation uploaded to registry'))
-    core.info(`${attestation.subjectName}@${attestation.attestationDigest}`)
+    core.info(`${subjects[0].name}@${attestation.attestationDigest}`)
   }
 }
 
 // Attach summary information to the GitHub Actions run
-const logSummary = (attestations: AttestResult[]): void => {
-  if (attestations.length > 0) {
-    core.summary.addHeading(
-      /* istanbul ignore next */
-      attestations.length > 1 ? 'Attestations Created' : 'Attestation Created',
-      3
-    )
+const logSummary = (attestation: AttestResult): void => {
+  const { attestationID } = attestation
 
-    const listItems = []
-    for (const { subjectName, subjectDigest, attestationID } of attestations) {
-      if (attestationID) {
-        listItems.push(
-          `<a href="${attestationURL(attestationID)}">${subjectName}@${subjectDigest}</a>`
-        )
-      }
-    }
-
-    core.summary.addList(listItems)
+  if (attestationID) {
+    const url = attestationURL(attestationID)
+    core.summary.addHeading('Attestation Created', 3)
+    core.summary.addList([`<a href="${url}">${url}</a>`])
     core.summary.write()
   }
 }
@@ -193,19 +169,6 @@ const tempDir = (): string => {
 
   return fs.mkdtempSync(path.join(basePath, path.sep))
 }
-
-// Transforms an array into an array of arrays, each containing at most
-// `chunkSize` elements.
-const chunkArray = <T>(array: T[], chunkSize: number): T[][] => {
-  return Array.from(
-    { length: Math.ceil(array.length / chunkSize) },
-    (_, index) => array.slice(index * chunkSize, (index + 1) * chunkSize)
-  )
-}
-
-// Calculate the delay time for a given iteration
-const delay = (iteration: number): number =>
-  Math.min(DELAY_INTERVAL_MS * 2 ** iteration, DELAY_MAX_MS)
 
 const attestationURL = (id: string): string =>
   `${github.context.serverUrl}/${github.context.repo.owner}/${github.context.repo.repo}/attestations/${id}`

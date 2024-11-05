@@ -2,7 +2,11 @@ import crypto from 'crypto'
 import fs from 'fs/promises'
 import os from 'os'
 import path from 'path'
-import { subjectFromInputs, SubjectInputs } from '../src/subject'
+import {
+  formatSubjectDigest,
+  subjectFromInputs,
+  SubjectInputs
+} from '../src/subject'
 
 describe('subjectFromInputs', () => {
   const blankInputs: SubjectInputs = {
@@ -358,5 +362,17 @@ describe('subjectFromInputs', () => {
         })
       })
     })
+  })
+})
+
+describe('subjectDigest', () => {
+  it('returns the digest', () => {
+    const subject = {
+      name: 'foo',
+      digest: { sha1: 'deadbeef' }
+    }
+
+    const digest = formatSubjectDigest(subject)
+    expect(digest).toEqual('sha1:deadbeef')
   })
 })

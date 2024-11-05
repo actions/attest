@@ -6,7 +6,7 @@ import path from 'path'
 
 import type { Subject } from '@actions/attest'
 
-const MAX_SUBJECT_COUNT = 2500
+const MAX_SUBJECT_COUNT = 1024
 const DIGEST_ALGORITHM = 'sha256'
 
 export type SubjectInputs = {
@@ -49,6 +49,13 @@ export const subjectFromInputs = async (
   }
 }
 
+// Returns the subject's digest as a formatted string of the form
+// "<algorithm>:<digest>".
+export const formatSubjectDigest = (subject: Subject): string => {
+  const alg = Object.keys(subject.digest).sort()[0]
+  return `${alg}:${subject.digest[alg]}`
+}
+
 // Returns the subject specified by the path to a file. The file's digest is
 // calculated and returned along with the subject's name.
 const getSubjectFromPath = async (
@@ -60,9 +67,12 @@ const getSubjectFromPath = async (
   // Parse the list of subject paths
   const subjectPaths = parseList(subjectPath).join('\n')
 
-  // Expand the globbed paths to a list of files
+  // Expand the globbed paths to a list of actual paths
   /* eslint-disable-next-line github/no-then */
-  const files = await glob.create(subjectPaths).then(async g => g.glob())
+  const paths = await glob.create(subjectPaths).then(async g => g.glob())
+
+  // Filter path list to just the files (not directories)
+  const files = paths.filter(p => fs.statSync(p).isFile())
 
   if (files.length > MAX_SUBJECT_COUNT) {
     throw new Error(
@@ -71,11 +81,6 @@ const getSubjectFromPath = async (
   }
 
   for (const file of files) {
-    // Skip anything that is NOT a file
-    if (!fs.statSync(file).isFile()) {
-      continue
-    }
-
     const name = subjectName || path.parse(file).base
     const digest = await digestFile(DIGEST_ALGORITHM, file)
 
