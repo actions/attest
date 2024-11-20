@@ -15,7 +15,7 @@ import {
 
 import type { Subject } from '@actions/attest'
 
-const ATTESTATION_FILE_NAME = 'attestation.jsonl'
+const ATTESTATION_FILE_NAME = 'attestation.json'
 
 export type RunInputs = SubjectInputs &
   PredicateInputs & {

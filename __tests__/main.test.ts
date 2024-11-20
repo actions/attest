@@ -197,7 +197,7 @@ describe('action', () => {
       expect(setOutputMock).toHaveBeenNthCalledWith(
         1,
         'bundle-path',
-        expect.stringMatching('attestation.jsonl')
+        expect.stringMatching('attestation.json')
       )
       expect(setFailedMock).not.toHaveBeenCalled()
     })
@@ -283,7 +283,7 @@ describe('action', () => {
       expect(setOutputMock).toHaveBeenNthCalledWith(
         1,
         'bundle-path',
-        expect.stringMatching('attestation.jsonl')
+        expect.stringMatching('attestation.json')
       )
       expect(setFailedMock).not.toHaveBeenCalled()
     })
