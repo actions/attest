@@ -70907,7 +70907,7 @@ const endpoints_1 = __nccwpck_require__(7437);
 const predicate_1 = __nccwpck_require__(84982);
 const style = __importStar(__nccwpck_require__(64542));
 const subject_1 = __nccwpck_require__(36303);
-const ATTESTATION_FILE_NAME = 'attestation.jsonl';
+const ATTESTATION_FILE_NAME = 'attestation.json';
 /* istanbul ignore next */
 const logHandler = (level, ...args) => {
     // Send any HTTP-related log events to the GitHub Actions debug log

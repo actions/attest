@@ -65,7 +65,7 @@ See [action.yml](action.yml)
   with:
     # Path to the artifact serving as the subject of the attestation. Must
     # specify exactly one of "subject-path" or "subject-digest". May contain
-    # a glob pattern or list of paths (total subject count cannot exceed 2500).
+    # a glob pattern or list of paths (total subject count cannot exceed 1024).
     subject-path:
 
     # SHA256 digest of the subject for the attestation. Must be in the form
@@ -109,9 +109,9 @@ See [action.yml](action.yml)
 
 <!-- markdownlint-disable MD013 -->
 
-| Name          | Description                                                    | Example                  |
-| ------------- | -------------------------------------------------------------- | ------------------------ |
-| `bundle-path` | Absolute path to the file containing the generated attestation | `/tmp/attestation.jsonl` |
+| Name          | Description                                                    | Example                 |
+| ------------- | -------------------------------------------------------------- | ----------------------- |
+| `bundle-path` | Absolute path to the file containing the generated attestation | `/tmp/attestation.json` |
 
 <!-- markdownlint-enable MD013 -->
 
@@ -166,8 +166,8 @@ jobs:
 
 ### Identify Multiple Subjects
 
-If you are generating multiple artifacts, you can generate an attestation for
-each by using a wildcard in the `subject-path` input.
+If you are generating multiple artifacts, you can attest all of them at the same
+time by using a wildcard in the `subject-path` input.
 
 ```yaml
 - uses: actions/attest@v1
