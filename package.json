@@ -73,7 +73,7 @@
     "@actions/core": "^1.11.1",
     "@actions/glob": "^0.5.0",
     "@sigstore/oci": "^0.4.0",
-    "csv-parse": "^5.5.6"
+    "csv-parse": "^5.6.0"
   },
   "devDependencies": {
     "@sigstore/mock": "^0.8.0",
