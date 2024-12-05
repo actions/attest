@@ -84,7 +84,14 @@ const getSubjectFromPath = async (
     const name = subjectName || path.parse(file).base
     const digest = await digestFile(DIGEST_ALGORITHM, file)
 
-    digestedSubjects.push({ name, digest: { [DIGEST_ALGORITHM]: digest } })
+    // Only add the subject if it is not already in the list
+    if (
+      !digestedSubjects.some(
+        s => s.name === name && s.digest[DIGEST_ALGORITHM] === digest
+      )
+    ) {
+      digestedSubjects.push({ name, digest: { [DIGEST_ALGORITHM]: digest } })
+    }
   }
 
   if (digestedSubjects.length === 0) {

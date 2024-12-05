@@ -362,6 +362,31 @@ describe('subjectFromInputs', () => {
         })
       })
     })
+
+    describe('when duplicate subjects are supplied', () => {
+      let otherDir = ''
+
+      // Add duplicate subject in alternate directory
+      beforeEach(async () => {
+        // Set-up temp directory
+        const tmpDir = await fs.realpath(os.tmpdir())
+        otherDir = await fs.mkdtemp(tmpDir + path.sep)
+
+        // Write file to temp directory
+        await fs.writeFile(path.join(otherDir, filename), content)
+      })
+
+      it('returns de-duplicated subjects', async () => {
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectPath: `${path.join(dir, 'subject')}, ${path.join(otherDir, 'subject')} `
+        }
+        const subjects = await subjectFromInputs(inputs)
+
+        expect(subjects).toBeDefined()
+        expect(subjects).toHaveLength(1)
+      })
+    })
   })
 })
 
