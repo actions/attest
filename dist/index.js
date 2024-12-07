@@ -70970,6 +70970,10 @@ async function run(inputs) {
             encoding: 'utf-8',
             flag: 'a'
         });
+        if (att.attestationID) {
+            core.setOutput('attestation-id', att.attestationID);
+            core.setOutput('attestation-url', attestationURL(att.attestationID));
+        }
         if (inputs.showSummary) {
             logSummary(att);
         }

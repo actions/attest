@@ -199,6 +199,16 @@ describe('action', () => {
         'bundle-path',
         expect.stringMatching('attestation.json')
       )
+      expect(setOutputMock).toHaveBeenNthCalledWith(
+        2,
+        'attestation-id',
+        expect.stringMatching(attestationID)
+      )
+      expect(setOutputMock).toHaveBeenNthCalledWith(
+        3,
+        'attestation-url',
+        expect.stringContaining(`foo/bar/attestations/${attestationID}`)
+      )
       expect(setFailedMock).not.toHaveBeenCalled()
     })
   })
@@ -284,6 +294,16 @@ describe('action', () => {
         1,
         'bundle-path',
         expect.stringMatching('attestation.json')
+      )
+      expect(setOutputMock).toHaveBeenNthCalledWith(
+        2,
+        'attestation-id',
+        expect.stringMatching(attestationID)
+      )
+      expect(setOutputMock).toHaveBeenNthCalledWith(
+        3,
+        'attestation-url',
+        expect.stringContaining(`foo/bar/attestations/${attestationID}`)
       )
       expect(setFailedMock).not.toHaveBeenCalled()
     })

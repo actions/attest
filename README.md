@@ -44,7 +44,7 @@ attest:
 1. Add the following to your workflow after your artifact has been built:
 
    ```yaml
-   - uses: actions/attest@v1
+   - uses: actions/attest@v2
      with:
        subject-path: '<PATH TO ARTIFACT>'
        predicate-type: '<PREDICATE URI>'
@@ -61,7 +61,7 @@ attest:
 See [action.yml](action.yml)
 
 ```yaml
-- uses: actions/attest@v1
+- uses: actions/attest@v2
   with:
     # Path to the artifact serving as the subject of the attestation. Must
     # specify exactly one of "subject-path" or "subject-digest". May contain
@@ -109,9 +109,11 @@ See [action.yml](action.yml)
 
 <!-- markdownlint-disable MD013 -->
 
-| Name          | Description                                                    | Example                 |
-| ------------- | -------------------------------------------------------------- | ----------------------- |
-| `bundle-path` | Absolute path to the file containing the generated attestation | `/tmp/attestation.json` |
+| Name              | Description                                                    | Example                                          |
+| ----------------- | -------------------------------------------------------------- | ------------------------------------------------ |
+| `attestation-id`  | GitHub ID for the attestation                                  | `123456`                                         |
+| `attestation-url` | Absolute path to the file containing the generated attestation | `https://github.com/foo/bar/attestations/123456` |
+| `bundle-path`     | Absolute path to the file containing the generated attestation | `/tmp/attestation.json`                          |
 
 <!-- markdownlint-enable MD013 -->
 
@@ -157,7 +159,7 @@ jobs:
       - name: Build artifact
         run: make my-app
       - name: Attest
-        uses: actions/attest@v1
+        uses: actions/attest@v2
         with:
           subject-path: '${{ github.workspace }}/my-app'
           predicate-type: 'https://example.com/predicate/v1'
@@ -170,7 +172,7 @@ If you are generating multiple artifacts, you can attest all of them at the same
 time by using a wildcard in the `subject-path` input.
 
 ```yaml
-- uses: actions/attest@v1
+- uses: actions/attest@v2
   with:
     subject-path: 'dist/**/my-bin-*'
     predicate-type: 'https://example.com/predicate/v1'
@@ -184,13 +186,13 @@ Alternatively, you can explicitly list multiple subjects with either a comma or
 newline delimited list:
 
 ```yaml
-- uses: actions/attest@v1
+- uses: actions/attest@v2
   with:
     subject-path: 'dist/foo, dist/bar'
 ```
 
 ```yaml
-- uses: actions/attest@v1
+- uses: actions/attest@v2
   with:
     subject-path: |
       dist/foo
@@ -247,7 +249,7 @@ jobs:
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
       - name: Attest
-        uses: actions/attest@v1
+        uses: actions/attest@v2
         id: attest
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
