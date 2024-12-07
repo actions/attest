@@ -61,6 +61,10 @@ inputs:
 outputs:
   bundle-path:
     description: 'The path to the file containing the attestation bundle.'
+  attestation-id:
+    description: 'The ID of the attestation.'
+  attestation-url:
+    description: 'The URL for the attestation summary.'
 
 runs:
   using: node20

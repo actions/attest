@@ -79,6 +79,11 @@ export async function run(inputs: RunInputs): Promise<void> {
       flag: 'a'
     })
 
+    if (att.attestationID) {
+      core.setOutput('attestation-id', att.attestationID)
+      core.setOutput('attestation-url', attestationURL(att.attestationID))
+    }
+
     if (inputs.showSummary) {
       logSummary(att)
     }
