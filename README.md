@@ -122,7 +122,7 @@ See [action.yml](action.yml)
 | Name              | Description                                                    | Example                                          |
 | ----------------- | -------------------------------------------------------------- | ------------------------------------------------ |
 | `attestation-id`  | GitHub ID for the attestation                                  | `123456`                                         |
-| `attestation-url` | Absolute path to the file containing the generated attestation | `https://github.com/foo/bar/attestations/123456` |
+| `attestation-url` | URL for the attestation summary                                | `https://github.com/foo/bar/attestations/123456` |
 | `bundle-path`     | Absolute path to the file containing the generated attestation | `/tmp/attestation.json`                          |
 
 <!-- markdownlint-enable MD013 -->
