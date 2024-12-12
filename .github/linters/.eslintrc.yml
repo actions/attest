@@ -44,7 +44,6 @@ rules:
     'import/no-unresolved': ['error', { 'ignore': ['csv-parse/sync'] }],
     'no-console': 'off',
     'no-unused-vars': 'off',
-    'prettier/prettier': 'error',
     'semi': 'off',
     '@typescript-eslint/array-type': 'error',
     '@typescript-eslint/await-thenable': 'error',
