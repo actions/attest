@@ -70868,7 +70868,7 @@ const inputs = {
     // undocumented -- not part of public interface
     privateSigning: ['true', 'True', 'TRUE', '1'].includes(core.getInput('private-signing'))
 };
-// eslint-disable-next-line @typescript-eslint/no-floating-promises
+/* eslint-disable-next-line @typescript-eslint/no-floating-promises */
 (0, main_1.run)(inputs);
 
 
@@ -70975,7 +70975,7 @@ async function run(inputs) {
             core.setOutput('attestation-url', attestationURL(att.attestationID));
         }
         if (inputs.showSummary) {
-            logSummary(att);
+            await logSummary(att);
         }
     }
     catch (err) {
@@ -71018,13 +71018,13 @@ const logAttestation = (subjects, attestation, sigstoreInstance) => {
     }
 };
 // Attach summary information to the GitHub Actions run
-const logSummary = (attestation) => {
+const logSummary = async (attestation) => {
     const { attestationID } = attestation;
     if (attestationID) {
         const url = attestationURL(attestationID);
         core.summary.addHeading('Attestation Created', 3);
         core.summary.addList([`<a href="${url}">${url}</a>`]);
-        core.summary.write();
+        await core.summary.write();
     }
 };
 const tempDir = () => {
@@ -71199,7 +71199,6 @@ const getSubjectFromPath = async (subjectPath, subjectName) => {
     // Parse the list of subject paths
     const subjectPaths = parseList(subjectPath).join('\n');
     // Expand the globbed paths to a list of actual paths
-    /* eslint-disable-next-line github/no-then */
     const paths = await glob.create(subjectPaths).then(async (g) => g.glob());
     // Filter path list to just the files (not directories)
     const files = paths.filter(p => fs_1.default.statSync(p).isFile());

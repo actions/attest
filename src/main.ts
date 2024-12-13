@@ -85,7 +85,7 @@ export async function run(inputs: RunInputs): Promise<void> {
     }
 
     if (inputs.showSummary) {
-      logSummary(att)
+      await logSummary(att)
     }
   } catch (err) {
     // Fail the workflow run if an error occurs
@@ -153,14 +153,14 @@ const logAttestation = (
 }
 
 // Attach summary information to the GitHub Actions run
-const logSummary = (attestation: AttestResult): void => {
+const logSummary = async (attestation: AttestResult): Promise<void> => {
   const { attestationID } = attestation
 
   if (attestationID) {
     const url = attestationURL(attestationID)
     core.summary.addHeading('Attestation Created', 3)
     core.summary.addList([`<a href="${url}">${url}</a>`])
-    core.summary.write()
+    await core.summary.write()
   }
 }
 

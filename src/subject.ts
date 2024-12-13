@@ -68,7 +68,6 @@ const getSubjectFromPath = async (
   const subjectPaths = parseList(subjectPath).join('\n')
 
   // Expand the globbed paths to a list of actual paths
-  /* eslint-disable-next-line github/no-then */
   const paths = await glob.create(subjectPaths).then(async g => g.glob())
 
   // Filter path list to just the files (not directories)

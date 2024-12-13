@@ -20,5 +20,5 @@ const inputs: RunInputs = {
   )
 }
 
-// eslint-disable-next-line @typescript-eslint/no-floating-promises
+/* eslint-disable-next-line @typescript-eslint/no-floating-promises */
 run(inputs)

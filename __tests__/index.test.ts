@@ -13,7 +13,7 @@ describe('index', () => {
   beforeEach(() => {
     getBooleanInputMock.mockImplementation(() => false)
   })
-  it('calls run when imported', async () => {
+  it('calls run when imported', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     require('../src/index')
 
