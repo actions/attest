@@ -232,7 +232,6 @@ describe('subjectFromInputs', () => {
         expect(subjects).toBeDefined()
         expect(subjects).toHaveLength(3)
 
-        /* eslint-disable-next-line github/array-foreach */
         subjects.forEach((subject, i) => {
           expect(subject.name).toEqual(`${filename}-${i}`)
           expect(subject.digest).toEqual({ sha256: expectedDigest })
