@@ -70835,6 +70835,7 @@ const inputs = {
     subjectPath: core.getInput('subject-path'),
     subjectName: core.getInput('subject-name'),
     subjectDigest: core.getInput('subject-digest'),
+    subjectChecksums: core.getInput('subject-checksums'),
     predicateType: core.getInput('predicate-type'),
     predicate: core.getInput('predicate'),
     predicatePath: core.getInput('predicate-path'),
@@ -71129,23 +71130,27 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.formatSubjectDigest = exports.subjectFromInputs = void 0;
 const glob = __importStar(__nccwpck_require__(47206));
+const assert_1 = __importDefault(__nccwpck_require__(42613));
 const crypto_1 = __importDefault(__nccwpck_require__(76982));
 const sync_1 = __nccwpck_require__(61110);
 const fs_1 = __importDefault(__nccwpck_require__(79896));
+const os_1 = __importDefault(__nccwpck_require__(70857));
 const path_1 = __importDefault(__nccwpck_require__(16928));
 const MAX_SUBJECT_COUNT = 1024;
+const MAX_SUBJECT_CHECKSUM_SIZE_BYTES = 512 * MAX_SUBJECT_COUNT;
 const DIGEST_ALGORITHM = 'sha256';
 // Returns the subject specified by the action's inputs. The subject may be
 // specified as a path to a file or as a digest. If a path is provided, the
 // file's digest is calculated and returned along with the subject's name. If a
 // digest is provided, the name must also be provided.
 const subjectFromInputs = async (inputs) => {
-    const { subjectPath, subjectDigest, subjectName, downcaseName } = inputs;
-    if (!subjectPath && !subjectDigest) {
-        throw new Error('One of subject-path or subject-digest must be provided');
+    const { subjectPath, subjectDigest, subjectName, subjectChecksums, downcaseName } = inputs;
+    const enabledInputs = [subjectPath, subjectDigest, subjectChecksums].filter(Boolean);
+    if (enabledInputs.length === 0) {
+        throw new Error('One of subject-path, subject-digest, or subject-checksums must be provided');
     }
-    if (subjectPath && subjectDigest) {
-        throw new Error('Only one of subject-path or subject-digest may be provided');
+    if (enabledInputs.length > 1) {
+        throw new Error('Only one of subject-path, subject-digest, or subject-checksums may be provided');
     }
     if (subjectDigest && !subjectName) {
         throw new Error('subject-name must be provided when using subject-digest');
@@ -71153,11 +71158,17 @@ const subjectFromInputs = async (inputs) => {
     // If push-to-registry is enabled, ensure the subject name is lowercase
     // to conform to OCI image naming conventions
     const name = downcaseName ? subjectName.toLowerCase() : subjectName;
-    if (subjectPath) {
-        return await getSubjectFromPath(subjectPath, name);
-    }
-    else {
-        return [getSubjectFromDigest(subjectDigest, name)];
+    switch (true) {
+        case !!subjectPath:
+            return getSubjectFromPath(subjectPath, name);
+        case !!subjectDigest:
+            return [getSubjectFromDigest(subjectDigest, name)];
+        case !!subjectChecksums:
+            return getSubjectFromChecksums(subjectChecksums);
+        /* istanbul ignore next */
+        default:
+            // This should be unreachable, but TS requires a default case
+            assert_1.default.fail('unreachable');
     }
 };
 exports.subjectFromInputs = subjectFromInputs;
@@ -71173,7 +71184,7 @@ exports.formatSubjectDigest = formatSubjectDigest;
 const getSubjectFromPath = async (subjectPath, subjectName) => {
     const digestedSubjects = [];
     // Parse the list of subject paths
-    const subjectPaths = parseList(subjectPath).join('\n');
+    const subjectPaths = parseSubjectPathList(subjectPath).join('\n');
     // Expand the globbed paths to a list of actual paths
     const paths = await glob.create(subjectPaths).then(async (g) => g.glob());
     // Filter path list to just the files (not directories)
@@ -71206,6 +71217,46 @@ const getSubjectFromDigest = (subjectDigest, subjectName) => {
         digest: { [alg]: digest }
     };
 };
+const getSubjectFromChecksums = (subjectChecksums) => {
+    if (fs_1.default.existsSync(subjectChecksums)) {
+        return getSubjectFromChecksumsFile(subjectChecksums);
+    }
+    else {
+        return getSubjectFromChecksumsString(subjectChecksums);
+    }
+};
+const getSubjectFromChecksumsFile = (checksumsPath) => {
+    const stats = fs_1.default.statSync(checksumsPath);
+    if (!stats.isFile()) {
+        throw new Error(`subject checksums file not found: ${checksumsPath}`);
+    }
+    /* istanbul ignore next */
+    if (stats.size > MAX_SUBJECT_CHECKSUM_SIZE_BYTES) {
+        throw new Error(`subject checksums file exceeds maximum allowed size: ${MAX_SUBJECT_CHECKSUM_SIZE_BYTES} bytes`);
+    }
+    const checksums = fs_1.default.readFileSync(checksumsPath, 'utf-8');
+    return getSubjectFromChecksumsString(checksums);
+};
+const getSubjectFromChecksumsString = (checksums) => {
+    const subjects = [];
+    const records = checksums.split(os_1.default.EOL).filter(Boolean);
+    for (const record of records) {
+        // Find the space delimiter following the digest
+        const delimIndex = record.indexOf(' ');
+        // Skip any line that doesn't have a delimiter
+        if (delimIndex === -1) {
+            continue;
+        }
+        // Swallow the type identifier character at the beginning of the name
+        const name = record.slice(delimIndex + 2);
+        const digest = record.slice(0, delimIndex);
+        subjects.push({
+            name,
+            digest: { [digestAlgorithm(digest)]: digest }
+        });
+    }
+    return subjects;
+};
 // Calculates the digest of a file using the specified algorithm. The file is
 // streamed into the digest function to avoid loading the entire file into
 // memory. The returned digest is a hex string.
@@ -71218,7 +71269,7 @@ const digestFile = async (algorithm, filePath) => {
             .once('finish', () => resolve(hash.read()));
     });
 };
-const parseList = (input) => {
+const parseSubjectPathList = (input) => {
     const res = [];
     const records = (0, sync_1.parse)(input, {
         columns: false,
@@ -71230,6 +71281,16 @@ const parseList = (input) => {
         res.push(...record);
     }
     return res.filter(item => item).map(pat => pat.trim());
+};
+const digestAlgorithm = (digest) => {
+    switch (digest.length) {
+        case 64:
+            return 'sha256';
+        case 128:
+            return 'sha512';
+        default:
+            throw new Error(`Unknown digest algorithm: ${digest}`);
+    }
 };
 
 

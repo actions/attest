@@ -12,13 +12,14 @@ describe('subjectFromInputs', () => {
   const blankInputs: SubjectInputs = {
     subjectPath: '',
     subjectName: '',
-    subjectDigest: ''
+    subjectDigest: '',
+    subjectChecksums: ''
   }
 
   describe('when no inputs are provided', () => {
     it('throws an error', async () => {
       await expect(subjectFromInputs(blankInputs)).rejects.toThrow(
-        /one of subject-path or subject-digest must be provided/i
+        /one of subject-path, subject-digest, or subject-checksums must be provided/i
       )
     })
   })
@@ -28,11 +29,42 @@ describe('subjectFromInputs', () => {
       const inputs: SubjectInputs = {
         subjectName: 'foo',
         subjectPath: 'path/to/subject',
-        subjectDigest: 'digest'
+        subjectDigest: 'digest',
+        subjectChecksums: ''
       }
 
       await expect(subjectFromInputs(inputs)).rejects.toThrow(
-        /only one of subject-path or subject-digest may be provided/i
+        /only one of subject-path, subject-digest, or subject-checksums may be provided/i
+      )
+    })
+  })
+
+  describe('when both subject path and subject checksums are provided', () => {
+    it('throws an error', async () => {
+      const inputs: SubjectInputs = {
+        subjectName: '',
+        subjectPath: 'path/to/subject',
+        subjectDigest: '',
+        subjectChecksums: 'path/to/checksums'
+      }
+
+      await expect(subjectFromInputs(inputs)).rejects.toThrow(
+        /only one of subject-path, subject-digest, or subject-checksums may be provided/i
+      )
+    })
+  })
+
+  describe('when both subject digest and subject checksums are provided', () => {
+    it('throws an error', async () => {
+      const inputs: SubjectInputs = {
+        subjectName: 'foo',
+        subjectPath: '',
+        subjectDigest: 'digest',
+        subjectChecksums: 'path/to/checksums'
+      }
+
+      await expect(subjectFromInputs(inputs)).rejects.toThrow(
+        /only one of subject-path, subject-digest, or subject-checksums may be provided/i
       )
     })
   })
@@ -385,6 +417,104 @@ describe('subjectFromInputs', () => {
         expect(subjects).toBeDefined()
         expect(subjects).toHaveLength(1)
       })
+    })
+  })
+
+  describe('when specifying a subject checksums file', () => {
+    const checksums = `
+187dcd1506a170337415589ff00c8743f19d41cc31fca246c2739dfd450d0b9d  demo_0.0.1_linux_amd64
+badline
+5d8b4751ef31f9440d843fcfa4e53ca2e25b1cb1f13fd355fdc7c24b41fe645293291ea9297ba3989078abb77ebbaac66be073618a9e4974dbd0361881d4c718 demo_0.0.1_darwin_arm64`
+
+    let dir = ''
+    const filename = 'checksums'
+
+    beforeEach(async () => {
+      // Set-up temp directory
+      const tmpDir = await fs.realpath(os.tmpdir())
+      dir = await fs.mkdtemp(tmpDir + path.sep)
+
+      // Write file to temp directory
+      await fs.writeFile(path.join(dir, filename), checksums)
+    })
+
+    afterEach(async () => {
+      // Clean-up temp directory
+      await fs.rm(dir, { recursive: true })
+    })
+
+    describe('when the specified path is NOT a file', () => {
+      it('throws an error', async () => {
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectChecksums: dir
+        }
+        await expect(subjectFromInputs(inputs)).rejects.toThrow(
+          /subject checksums file not found/i
+        )
+      })
+    })
+
+    describe('when the specific path is a file', () => {
+      it('returns the multiple subjects', async () => {
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectChecksums: path.join(dir, filename)
+        }
+        const subjects = await subjectFromInputs(inputs)
+
+        expect(subjects).toBeDefined()
+        expect(subjects).toHaveLength(2)
+
+        expect(subjects).toContainEqual({
+          name: 'demo_0.0.1_linux_amd64',
+          digest: {
+            sha256:
+              '187dcd1506a170337415589ff00c8743f19d41cc31fca246c2739dfd450d0b9d'
+          }
+        })
+      })
+    })
+  })
+
+  describe('when specifying a subject checksums string', () => {
+    const checksums = `
+f861e68a080799ca83104630b56abb90d8dbcc5f8b5a8639cb691e269838f29e  demo_0.0.1_linux_386
+187dcd1506a170337415589ff00c8743f19d41cc31fca246c2739dfd450d0b9d  demo_0.0.1_linux_amd64
+9ecbf449e286a8a8748c161c52aa28b6b2fc64ab86f94161c5d1b3abc18156c5  demo_0.0.1_linux_arm64`
+
+    it('returns the multiple subjects', async () => {
+      const inputs: SubjectInputs = {
+        ...blankInputs,
+        subjectChecksums: checksums
+      }
+      const subjects = await subjectFromInputs(inputs)
+
+      expect(subjects).toBeDefined()
+      expect(subjects).toHaveLength(3)
+
+      expect(subjects).toContainEqual({
+        name: 'demo_0.0.1_linux_386',
+        digest: {
+          sha256:
+            'f861e68a080799ca83104630b56abb90d8dbcc5f8b5a8639cb691e269838f29e'
+        }
+      })
+    })
+  })
+
+  describe('when specifying a subject checksums string with an unrecognized digest', () => {
+    const checksums = `f861e  demo_0.0.1_linux_386`
+
+    it('throws an error', async () => {
+      const inputs: SubjectInputs = {
+        ...blankInputs,
+        subjectChecksums: checksums
+      }
+
+      await expect(subjectFromInputs(inputs)).rejects.toThrow(
+        /unknown digest algorithm/i
+      )
     })
   })
 })
