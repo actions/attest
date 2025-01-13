@@ -94,6 +94,6 @@
     "ts-jest": "^29.2.5",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.19.1",
-    "undici": "^5.28.4"
+    "undici": "^7.2.1"
   }
 }
