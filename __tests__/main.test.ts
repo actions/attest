@@ -43,6 +43,7 @@ const defaultInputs: main.RunInputs = {
   subjectName: '',
   subjectDigest: '',
   subjectPath: '',
+  subjectChecksums: '',
   pushToRegistry: false,
   showSummary: true,
   githubToken: '',
@@ -138,7 +139,9 @@ describe('action', () => {
 
       expect(runMock).toHaveReturned()
       expect(setFailedMock).toHaveBeenCalledWith(
-        new Error('One of subject-path or subject-digest must be provided')
+        new Error(
+          'One of subject-path, subject-digest, or subject-checksums must be provided'
+        )
       )
     })
   })
