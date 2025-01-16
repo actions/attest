@@ -517,6 +517,20 @@ f861e68a080799ca83104630b56abb90d8dbcc5f8b5a8639cb691e269838f29e  demo_0.0.1_lin
       )
     })
   })
+
+  describe('when specifying a subject checksums string with an invalid digest', () => {
+    const checksums =
+      '!!!!e68a080799ca83104630b56abb90d8dbcc5f8b5a8639cb691e269838f29e  demo_0.0.1_linux_386'
+
+    it('throws an error', async () => {
+      const inputs: SubjectInputs = {
+        ...blankInputs,
+        subjectChecksums: checksums
+      }
+
+      await expect(subjectFromInputs(inputs)).rejects.toThrow(/invalid digest/i)
+    })
+  })
 })
 
 describe('subjectDigest', () => {

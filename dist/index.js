@@ -71139,6 +71139,7 @@ const path_1 = __importDefault(__nccwpck_require__(16928));
 const MAX_SUBJECT_COUNT = 1024;
 const MAX_SUBJECT_CHECKSUM_SIZE_BYTES = 512 * MAX_SUBJECT_COUNT;
 const DIGEST_ALGORITHM = 'sha256';
+const HEX_STRING_RE = /^[0-9a-fA-F]+$/;
 // Returns the subject specified by the action's inputs. The subject may be
 // specified as a path to a file or as a digest. If a path is provided, the
 // file's digest is calculated and returned along with the subject's name. If a
@@ -71250,6 +71251,9 @@ const getSubjectFromChecksumsString = (checksums) => {
         // Swallow the type identifier character at the beginning of the name
         const name = record.slice(delimIndex + 2);
         const digest = record.slice(0, delimIndex);
+        if (!HEX_STRING_RE.test(digest)) {
+            throw new Error(`Invalid digest: ${digest}`);
+        }
         subjects.push({
             name,
             digest: { [digestAlgorithm(digest)]: digest }

@@ -11,6 +11,7 @@ import type { Subject } from '@actions/attest'
 const MAX_SUBJECT_COUNT = 1024
 const MAX_SUBJECT_CHECKSUM_SIZE_BYTES = 512 * MAX_SUBJECT_COUNT
 const DIGEST_ALGORITHM = 'sha256'
+const HEX_STRING_RE = /^[0-9a-fA-F]+$/
 
 export type SubjectInputs = {
   subjectPath: string
@@ -183,6 +184,10 @@ const getSubjectFromChecksumsString = (checksums: string): Subject[] => {
     // Swallow the type identifier character at the beginning of the name
     const name = record.slice(delimIndex + 2)
     const digest = record.slice(0, delimIndex)
+
+    if (!HEX_STRING_RE.test(digest)) {
+      throw new Error(`Invalid digest: ${digest}`)
+    }
 
     subjects.push({
       name,
