@@ -27,11 +27,12 @@ information on artifact attestations.
 <!-- prettier-ignore-start -->
 > [!NOTE]
 > Artifact attestations are available in public repositories for all
-> current GitHub plans. They are not available on legacy plans, such as Bronze,
-> Silver, or Gold. If you are on a GitHub Free, GitHub Pro, or GitHub Team plan,
-> artifact attestations are only available for public repositories. To use
-> artifact attestations in private or internal repositories, you must be on a
-> GitHub Enterprise Cloud plan.
+> current GitHub plans.
+>
+> To use artifact attestations in private or internal repositories, you must
+> be on a GitHub Enterprise Cloud plan.
+>
+> Artifact attestations are NOT supported on GitHub Enterprise Server.
 <!-- prettier-ignore-end -->
 
 ## Usage
