@@ -189,10 +189,17 @@ const getSubjectFromChecksumsString = (checksums: string): Subject[] => {
       throw new Error(`Invalid digest: ${digest}`)
     }
 
-    subjects.push({
-      name,
-      digest: { [digestAlgorithm(digest)]: digest }
-    })
+    if (digestAlgorithm(digest) === 'sha1') {
+      subjects.push({
+        uri: name,
+        digest: { [digestAlgorithm(digest)]: digest }
+      } as any)
+    } else {
+      subjects.push({
+        name,
+        digest: { [digestAlgorithm(digest)]: digest }
+      })
+    }
   }
 
   return subjects
@@ -233,6 +240,8 @@ const parseSubjectPathList = (input: string): string[] => {
 
 const digestAlgorithm = (digest: string): string => {
   switch (digest.length) {
+    case 40:
+      return 'sha1'
     case 64:
       return 'sha256'
     case 128:

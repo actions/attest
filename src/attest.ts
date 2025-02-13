@@ -25,8 +25,11 @@ export const createAttestation = async (
     predicateType: predicate.type,
     predicate: predicate.params,
     sigstore: opts.sigstoreInstance,
-    token: opts.githubToken
+    token: opts.githubToken,
+    skipWrite: true
   })
+
+  console.log(JSON.stringify(attestation.bundle))
 
   const result: AttestResult = attestation
 

@@ -70755,8 +70755,10 @@ const createAttestation = async (subjects, predicate, opts) => {
         predicateType: predicate.type,
         predicate: predicate.params,
         sigstore: opts.sigstoreInstance,
-        token: opts.githubToken
+        token: opts.githubToken,
+        skipWrite: true
     });
+    console.log(JSON.stringify(attestation.bundle));
     const result = attestation;
     if (subjects.length === 1 && opts.pushToRegistry) {
         const subject = subjects[0];
@@ -71262,10 +71264,18 @@ const getSubjectFromChecksumsString = (checksums) => {
         if (!HEX_STRING_RE.test(digest)) {
             throw new Error(`Invalid digest: ${digest}`);
         }
-        subjects.push({
-            name,
-            digest: { [digestAlgorithm(digest)]: digest }
-        });
+        if (digestAlgorithm(digest) === 'sha1') {
+            subjects.push({
+                uri: name,
+                digest: { [digestAlgorithm(digest)]: digest }
+            });
+        }
+        else {
+            subjects.push({
+                name,
+                digest: { [digestAlgorithm(digest)]: digest }
+            });
+        }
     }
     return subjects;
 };
@@ -71296,6 +71306,8 @@ const parseSubjectPathList = (input) => {
 };
 const digestAlgorithm = (digest) => {
     switch (digest.length) {
+        case 40:
+            return 'sha1';
         case 64:
             return 'sha256';
         case 128:
