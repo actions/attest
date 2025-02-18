@@ -65,7 +65,7 @@ attest:
    The `subject-path` parameter should identify the artifact for which you want
    to generate an attestation. The `predicate-type` can be any of the the
    [vetted predicate types][3] or a custom value. The `predicate-path`
-   identifies a file containg the JSON-encoded predicate parameters.
+   identifies a file containing the JSON-encoded predicate parameters.
 
 ### Inputs
 
