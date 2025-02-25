@@ -99,7 +99,7 @@ describe('subjectFromInputs', () => {
       })
     })
 
-    describe('when the alogrithm is not supported', () => {
+    describe('when the algorithm is not supported', () => {
       it('throws an error', async () => {
         const inputs: SubjectInputs = {
           ...blankInputs,
