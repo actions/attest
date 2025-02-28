@@ -3,7 +3,12 @@ import * as github from '@actions/github'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import { AttestResult, SigstoreInstance, createAttestation } from './attest'
+import {
+  AttestResult,
+  SigstoreInstance,
+  createAttestation,
+  CreateAttestationOptions
+} from './attest'
 import { SEARCH_PUBLIC_GOOD_URL } from './endpoints'
 import { PredicateInputs, predicateFromInputs } from './predicate'
 import * as style from './style'
@@ -13,7 +18,7 @@ import {
   subjectFromInputs
 } from './subject'
 
-import type { Subject } from '@actions/attest'
+import type { Predicate, Subject } from '@actions/attest'
 
 const ATTESTATION_FILE_NAME = 'attestation.json'
 
@@ -22,6 +27,8 @@ export type RunInputs = SubjectInputs &
     pushToRegistry: boolean
     githubToken: string
     showSummary: boolean
+    singleSubjectAttestations: boolean
+    // undocumented -- not part of public interface
     privateSigning: boolean
   }
 
@@ -65,27 +72,31 @@ export async function run(inputs: RunInputs): Promise<void> {
     const outputPath = path.join(tempDir(), ATTESTATION_FILE_NAME)
     core.setOutput('bundle-path', outputPath)
 
-    const att = await createAttestation(subjects, predicate, {
+    const opts: CreateAttestationOptions = {
       sigstoreInstance,
       pushToRegistry: inputs.pushToRegistry,
       githubToken: inputs.githubToken
-    })
+    }
 
-    logAttestation(subjects, att, sigstoreInstance)
+    let atts: AttestResult[]
+    if (inputs.singleSubjectAttestations) {
+      atts = await createSingleSubjectAttestations(subjects, predicate, opts)
+    } else {
+      atts = await createMultiSubjectAttestation(subjects, predicate, opts)
+    }
 
-    // Write attestation bundle to output file
-    fs.writeFileSync(outputPath, JSON.stringify(att.bundle) + os.EOL, {
-      encoding: 'utf-8',
-      flag: 'a'
-    })
+    for (const att of atts) {
+      logAttestation(att, sigstoreInstance)
 
-    if (att.attestationID) {
-      core.setOutput('attestation-id', att.attestationID)
-      core.setOutput('attestation-url', attestationURL(att.attestationID))
+      // Write attestation bundle to output file
+      fs.writeFileSync(outputPath, JSON.stringify(att.bundle) + os.EOL, {
+        encoding: 'utf-8',
+        flag: 'a'
+      })
     }
 
     if (inputs.showSummary) {
-      await logSummary(att)
+      await logSummary(atts)
     }
   } catch (err) {
     // Fail the workflow run if an error occurs
@@ -108,12 +119,41 @@ export async function run(inputs: RunInputs): Promise<void> {
   }
 }
 
+const createSingleSubjectAttestations = async (
+  subjects: Subject[],
+  predicate: Predicate,
+  opts: CreateAttestationOptions
+): Promise<AttestResult[]> => {
+  const atts: AttestResult[] = []
+  // Generate one attestation for each subject
+  for (const subject of subjects) {
+    const att = await createAttestation([subject], predicate, opts)
+    atts.push(att)
+  }
+  return atts
+}
+
+const createMultiSubjectAttestation = async (
+  subjects: Subject[],
+  predicate: Predicate,
+  opts: CreateAttestationOptions
+): Promise<AttestResult[]> => {
+  const att = await createAttestation(subjects, predicate, opts)
+
+  if (att.attestationID) {
+    core.setOutput('attestation-id', att.attestationID)
+    core.setOutput('attestation-url', attestationURL(att.attestationID))
+  }
+
+  return [att]
+}
+
 // Log details about the attestation to the GitHub Actions run
 const logAttestation = (
-  subjects: Subject[],
   attestation: AttestResult,
   sigstoreInstance: SigstoreInstance
 ): void => {
+  const subjects = attestation.attestationSubjects
   if (subjects.length === 1) {
     core.info(
       `Attestation created for ${subjects[0].name}@${formatSubjectDigest(subjects[0])}`
@@ -153,13 +193,26 @@ const logAttestation = (
 }
 
 // Attach summary information to the GitHub Actions run
-const logSummary = async (attestation: AttestResult): Promise<void> => {
-  const { attestationID } = attestation
-
-  if (attestationID) {
-    const url = attestationURL(attestationID)
-    core.summary.addHeading('Attestation Created', 3)
-    core.summary.addList([`<a href="${url}">${url}</a>`])
+const logSummary = async (attestations: AttestResult[]): Promise<void> => {
+  if (attestations.length > 0) {
+    core.summary.addHeading(
+      /* istanbul ignore next */
+      attestations.length !== 1
+        ? 'Attestations Created'
+        : 'Attestation Created',
+      3
+    )
+    const listItems: string[] = []
+    for (const attestation of attestations) {
+      if (attestation.attestationID) {
+        const url = attestationURL(attestation.attestationID)
+        for (const subject of attestation.attestationSubjects) {
+          const digest = formatSubjectDigest(subject)
+          listItems.push(`<a href="${url}">${subject.name}@${digest}</a>`)
+        }
+      }
+    }
+    core.summary.addList(listItems)
     await core.summary.write()
   }
 }

@@ -18,6 +18,7 @@ export type SubjectInputs = {
   subjectName: string
   subjectDigest: string
   subjectChecksums: string
+  singleSubjectAttestations: boolean
   downcaseName?: boolean
 }
 // Returns the subject specified by the action's inputs. The subject may be

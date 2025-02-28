@@ -15,6 +15,9 @@ const inputs: RunInputs = {
   pushToRegistry: core.getBooleanInput('push-to-registry'),
   showSummary: core.getBooleanInput('show-summary'),
   githubToken: core.getInput('github-token'),
+  singleSubjectAttestations: core.getBooleanInput(
+    'single-subject-attestations'
+  ),
   // undocumented -- not part of public interface
   privateSigning: ['true', 'True', 'TRUE', '1'].includes(
     core.getInput('private-signing')
