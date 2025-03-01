@@ -168,27 +168,22 @@ const logAttestation = (
 
 // Attach summary information to the GitHub Actions run
 const logSummary = async (attestations: AttestResult[]): Promise<void> => {
-  if (attestations.length > 0) {
-    core.summary.addHeading(
-      /* istanbul ignore next */
-      attestations.length !== 1
-        ? 'Attestations Created'
-        : 'Attestation Created',
-      3
-    )
-    const listItems: string[] = []
-    for (const attestation of attestations) {
-      if (attestation.attestationID) {
-        const url = attestationURL(attestation.attestationID)
-        for (const subject of attestation.attestationSubjects) {
-          const digest = formatSubjectDigest(subject)
-          listItems.push(`<a href="${url}">${subject.name}@${digest}</a>`)
-        }
-      }
+  if (attestations.length <= 0) return
+
+  core.summary.addHeading(
+    /* istanbul ignore next */
+    attestations.length !== 1 ? 'Attestations Created' : 'Attestation Created',
+    3
+  )
+  const listItems: string[] = []
+  for (const { attestationID } of attestations) {
+    if (attestationID) {
+      const url = attestationURL(attestationID)
+      listItems.push(`<a href="${url}">${url}</a>`)
     }
-    core.summary.addList(listItems)
-    await core.summary.write()
   }
+  core.summary.addList(listItems)
+  await core.summary.write()
 }
 
 const tempDir = (): string => {
