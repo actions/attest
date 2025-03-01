@@ -6,11 +6,6 @@ const OCI_TIMEOUT = 30000
 const OCI_RETRY = 3
 
 export type SigstoreInstance = 'public-good' | 'github'
-export type CreateAttestationOptions = {
-  sigstoreInstance: SigstoreInstance
-  pushToRegistry: boolean
-  githubToken: string
-}
 export type AttestResult = Attestation & {
   attestationDigest?: string
   attestationSubjects: Subject[]
@@ -19,7 +14,11 @@ export type AttestResult = Attestation & {
 export const createAttestation = async (
   subjects: Subject[],
   predicate: Predicate,
-  opts: CreateAttestationOptions
+  opts: {
+    sigstoreInstance: SigstoreInstance
+    pushToRegistry: boolean
+    githubToken: string
+  }
 ): Promise<AttestResult> => {
   // Sign provenance w/ Sigstore
   const attestation: Attestation = await attest({

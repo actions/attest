@@ -3,12 +3,7 @@ import * as github from '@actions/github'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import {
-  AttestResult,
-  SigstoreInstance,
-  createAttestation,
-  CreateAttestationOptions
-} from './attest'
+import { AttestResult, SigstoreInstance, createAttestation } from './attest'
 import { SEARCH_PUBLIC_GOOD_URL } from './endpoints'
 import { PredicateInputs, predicateFromInputs } from './predicate'
 import * as style from './style'
@@ -17,8 +12,6 @@ import {
   formatSubjectDigest,
   subjectFromInputs
 } from './subject'
-
-import type { Predicate, Subject } from '@actions/attest'
 
 const ATTESTATION_FILE_NAME = 'attestation.json'
 
@@ -72,17 +65,22 @@ export async function run(inputs: RunInputs): Promise<void> {
     const outputPath = path.join(tempDir(), ATTESTATION_FILE_NAME)
     core.setOutput('bundle-path', outputPath)
 
-    const opts: CreateAttestationOptions = {
+    const opts = {
       sigstoreInstance,
       pushToRegistry: inputs.pushToRegistry,
       githubToken: inputs.githubToken
     }
 
-    let atts: AttestResult[]
+    const atts: AttestResult[] = []
     if (inputs.singleSubjectAttestations) {
-      atts = await createSingleSubjectAttestations(subjects, predicate, opts)
+      // Generate one attestation for each subject
+      for (const subject of subjects) {
+        const att = await createAttestation([subject], predicate, opts)
+        atts.push(att)
+      }
     } else {
-      atts = await createMultiSubjectAttestation(subjects, predicate, opts)
+      const att = await createAttestation(subjects, predicate, opts)
+      atts.push(att)
     }
 
     for (const att of atts) {
@@ -93,6 +91,11 @@ export async function run(inputs: RunInputs): Promise<void> {
         encoding: 'utf-8',
         flag: 'a'
       })
+    }
+
+    if (atts[0].attestationID) {
+      core.setOutput('attestation-id', atts[0].attestationID)
+      core.setOutput('attestation-url', attestationURL(atts[0].attestationID))
     }
 
     if (inputs.showSummary) {
@@ -117,35 +120,6 @@ export async function run(inputs: RunInputs): Promise<void> {
   } finally {
     process.removeListener('log', logHandler)
   }
-}
-
-const createSingleSubjectAttestations = async (
-  subjects: Subject[],
-  predicate: Predicate,
-  opts: CreateAttestationOptions
-): Promise<AttestResult[]> => {
-  const atts: AttestResult[] = []
-  // Generate one attestation for each subject
-  for (const subject of subjects) {
-    const att = await createAttestation([subject], predicate, opts)
-    atts.push(att)
-  }
-  return atts
-}
-
-const createMultiSubjectAttestation = async (
-  subjects: Subject[],
-  predicate: Predicate,
-  opts: CreateAttestationOptions
-): Promise<AttestResult[]> => {
-  const att = await createAttestation(subjects, predicate, opts)
-
-  if (att.attestationID) {
-    core.setOutput('attestation-id', att.attestationID)
-    core.setOutput('attestation-url', attestationURL(att.attestationID))
-  }
-
-  return [att]
 }
 
 // Log details about the attestation to the GitHub Actions run
