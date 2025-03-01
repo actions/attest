@@ -20,7 +20,7 @@ export const createAttestation = async (
   }
 ): Promise<AttestResult> => {
   // Sign provenance w/ Sigstore
-  const attestation = await attest({
+  const attestation: Attestation = await attest({
     subjects,
     predicateType: predicate.type,
     predicate: predicate.params,

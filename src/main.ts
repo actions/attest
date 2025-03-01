@@ -22,6 +22,8 @@ export type RunInputs = SubjectInputs &
     pushToRegistry: boolean
     githubToken: string
     showSummary: boolean
+    singleSubjectAttestations: boolean
+    // undocumented -- not part of public interface
     privateSigning: boolean
   }
 
@@ -65,27 +67,41 @@ export async function run(inputs: RunInputs): Promise<void> {
     const outputPath = path.join(tempDir(), ATTESTATION_FILE_NAME)
     core.setOutput('bundle-path', outputPath)
 
-    const att = await createAttestation(subjects, predicate, {
+    const opts = {
       sigstoreInstance,
       pushToRegistry: inputs.pushToRegistry,
       githubToken: inputs.githubToken
-    })
+    }
 
-    logAttestation(subjects, att, sigstoreInstance)
+    const atts: AttestResult[] = []
+    if (inputs.singleSubjectAttestations) {
+      // Generate one attestation for each subject
+      for (const subject of subjects) {
+        const att = await createAttestation([subject], predicate, opts)
+        atts.push(att)
+      }
+    } else {
+      const att = await createAttestation(subjects, predicate, opts)
+      atts.push(att)
+    }
 
-    // Write attestation bundle to output file
-    fs.writeFileSync(outputPath, JSON.stringify(att.bundle) + os.EOL, {
-      encoding: 'utf-8',
-      flag: 'a'
-    })
+    for (const att of atts) {
+      logAttestation(subjects, att, sigstoreInstance)
 
-    if (att.attestationID) {
-      core.setOutput('attestation-id', att.attestationID)
-      core.setOutput('attestation-url', attestationURL(att.attestationID))
+      // Write attestation bundle to output file
+      fs.writeFileSync(outputPath, JSON.stringify(att.bundle) + os.EOL, {
+        encoding: 'utf-8',
+        flag: 'a'
+      })
+    }
+
+    if (atts[0].attestationID) {
+      core.setOutput('attestation-id', atts[0].attestationID)
+      core.setOutput('attestation-url', attestationURL(atts[0].attestationID))
     }
 
     if (inputs.showSummary) {
-      await logSummary(att)
+      await logSummary(atts)
     }
   } catch (err) {
     // Fail the workflow run if an error occurs
@@ -153,15 +169,23 @@ const logAttestation = (
 }
 
 // Attach summary information to the GitHub Actions run
-const logSummary = async (attestation: AttestResult): Promise<void> => {
-  const { attestationID } = attestation
+const logSummary = async (attestations: AttestResult[]): Promise<void> => {
+  if (attestations.length <= 0) return
 
-  if (attestationID) {
-    const url = attestationURL(attestationID)
-    core.summary.addHeading('Attestation Created', 3)
-    core.summary.addList([`<a href="${url}">${url}</a>`])
-    await core.summary.write()
+  core.summary.addHeading(
+    /* istanbul ignore next */
+    attestations.length !== 1 ? 'Attestations Created' : 'Attestation Created',
+    3
+  )
+  const listItems: string[] = []
+  for (const { attestationID } of attestations) {
+    if (attestationID) {
+      const url = attestationURL(attestationID)
+      listItems.push(`<a href="${url}">${url}</a>`)
+    }
   }
+  core.summary.addList(listItems)
+  await core.summary.write()
 }
 
 const tempDir = (): string => {
