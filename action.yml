@@ -66,9 +66,7 @@ inputs:
     required: false
   single-subject-attestations:
     description: >
-      If true, generate one attestation per subject, 
-      otherwise generate a single attestations with multiple subjects.
-      Defaults to false.
+      If true, generate one attestation per subject. Defaults to false.
     default: false
     required: false
 outputs:

@@ -137,8 +137,11 @@ Attestations are saved in the JSON-serialized [Sigstore bundle][6] format.
 
 If multiple subjects are being attested at the same time, a single attestation
 will be created with references to each of the supplied subjects.
-If `single-subject-attestations` is true, each attestation will be written
-to the output file on  a separate line (using the [JSON Lines][7] format).
+
+If the `single-subject-attestations` option has been set to true,
+one attestation will be generated per provided subject.
+All of these attestations will be written to the output file,
+using the [JSON Lines][7] format (one attestation per line).
 
 ## Attestation Limits
 
