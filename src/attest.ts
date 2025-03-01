@@ -8,7 +8,6 @@ const OCI_RETRY = 3
 export type SigstoreInstance = 'public-good' | 'github'
 export type AttestResult = Attestation & {
   attestationDigest?: string
-  attestationSubjects: Subject[]
 }
 
 export const createAttestation = async (
@@ -29,10 +28,7 @@ export const createAttestation = async (
     token: opts.githubToken
   })
 
-  const result: AttestResult = {
-    ...attestation,
-    attestationSubjects: subjects
-  }
+  const result: AttestResult = attestation
 
   if (subjects.length === 1 && opts.pushToRegistry) {
     const subject = subjects[0]

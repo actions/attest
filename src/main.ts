@@ -13,6 +13,8 @@ import {
   subjectFromInputs
 } from './subject'
 
+import type { Subject } from '@actions/attest'
+
 const ATTESTATION_FILE_NAME = 'attestation.json'
 
 export type RunInputs = SubjectInputs &
@@ -84,7 +86,7 @@ export async function run(inputs: RunInputs): Promise<void> {
     }
 
     for (const att of atts) {
-      logAttestation(att, sigstoreInstance)
+      logAttestation(subjects, att, sigstoreInstance)
 
       // Write attestation bundle to output file
       fs.writeFileSync(outputPath, JSON.stringify(att.bundle) + os.EOL, {
@@ -124,10 +126,10 @@ export async function run(inputs: RunInputs): Promise<void> {
 
 // Log details about the attestation to the GitHub Actions run
 const logAttestation = (
+  subjects: Subject[],
   attestation: AttestResult,
   sigstoreInstance: SigstoreInstance
 ): void => {
-  const subjects = attestation.attestationSubjects
   if (subjects.length === 1) {
     core.info(
       `Attestation created for ${subjects[0].name}@${formatSubjectDigest(subjects[0])}`
