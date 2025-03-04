@@ -86,7 +86,7 @@ export async function run(inputs: RunInputs): Promise<void> {
     }
 
     for (const att of atts) {
-      logAttestation(subjects, att, sigstoreInstance)
+      logAttestation(att, sigstoreInstance)
 
       // Write attestation bundle to output file
       fs.writeFileSync(outputPath, JSON.stringify(att.bundle) + os.EOL, {
@@ -94,6 +94,8 @@ export async function run(inputs: RunInputs): Promise<void> {
         flag: 'a'
       })
     }
+
+    logSubjects(subjects)
 
     if (atts[0].attestationID) {
       core.setOutput('attestation-id', atts[0].attestationID)
@@ -126,18 +128,9 @@ export async function run(inputs: RunInputs): Promise<void> {
 
 // Log details about the attestation to the GitHub Actions run
 const logAttestation = (
-  subjects: Subject[],
   attestation: AttestResult,
   sigstoreInstance: SigstoreInstance
 ): void => {
-  if (subjects.length === 1) {
-    core.info(
-      `Attestation created for ${subjects[0].name}@${formatSubjectDigest(subjects[0])}`
-    )
-  } else {
-    core.info(`Attestation created for ${subjects.length} subjects`)
-  }
-
   const instanceName =
     sigstoreInstance === 'public-good' ? 'Public Good' : 'GitHub'
   core.startGroup(
@@ -165,6 +158,16 @@ const logAttestation = (
   if (attestation.attestationDigest) {
     core.info(style.highlight('Attestation uploaded to registry'))
     core.info(`${subjects[0].name}@${attestation.attestationDigest}`)
+  }
+}
+
+// Log details about attestation subjects to the GitHub Actions run
+const logSubjects = (subjects: Subject[]): void => {
+  core.info(`Attestation created for ${subjects.length} subjects`)
+  for (const subject of subjects) {
+    core.info(
+      `Attestation created for ${subject.name}@${formatSubjectDigest(subject)}`
+    )
   }
 }
 
