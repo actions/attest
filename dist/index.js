@@ -377,9 +377,11 @@ const buildSLSAProvenancePredicate = (issuer) => __awaiter(void 0, void 0, void 
     // Split just the path and ref from the workflow string.
     // owner/repo/.github/workflows/main.yml@main =>
     //   .github/workflows/main.yml, main
-    const [workflowPath] = claims.workflow_ref
+    const [workflowPath, ...workflowRefChunks] = claims.workflow_ref
         .replace(`${claims.repository}/`, '')
         .split('@');
+    // Handle case where tag contains `@` (e.g: when using changesets in a monorepo context),
+    const workflowRef = workflowRefChunks.join('@');
     return {
         type: SLSA_PREDICATE_V1_TYPE,
         params: {
@@ -387,7 +389,7 @@ const buildSLSAProvenancePredicate = (issuer) => __awaiter(void 0, void 0, void 
                 buildType: GITHUB_BUILD_TYPE,
                 externalParameters: {
                     workflow: {
-                        ref: claims.ref,
+                        ref: workflowRef,
                         repository: `${serverURL}/${claims.repository}`,
                         path: workflowPath
                     }
@@ -7519,7 +7521,7 @@ __export(dist_src_exports, {
 module.exports = __toCommonJS(dist_src_exports);
 
 // pkg/dist-src/version.js
-var VERSION = "9.2.2";
+var VERSION = "9.1.5";
 
 // pkg/dist-src/normalize-paginated-list-response.js
 function normalizePaginatedListResponse(response) {
@@ -7567,7 +7569,7 @@ function iterator(octokit, route, parameters) {
           const response = await requestMethod({ method, url, headers });
           const normalizedResponse = normalizePaginatedListResponse(response);
           url = ((normalizedResponse.headers.link || "").match(
-            /<([^<>]+)>;\s*rel="next"/
+            /<([^>]+)>;\s*rel="next"/
           ) || [])[1];
           return { value: normalizedResponse };
         } catch (error) {
@@ -7680,8 +7682,6 @@ var paginatingEndpoints = [
   "GET /orgs/{org}/members/{username}/codespaces",
   "GET /orgs/{org}/migrations",
   "GET /orgs/{org}/migrations/{migration_id}/repositories",
-  "GET /orgs/{org}/organization-roles/{role_id}/teams",
-  "GET /orgs/{org}/organization-roles/{role_id}/users",
   "GET /orgs/{org}/outside_collaborators",
   "GET /orgs/{org}/packages",
   "GET /orgs/{org}/packages/{package_type}/{package_name}/versions",
@@ -42881,7 +42881,7 @@ const testSet = (set, version, options) => {
 
 const debug = __nccwpck_require__(1159)
 const { MAX_LENGTH, MAX_SAFE_INTEGER } = __nccwpck_require__(45101)
-const { safeRe: re, safeSrc: src, t } = __nccwpck_require__(95471)
+const { safeRe: re, t } = __nccwpck_require__(95471)
 
 const parseOptions = __nccwpck_require__(70356)
 const { compareIdentifiers } = __nccwpck_require__(73348)
@@ -42891,7 +42891,7 @@ class SemVer {
 
     if (version instanceof SemVer) {
       if (version.loose === !!options.loose &&
-        version.includePrerelease === !!options.includePrerelease) {
+          version.includePrerelease === !!options.includePrerelease) {
         return version
       } else {
         version = version.version
@@ -43057,20 +43057,6 @@ class SemVer {
   // preminor will bump the version up to the next minor release, and immediately
   // down to pre-release. premajor and prepatch work the same way.
   inc (release, identifier, identifierBase) {
-    if (release.startsWith('pre')) {
-      if (!identifier && identifierBase === false) {
-        throw new Error('invalid increment argument: identifier is empty')
-      }
-      // Avoid an invalid semver results
-      if (identifier) {
-        const r = new RegExp(`^${this.options.loose ? src[t.PRERELEASELOOSE] : src[t.PRERELEASE]}$`)
-        const match = `-${identifier}`.match(r)
-        if (!match || match[1] !== identifier) {
-          throw new Error(`invalid identifier: ${identifier}`)
-        }
-      }
-    }
-
     switch (release) {
       case 'premajor':
         this.prerelease.length = 0
@@ -43100,12 +43086,6 @@ class SemVer {
           this.inc('patch', identifier, identifierBase)
         }
         this.inc('pre', identifier, identifierBase)
-        break
-      case 'release':
-        if (this.prerelease.length === 0) {
-          throw new Error(`version ${this.raw} is not a prerelease`)
-        }
-        this.prerelease.length = 0
         break
 
       case 'major':
@@ -43149,6 +43129,10 @@ class SemVer {
       // 1.0.0 'pre' would become 1.0.0-0 which is the wrong direction.
       case 'pre': {
         const base = Number(identifierBase) ? 1 : 0
+
+        if (!identifier && identifierBase === false) {
+          throw new Error('invalid increment argument: identifier is empty')
+        }
 
         if (this.prerelease.length === 0) {
           this.prerelease = [base]
@@ -43408,13 +43392,20 @@ const diff = (version1, version2) => {
       return 'major'
     }
 
-    // If the main part has no difference
-    if (lowVersion.compareMain(highVersion) === 0) {
-      if (lowVersion.minor && !lowVersion.patch) {
-        return 'minor'
-      }
+    // Otherwise it can be determined by checking the high version
+
+    if (highVersion.patch) {
+      // anything higher than a patch bump would result in the wrong version
       return 'patch'
     }
+
+    if (highVersion.minor) {
+      // anything higher than a minor bump would result in the wrong version
+      return 'minor'
+    }
+
+    // bumping major/minor/patch all have same result
+    return 'major'
   }
 
   // add the `pre` prefix if we are going to a prerelease version
@@ -43921,7 +43912,6 @@ exports = module.exports = {}
 const re = exports.re = []
 const safeRe = exports.safeRe = []
 const src = exports.src = []
-const safeSrc = exports.safeSrc = []
 const t = exports.t = {}
 let R = 0
 
@@ -43954,7 +43944,6 @@ const createToken = (name, value, isGlobal) => {
   debug(name, index, value)
   t[name] = index
   src[index] = value
-  safeSrc[index] = safe
   re[index] = new RegExp(value, isGlobal ? 'g' : undefined)
   safeRe[index] = new RegExp(safe, isGlobal ? 'g' : undefined)
 }
