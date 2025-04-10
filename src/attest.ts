@@ -17,6 +17,7 @@ export const createAttestation = async (
     sigstoreInstance: SigstoreInstance
     pushToRegistry: boolean
     githubToken: string
+    ociCompatMode: boolean
   }
 ): Promise<AttestResult> => {
   // Sign provenance w/ Sigstore
@@ -43,6 +44,7 @@ export const createAttestation = async (
         'dev.sigstore.bundle.content': 'dsse-envelope',
         'dev.sigstore.bundle.predicateType': predicate.type
       },
+      compatibility: opts.ociCompatMode,
       fetchOpts: { timeout: OCI_TIMEOUT, retry: OCI_RETRY }
     })
 

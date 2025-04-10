@@ -23,6 +23,7 @@ export type RunInputs = SubjectInputs &
     githubToken: string
     showSummary: boolean
     privateSigning: boolean
+    ociCompatMode: boolean
   }
 
 /* istanbul ignore next */
@@ -68,7 +69,8 @@ export async function run(inputs: RunInputs): Promise<void> {
     const att = await createAttestation(subjects, predicate, {
       sigstoreInstance,
       pushToRegistry: inputs.pushToRegistry,
-      githubToken: inputs.githubToken
+      githubToken: inputs.githubToken,
+      ociCompatMode: inputs.ociCompatMode
     })
 
     logAttestation(subjects, att, sigstoreInstance)

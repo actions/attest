@@ -18,6 +18,9 @@ const inputs: RunInputs = {
   // undocumented -- not part of public interface
   privateSigning: ['true', 'True', 'TRUE', '1'].includes(
     core.getInput('private-signing')
+  ),
+  ociCompatMode: ['true', 'True', 'TRUE', '1'].includes(
+    core.getInput('oci-compatibility-mode')
   )
 }
 
