@@ -12934,7 +12934,7 @@ const getRegistryCredentials = (imageName) => {
     const { username, password } = (0, exports.fromBasicAuth)(creds.auth);
     // If the identitytoken is present, use it as the password (primarily for ACR)
     const pass = creds.identitytoken ? creds.identitytoken : password;
-    return { username, password: pass };
+    return { headers: dockerConfig.HttpHeaders, username, password: pass };
 };
 exports.getRegistryCredentials = getRegistryCredentials;
 // Encode the username and password as base64-encoded basicauth value
@@ -13422,6 +13422,8 @@ class RegistryClient {
     // authenticate requests.
     // https://github.com/google/go-containerregistry/blob/main/pkg/authn/README.md#the-registry
     async signIn(creds) {
+        // Ensure we include an auth headers if they are present
+        __classPrivateFieldSet(this, _RegistryClient_fetch, __classPrivateFieldGet(this, _RegistryClient_fetch, "f").defaults({ headers: creds.headers }), "f");
         // Initiate a blob upload to get the auth challenge
         const probeResponse = await __classPrivateFieldGet(this, _RegistryClient_fetch, "f").call(this, `${__classPrivateFieldGet(this, _RegistryClient_baseURL, "f")}/v2/${__classPrivateFieldGet(this, _RegistryClient_repository, "f")}/blobs/uploads/`, { method: 'POST' });
         // If we get a 200 response, we're already authenticated
