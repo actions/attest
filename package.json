@@ -81,7 +81,7 @@
     "@sigstore/mock": "^0.10.0",
     "@types/jest": "^29.5.14",
     "@types/make-fetch-happen": "^10.0.4",
-    "@types/node": "^22.15.8",
+    "@types/node": "^22.15.17",
     "@vercel/ncc": "^0.38.3",
     "eslint": "^9.26.0",
     "eslint-plugin-import": "^2.31.0",
@@ -93,7 +93,7 @@
     "prettier": "^3.5.3",
     "ts-jest": "^29.3.2",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.32.0",
+    "typescript-eslint": "^8.32.1",
     "undici": "^5.28.5"
   }
 }
