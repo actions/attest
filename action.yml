@@ -64,6 +64,11 @@ inputs:
       The GitHub token used to make authenticated API requests.
     default: ${{ github.token }}
     required: false
+  single-subject-attestations:
+    description: >
+      If true, generate one attestation per subject. Defaults to false.
+    default: false
+    required: false
 outputs:
   bundle-path:
     description: 'The path to the file containing the attestation bundle.'

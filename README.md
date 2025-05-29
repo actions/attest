@@ -138,6 +138,11 @@ Attestations are saved in the JSON-serialized [Sigstore bundle][6] format.
 If multiple subjects are being attested at the same time, a single attestation
 will be created with references to each of the supplied subjects.
 
+If the `single-subject-attestations` option has been set to true,
+one attestation will be generated per provided subject.
+All of these attestations will be written to the output file,
+using the [JSON Lines][7] format (one attestation per line).
+
 ## Attestation Limits
 
 ### Subject Limits
@@ -320,6 +325,7 @@ jobs:
 [5]: https://cli.github.com/manual/gh_attestation_verify
 [6]:
   https://github.com/sigstore/protobuf-specs/blob/main/protos/sigstore_bundle.proto
+[7]: https://jsonlines.org/
 [8]: https://github.com/actions/toolkit/tree/main/packages/glob#patterns
 [9]:
   https://docs.github.com/en/actions/security-guides/using-artifact-attestations-to-establish-provenance-for-builds

@@ -47,6 +47,7 @@ const defaultInputs: main.RunInputs = {
   pushToRegistry: false,
   showSummary: true,
   githubToken: '',
+  singleSubjectAttestations: false,
   privateSigning: false
 }
 
