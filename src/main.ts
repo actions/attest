@@ -16,6 +16,10 @@ import {
 import type { Subject } from '@actions/attest'
 
 const ATTESTATION_FILE_NAME = 'attestation.json'
+// The attestations paths file is part of the API, and so should not be made
+// configurable. Other steps or summary jobs can read this file to find all the
+// attestation paths created by this action.
+const ATTESTATION_PATHS_FILE_NAME = '/tmp/created_attestation_paths.txt'
 
 export type RunInputs = SubjectInputs &
   PredicateInputs & {
@@ -75,6 +79,12 @@ export async function run(inputs: RunInputs): Promise<void> {
 
     // Write attestation bundle to output file
     fs.writeFileSync(outputPath, JSON.stringify(att.bundle) + os.EOL, {
+      encoding: 'utf-8',
+      flag: 'a'
+    })
+
+    // Append the output path to the attestations paths file
+    fs.appendFileSync(ATTESTATION_PATHS_FILE_NAME, outputPath + os.EOL, {
       encoding: 'utf-8',
       flag: 'a'
     })

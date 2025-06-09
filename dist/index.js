@@ -71130,6 +71130,10 @@ const predicate_1 = __nccwpck_require__(84982);
 const style = __importStar(__nccwpck_require__(64542));
 const subject_1 = __nccwpck_require__(36303);
 const ATTESTATION_FILE_NAME = 'attestation.json';
+// The attestations paths file is part of the API, and so should not be made
+// configurable. Other steps or summary jobs can read this file to find all the
+// attestation paths created by this action.
+const ATTESTATION_PATHS_FILE_NAME = '/tmp/created_attestation_paths.txt';
 /* istanbul ignore next */
 const logHandler = (level, ...args) => {
     // Send any HTTP-related log events to the GitHub Actions debug log
@@ -71169,6 +71173,11 @@ async function run(inputs) {
         logAttestation(subjects, att, sigstoreInstance);
         // Write attestation bundle to output file
         fs_1.default.writeFileSync(outputPath, JSON.stringify(att.bundle) + os_1.default.EOL, {
+            encoding: 'utf-8',
+            flag: 'a'
+        });
+        // Append the output path to the attestations paths file
+        fs_1.default.appendFileSync(ATTESTATION_PATHS_FILE_NAME, outputPath + os_1.default.EOL, {
             encoding: 'utf-8',
             flag: 'a'
         });
