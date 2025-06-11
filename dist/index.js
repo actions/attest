@@ -71173,13 +71173,18 @@ async function run(inputs) {
             encoding: 'utf-8',
             flag: 'a'
         });
-        const baseDir = process.env.RUNNER_TEMP || tempDir();
-        const outputSummaryPath = path_1.default.join(baseDir, ATTESTATION_PATHS_FILE_NAME);
-        // Append the output path to the attestations paths file
-        fs_1.default.appendFileSync(outputSummaryPath, outputPath + os_1.default.EOL, {
-            encoding: 'utf-8',
-            flag: 'a'
-        });
+        const baseDir = process.env.RUNNER_TEMP;
+        if (baseDir) {
+            const outputSummaryPath = path_1.default.join(baseDir, ATTESTATION_PATHS_FILE_NAME);
+            // Append the output path to the attestations paths file
+            fs_1.default.appendFileSync(outputSummaryPath, outputPath + os_1.default.EOL, {
+                encoding: 'utf-8',
+                flag: 'a'
+            });
+        }
+        else {
+            core.warning('RUNNER_TEMP environment variable is not set. Cannot write attestation paths file.');
+        }
         if (att.attestationID) {
             core.setOutput('attestation-id', att.attestationID);
             core.setOutput('attestation-url', attestationURL(att.attestationID));
