@@ -19,10 +19,10 @@ attestations API and associated with the repository from which the workflow was
 initiated.
 
 When an attestation is created, the attestation is stored on the local
-filesystem used by the runner. For each attestation created, the filesystem
-path will be appended to the file
-`${RUNNER_TEMP}/created_attestation_paths.txt`. This can be used to gather all
-attestations created by all jobs during a the workflow.
+filesystem used by the runner. For each attestation created, the filesystem path
+will be appended to the file `${RUNNER_TEMP}/created_attestation_paths.txt`.
+This can be used to gather all attestations created by all jobs during a the
+workflow.
 
 Attestations can be verified using the [`attestation` command in the GitHub
 CLI][5].
