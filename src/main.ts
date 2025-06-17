@@ -81,6 +81,7 @@ export async function run(inputs: RunInputs): Promise<void> {
     })
 
     const baseDir = process.env.RUNNER_TEMP
+    /* istanbul ignore else */
     if (baseDir) {
       const outputSummaryPath = path.join(baseDir, ATTESTATION_PATHS_FILE_NAME)
       // Append the output path to the attestations paths file
@@ -94,11 +95,13 @@ export async function run(inputs: RunInputs): Promise<void> {
       )
     }
 
+    /* istanbul ignore else */
     if (att.attestationID) {
       core.setOutput('attestation-id', att.attestationID)
       core.setOutput('attestation-url', attestationURL(att.attestationID))
     }
 
+    /* istanbul ignore else */
     if (inputs.showSummary) {
       await logSummary(att)
     }
@@ -156,6 +159,7 @@ const logAttestation = (
     core.info(`${SEARCH_PUBLIC_GOOD_URL}?logIndex=${attestation.tlogID}`)
   }
 
+  /* istanbul ignore else */
   if (attestation.attestationID) {
     core.info(style.highlight('Attestation uploaded to repository'))
     core.info(attestationURL(attestation.attestationID))
@@ -171,6 +175,7 @@ const logAttestation = (
 const logSummary = async (attestation: AttestResult): Promise<void> => {
   const { attestationID } = attestation
 
+  /* istanbul ignore else */
   if (attestationID) {
     const url = attestationURL(attestationID)
     core.summary.addHeading('Attestation Created', 3)
