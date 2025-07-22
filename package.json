@@ -77,23 +77,23 @@
     "csv-parse": "^5.6.0"
   },
   "devDependencies": {
-    "@eslint/js": "^9.29.0",
+    "@eslint/js": "^9.30.0",
     "@sigstore/mock": "^0.10.0",
     "@types/jest": "^30.0.0",
     "@types/make-fetch-happen": "^10.0.4",
-    "@types/node": "^24.0.3",
+    "@types/node": "^24.0.8",
     "@vercel/ncc": "^0.38.3",
-    "eslint": "^9.29.0",
+    "eslint": "^9.30.0",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-jest": "^29.0.1",
-    "jest": "^30.0.2",
+    "jest": "^30.0.3",
     "js-yaml": "^4.1.0",
     "markdownlint-cli": "^0.45.0",
     "nock": "^13.5.6",
-    "prettier": "^3.6.0",
+    "prettier": "^3.6.2",
     "ts-jest": "^29.4.0",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.35.0",
+    "typescript-eslint": "^8.35.1",
     "undici": "^5.29.0"
   }
 }
