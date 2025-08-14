@@ -1,6 +1,7 @@
 import eslint from '@eslint/js'
 import importplugin from 'eslint-plugin-import'
 import jestplugin from 'eslint-plugin-jest'
+import path from 'node:path'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
@@ -21,7 +22,12 @@ export default tseslint.config(
     languageOptions: {
       ecmaVersion: 2023,
       parserOptions: {
-        project: ['./.github/linters/tsconfig.json', './tsconfig.json']
+        project: [
+          path.resolve(
+            path.dirname(new URL(import.meta.url).pathname),
+            './tsconfig.json'
+          )
+        ]
       }
     },
     rules: {
