@@ -473,6 +473,13 @@ badline
               '187dcd1506a170337415589ff00c8743f19d41cc31fca246c2739dfd450d0b9d'
           }
         })
+        expect(subjects).toContainEqual({
+          name: 'demo_0.0.1_darwin_arm64',
+          digest: {
+            sha512:
+              '5d8b4751ef31f9440d843fcfa4e53ca2e25b1cb1f13fd355fdc7c24b41fe645293291ea9297ba3989078abb77ebbaac66be073618a9e4974dbd0361881d4c718'
+          }
+        })
       })
     })
   })
@@ -480,8 +487,8 @@ badline
   describe('when specifying a subject checksums string', () => {
     const checksums = `
 f861e68a080799ca83104630b56abb90d8dbcc5f8b5a8639cb691e269838f29e  demo_0.0.1_linux_386
-187dcd1506a170337415589ff00c8743f19d41cc31fca246c2739dfd450d0b9d  demo_0.0.1_linux_amd64
-9ecbf449e286a8a8748c161c52aa28b6b2fc64ab86f94161c5d1b3abc18156c5  demo_0.0.1_linux_arm64`
+187dcd1506a170337415589ff00c8743f19d41cc31fca246c2739dfd450d0b9d *demo_0.0.1_linux_amd64
+9ecbf449e286a8a8748c161c52aa28b6b2fc64ab86f94161c5d1b3abc18156c5 demo_0.0.1_linux_arm64`
 
     it('returns the multiple subjects', async () => {
       const inputs: SubjectInputs = {
@@ -498,6 +505,20 @@ f861e68a080799ca83104630b56abb90d8dbcc5f8b5a8639cb691e269838f29e  demo_0.0.1_lin
         digest: {
           sha256:
             'f861e68a080799ca83104630b56abb90d8dbcc5f8b5a8639cb691e269838f29e'
+        }
+      })
+      expect(subjects).toContainEqual({
+        name: 'demo_0.0.1_linux_amd64',
+        digest: {
+          sha256:
+            '187dcd1506a170337415589ff00c8743f19d41cc31fca246c2739dfd450d0b9d'
+        }
+      })
+      expect(subjects).toContainEqual({
+        name: 'demo_0.0.1_linux_arm64',
+        digest: {
+          sha256:
+            '9ecbf449e286a8a8748c161c52aa28b6b2fc64ab86f94161c5d1b3abc18156c5'
         }
       })
     })
