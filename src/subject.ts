@@ -181,8 +181,14 @@ const getSubjectFromChecksumsString = (checksums: string): Subject[] => {
       continue
     }
 
-    // Swallow the type identifier character at the beginning of the name
-    const name = record.slice(delimIndex + 2)
+    // It's common for checksum records to have a leading flag character before
+    // the artifact name. It will be either a '*' or a space.
+    const flag_and_name = record.slice(delimIndex + 1)
+    const name =
+      flag_and_name.startsWith('*') || flag_and_name.startsWith(' ')
+        ? flag_and_name.slice(1)
+        : flag_and_name
+
     const digest = record.slice(0, delimIndex)
 
     if (!HEX_STRING_RE.test(digest)) {
