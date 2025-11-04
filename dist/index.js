@@ -74168,7 +74168,7 @@ const getSubjectFromPath = async (subjectPath, subjectName) => {
     // Filter path list to just the files (not directories)
     const files = paths.filter(p => fs_1.default.statSync(p).isFile());
     if (files.length > MAX_SUBJECT_COUNT) {
-        throw new Error(`Too many subjects specified. The maximum number of subjects is ${MAX_SUBJECT_COUNT}.`);
+        throw new Error(`Too many subjects specified. The maximum number of subjects is ${MAX_SUBJECT_COUNT}. ${files.length} subjects were provided.`);
     }
     for (const file of files) {
         const name = subjectName || path_1.default.parse(file).base;
