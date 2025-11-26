@@ -32,7 +32,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.0
 
       - name: Initialize CodeQL
         id: initialize
