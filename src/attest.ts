@@ -1,4 +1,10 @@
-import { Attestation, Predicate, Subject, attest } from '@actions/attest'
+import {
+  Attestation,
+  Predicate,
+  Subject,
+  attest,
+  createStorageRecord
+} from '@actions/attest'
 import { attachArtifactToImage, getRegistryCredentials } from '@sigstore/oci'
 import { formatSubjectDigest } from './subject'
 
@@ -32,6 +38,18 @@ export const createAttestation = async (
 
   if (subjects.length === 1 && opts.pushToRegistry) {
     const subject = subjects[0]
+    const record = await createStorageRecord({
+      artifactOptions: {
+        name: subject.name,
+        digest: formatSubjectDigest(subject)
+      },
+      packageRegistryOptions: {
+        registryUrl: 'https://ghcr.io'
+      },
+      token: opts.githubToken,
+      writeOptions: {}
+    })
+
     const credentials = getRegistryCredentials(subject.name)
     const artifact = await attachArtifactToImage({
       credentials,
