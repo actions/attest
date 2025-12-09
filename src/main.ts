@@ -21,6 +21,7 @@ const ATTESTATION_PATHS_FILE_NAME = 'created_attestation_paths.txt'
 export type RunInputs = SubjectInputs &
   PredicateInputs & {
     pushToRegistry: boolean
+    createStorageRecord: boolean
     githubToken: string
     showSummary: boolean
     privateSigning: boolean
@@ -69,6 +70,7 @@ export async function run(inputs: RunInputs): Promise<void> {
     const att = await createAttestation(subjects, predicate, {
       sigstoreInstance,
       pushToRegistry: inputs.pushToRegistry,
+      createStorageRecord: inputs.createStorageRecord,
       githubToken: inputs.githubToken
     })
 

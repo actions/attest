@@ -1,4 +1,4 @@
-import { Attestation, Predicate, Subject, attest } from '@actions/attest'
+import { Attestation, Predicate, Subject, attest, createStorageRecord } from '@actions/attest'
 import { attachArtifactToImage, getRegistryCredentials } from '@sigstore/oci'
 import { formatSubjectDigest } from './subject'
 
@@ -16,6 +16,7 @@ export const createAttestation = async (
   opts: {
     sigstoreInstance: SigstoreInstance
     pushToRegistry: boolean
+    createStorageRecord: boolean
     githubToken: string
   }
 ): Promise<AttestResult> => {
@@ -33,10 +34,11 @@ export const createAttestation = async (
   if (subjects.length === 1 && opts.pushToRegistry) {
     const subject = subjects[0]
     const credentials = getRegistryCredentials(subject.name)
+    const subjectDigest = formatSubjectDigest(subject)
     const artifact = await attachArtifactToImage({
       credentials,
       imageName: subject.name,
-      imageDigest: formatSubjectDigest(subject),
+      imageDigest: subjectDigest,
       artifact: Buffer.from(JSON.stringify(attestation.bundle)),
       mediaType: attestation.bundle.mediaType,
       annotations: {
@@ -48,6 +50,21 @@ export const createAttestation = async (
 
     // Add the attestation's digest to the result
     result.attestationDigest = artifact.digest
+
+    if (opts.createStorageRecord) {
+      const record = await createStorageRecord({
+        artifactOptions: {
+          name: subject.name,
+          digest: subjectDigest,
+        },
+        packageRegistryOptions: {
+          registryUrl: artifact.baseURL,
+          artifactUrl: artifact.repository,
+        },
+        token: opts.githubToken,
+        writeOptions: {}
+      })
+    }
   }
 
   return result
