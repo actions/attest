@@ -52,18 +52,22 @@ export const createAttestation = async (
     result.attestationDigest = artifact.digest
 
     if (opts.createStorageRecord) {
-      const record = await createStorageRecord({
-        artifactOptions: {
-          name: subject.name,
-          digest: subjectDigest,
-        },
-        packageRegistryOptions: {
-          registryUrl: artifact.baseURL,
-          artifactUrl: artifact.repository,
-        },
-        token: opts.githubToken,
-        writeOptions: {}
-      })
+      const artifactOpts = {
+        name: subject.name,
+        digest: subjectDigest,
+      }
+      const urlObject = new URL(subject.name)
+      const registryUrl = urlObject.origin
+      const packageRegistryOpts = {
+        registryUrl,
+        artifactUrl: subject.name,
+      }
+
+      const record = await createStorageRecord(
+        artifactOpts,
+        packageRegistryOpts,
+        opts.githubToken
+      )
     }
   }
 
