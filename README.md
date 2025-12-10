@@ -269,6 +269,10 @@ fully-qualified image name (e.g. "ghcr.io/user/app" or
 "acme.azurecr.io/user/app"). Do NOT include a tag as part of the image name --
 the specific image being attested is identified by the supplied digest.
 
+If the `push-to-registry` option is set to true, the Action will also
+emit an Artifact Metadata Storage Record. If you do not want to emit a
+storage record, set `create-storage-record` to `false`.
+
 > **NOTE**: When pushing to Docker Hub, please use "docker.io" as the registry
 > portion of the image name.
 
@@ -287,6 +291,7 @@ jobs:
       packages: write
       contents: read
       attestations: write
+      artifact-metadata: write
     env:
       REGISTRY: ghcr.io
       IMAGE_NAME: ${{ github.repository }}
