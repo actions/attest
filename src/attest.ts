@@ -1,4 +1,10 @@
-import { Attestation, Predicate, Subject, attest, createStorageRecord } from '@actions/attest'
+import {
+  Attestation,
+  Predicate,
+  Subject,
+  attest,
+  createStorageRecord
+} from '@actions/attest'
 import { attachArtifactToImage, getRegistryCredentials } from '@sigstore/oci'
 import { formatSubjectDigest } from './subject'
 
@@ -8,6 +14,7 @@ const OCI_RETRY = 3
 export type SigstoreInstance = 'public-good' | 'github'
 export type AttestResult = Attestation & {
   attestationDigest?: string
+  storageRecordId?: number
 }
 
 export const createAttestation = async (
@@ -54,20 +61,21 @@ export const createAttestation = async (
     if (opts.createStorageRecord) {
       const artifactOpts = {
         name: subject.name,
-        digest: subjectDigest,
+        digest: subjectDigest
       }
       const urlObject = new URL(subject.name)
       const registryUrl = urlObject.origin
       const packageRegistryOpts = {
         registryUrl,
-        artifactUrl: subject.name,
+        artifactUrl: subject.name
       }
 
-      const record = await createStorageRecord(
+      const records = await createStorageRecord(
         artifactOpts,
         packageRegistryOpts,
         opts.githubToken
       )
+      result.storageRecordId = records[0]
     }
   }
 
