@@ -144,6 +144,7 @@ See [action.yml](action.yml)
 | `attestation-id`  | GitHub ID for the attestation                                  | `123456`                                         |
 | `attestation-url` | URL for the attestation summary                                | `https://github.com/foo/bar/attestations/123456` |
 | `bundle-path`     | Absolute path to the file containing the generated attestation | `/tmp/attestation.json`                          |
+| `storage-record-id` | GitHub ID for the storage record | `98765`
 
 <!-- markdownlint-enable MD013 -->
 
