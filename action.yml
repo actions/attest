@@ -77,6 +77,8 @@ outputs:
     description: 'The ID of the attestation.'
   attestation-url:
     description: 'The URL for the attestation summary.'
+  storage-record-id:
+    description: 'The ID of the storage record created for the artifact.'
 
 runs:
   using: node24
