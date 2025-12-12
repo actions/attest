@@ -74155,6 +74155,9 @@ async function run(inputs) {
             core.setOutput('attestation-id', att.attestationID);
             core.setOutput('attestation-url', attestationURL(att.attestationID));
         }
+        if (att.storageRecordId) {
+            core.setOutput('storage-record-id', att.storageRecordId);
+        }
         /* istanbul ignore else */
         if (inputs.showSummary) {
             await logSummary(att);
@@ -74198,6 +74201,10 @@ const logAttestation = (subjects, attestation, sigstoreInstance) => {
     if (attestation.attestationDigest) {
         core.info(style.highlight('Attestation uploaded to registry'));
         core.info(`${subjects[0].name}@${attestation.attestationDigest}`);
+    }
+    if (attestation.storageRecordId) {
+        core.info(style.highlight('Storage record created'));
+        core.info(`Storage record ID: ${attestation.storageRecordId}`);
     }
 };
 // Attach summary information to the GitHub Actions run
