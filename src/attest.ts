@@ -1,4 +1,10 @@
-import { Attestation, Predicate, Subject, attest } from '@actions/attest'
+import {
+  Attestation,
+  Predicate,
+  Subject,
+  attest,
+  createStorageRecord
+} from '@actions/attest'
 import { attachArtifactToImage, getRegistryCredentials } from '@sigstore/oci'
 import { formatSubjectDigest } from './subject'
 
@@ -8,6 +14,7 @@ const OCI_RETRY = 3
 export type SigstoreInstance = 'public-good' | 'github'
 export type AttestResult = Attestation & {
   attestationDigest?: string
+  storageRecordId?: number
 }
 
 export const createAttestation = async (
@@ -16,6 +23,7 @@ export const createAttestation = async (
   opts: {
     sigstoreInstance: SigstoreInstance
     pushToRegistry: boolean
+    createStorageRecord: boolean
     githubToken: string
   }
 ): Promise<AttestResult> => {
@@ -33,10 +41,11 @@ export const createAttestation = async (
   if (subjects.length === 1 && opts.pushToRegistry) {
     const subject = subjects[0]
     const credentials = getRegistryCredentials(subject.name)
+    const subjectDigest = formatSubjectDigest(subject)
     const artifact = await attachArtifactToImage({
       credentials,
       imageName: subject.name,
-      imageDigest: formatSubjectDigest(subject),
+      imageDigest: subjectDigest,
       artifact: Buffer.from(JSON.stringify(attestation.bundle)),
       mediaType: attestation.bundle.mediaType,
       annotations: {
@@ -48,6 +57,26 @@ export const createAttestation = async (
 
     // Add the attestation's digest to the result
     result.attestationDigest = artifact.digest
+
+    if (opts.createStorageRecord) {
+      const artifactOpts = {
+        name: subject.name,
+        digest: subjectDigest
+      }
+      const urlObject = new URL(subject.name)
+      const registryUrl = urlObject.origin
+      const packageRegistryOpts = {
+        registryUrl,
+        artifactUrl: subject.name
+      }
+
+      const records = await createStorageRecord(
+        artifactOpts,
+        packageRegistryOpts,
+        opts.githubToken
+      )
+      result.storageRecordId = records[0]
+    }
   }
 
   return result

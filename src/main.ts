@@ -21,6 +21,7 @@ const ATTESTATION_PATHS_FILE_NAME = 'created_attestation_paths.txt'
 export type RunInputs = SubjectInputs &
   PredicateInputs & {
     pushToRegistry: boolean
+    createStorageRecord: boolean
     githubToken: string
     showSummary: boolean
     privateSigning: boolean
@@ -69,6 +70,7 @@ export async function run(inputs: RunInputs): Promise<void> {
     const att = await createAttestation(subjects, predicate, {
       sigstoreInstance,
       pushToRegistry: inputs.pushToRegistry,
+      createStorageRecord: inputs.createStorageRecord,
       githubToken: inputs.githubToken
     })
 
@@ -99,6 +101,9 @@ export async function run(inputs: RunInputs): Promise<void> {
     if (att.attestationID) {
       core.setOutput('attestation-id', att.attestationID)
       core.setOutput('attestation-url', attestationURL(att.attestationID))
+    }
+    if (att.storageRecordId) {
+      core.setOutput('storage-record-id', att.storageRecordId)
     }
 
     /* istanbul ignore else */
@@ -168,6 +173,11 @@ const logAttestation = (
   if (attestation.attestationDigest) {
     core.info(style.highlight('Attestation uploaded to registry'))
     core.info(`${subjects[0].name}@${attestation.attestationDigest}`)
+  }
+
+  if (attestation.storageRecordId) {
+    core.info(style.highlight('Storage record created'))
+    core.info(`Storage record ID: ${attestation.storageRecordId}`)
   }
 }
 

@@ -45,6 +45,7 @@ const defaultInputs: main.RunInputs = {
   subjectPath: '',
   subjectChecksums: '',
   pushToRegistry: false,
+  createStorageRecord: true,
   showSummary: true,
   githubToken: '',
   privateSigning: false
@@ -66,13 +67,14 @@ describe('action', () => {
     'base64'
   )}.}`
 
-  const subjectName = 'registry/foo/bar'
+  const subjectName = 'https://ghcr.io/registry/foo/bar'
   const subjectDigest =
     'sha256:7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32'
   const predicate = '{}'
   const predicateType = 'https://in-toto.io/attestation/release/v0.1'
 
   const attestationID = '1234567890'
+  const storageRecordID = 987654321
 
   beforeEach(() => {
     jest.clearAllMocks()
@@ -82,13 +84,20 @@ describe('action', () => {
       .query({ audience: 'sigstore' })
       .reply(200, { value: oidcToken })
 
-    mockAgent
-      .get('https://api.github.com')
+    const pool = mockAgent.get('https://api.github.com')
+    pool
       .intercept({
         path: /^\/repos\/.*\/.*\/attestations$/,
         method: 'post'
       })
       .reply(201, { id: attestationID })
+
+    pool
+      .intercept({
+        path: /^\/orgs\/.*\/artifacts\/metadata\/storage-record$/,
+        method: 'post'
+      })
+      .reply(200, { storage_records: [{ id: storageRecordID }] })
 
     process.env = {
       ...originalEnv,
@@ -293,6 +302,14 @@ describe('action', () => {
         6,
         expect.stringMatching(attestationID)
       )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        9,
+        expect.stringMatching('Storage record created')
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        10,
+        expect.stringMatching('Storage record ID: 987654321')
+      )
       expect(setOutputMock).toHaveBeenNthCalledWith(
         1,
         'bundle-path',
@@ -307,6 +324,11 @@ describe('action', () => {
         3,
         'attestation-url',
         expect.stringContaining(`foo/bar/attestations/${attestationID}`)
+      )
+      expect(setOutputMock).toHaveBeenNthCalledWith(
+        4,
+        'storage-record-id',
+        storageRecordID
       )
       expect(setFailedMock).not.toHaveBeenCalled()
     })
