@@ -122,8 +122,8 @@ See [action.yml](action.yml)
 
     # Whether to create a storage record for the artifact.
     # Requires that push-to-registry is set to true. 
-    # Requires that the "subject-name" parameter specify the fully-qualified image name
-    # Defaults to true.
+    # Requires that the "subject-name" parameter specify the fully-qualified
+    # image name Defaults to true.
     create-storage-record:
 
     # Whether to attach a list of generated attestations to the workflow run
@@ -139,12 +139,12 @@ See [action.yml](action.yml)
 
 <!-- markdownlint-disable MD013 -->
 
-| Name              | Description                                                    | Example                                          |
-| ----------------- | -------------------------------------------------------------- | ------------------------------------------------ |
-| `attestation-id`  | GitHub ID for the attestation                                  | `123456`                                         |
-| `attestation-url` | URL for the attestation summary                                | `https://github.com/foo/bar/attestations/123456` |
-| `bundle-path`     | Absolute path to the file containing the generated attestation | `/tmp/attestation.json`                          |
-| `storage-record-id` | GitHub ID for the storage record | `98765`
+| Name                | Description                                                    | Example                                          |
+| ------------------- | -------------------------------------------------------------- | ------------------------------------------------ |
+| `attestation-id`    | GitHub ID for the attestation                                  | `123456`                                         |
+| `attestation-url`   | URL for the attestation summary                                | `https://github.com/foo/bar/attestations/123456` |
+| `bundle-path`       | Absolute path to the file containing the generated attestation | `/tmp/attestation.json`                          |
+| `storage-record-id` | GitHub ID for the storage record                               | `987654`                                         |
 
 <!-- markdownlint-enable MD013 -->
 
