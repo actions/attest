@@ -52,11 +52,13 @@ attest:
    permissions:
      id-token: write
      attestations: write
+     artifact-metadata: write
    ```
 
    The `id-token` permission gives the action the ability to mint the OIDC token
    necessary to request a Sigstore signing certificate. The `attestations`
-   permission is necessary to persist the attestation.
+   permission is necessary to persist the attestation. The `artifact-metadata`
+   permission is necessary to create the artifact storage record.
 
 1. Add the following to your workflow after your artifact has been built:
 
@@ -117,6 +119,12 @@ See [action.yml](action.yml)
     # "subject-name" parameter specify the fully-qualified image name and that
     # the "subject-digest" parameter be specified. Defaults to false.
     push-to-registry:
+
+    # Whether to create a storage record for the artifact.
+    # Requires that push-to-registry is set to true. 
+    # Requires that the "subject-name" parameter specify the fully-qualified image name
+    # Defaults to true.
+    create-storage-record:
 
     # Whether to attach a list of generated attestations to the workflow run
     # summary page. Defaults to true.
