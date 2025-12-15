@@ -14,7 +14,7 @@ const OCI_RETRY = 3
 export type SigstoreInstance = 'public-good' | 'github'
 export type AttestResult = Attestation & {
   attestationDigest?: string
-  storageRecordId?: number
+  storageRecordIds?: number[]
 }
 
 export const createAttestation = async (
@@ -75,7 +75,7 @@ export const createAttestation = async (
         packageRegistryOpts,
         opts.githubToken
       )
-      result.storageRecordId = records[0]
+      result.storageRecordIds = records
     }
   }
 

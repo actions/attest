@@ -73952,7 +73952,7 @@ const createAttestation = async (subjects, predicate, opts) => {
                 artifactUrl: subject.name
             };
             const records = await (0, attest_1.createStorageRecord)(artifactOpts, packageRegistryOpts, opts.githubToken);
-            result.storageRecordId = records[0];
+            result.storageRecordIds = records;
         }
     }
     return result;
@@ -74155,8 +74155,8 @@ async function run(inputs) {
             core.setOutput('attestation-id', att.attestationID);
             core.setOutput('attestation-url', attestationURL(att.attestationID));
         }
-        if (att.storageRecordId) {
-            core.setOutput('storage-record-id', att.storageRecordId);
+        if (att.storageRecordIds) {
+            core.setOutput('storage-record-ids', att.storageRecordIds.join(','));
         }
         /* istanbul ignore else */
         if (inputs.showSummary) {
@@ -74202,9 +74202,9 @@ const logAttestation = (subjects, attestation, sigstoreInstance) => {
         core.info(style.highlight('Attestation uploaded to registry'));
         core.info(`${subjects[0].name}@${attestation.attestationDigest}`);
     }
-    if (attestation.storageRecordId) {
+    if (attestation.storageRecordIds && attestation.storageRecordIds.length > 0) {
         core.info(style.highlight('Storage record created'));
-        core.info(`Storage record ID: ${attestation.storageRecordId}`);
+        core.info(`Storage record IDs: ${attestation.storageRecordIds.join(',')}`);
     }
 };
 // Attach summary information to the GitHub Actions run

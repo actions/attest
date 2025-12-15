@@ -308,7 +308,7 @@ describe('action', () => {
       )
       expect(infoMock).toHaveBeenNthCalledWith(
         10,
-        expect.stringMatching('Storage record ID: 987654321')
+        expect.stringMatching('Storage record IDs: 987654321')
       )
       expect(setOutputMock).toHaveBeenNthCalledWith(
         1,
@@ -327,8 +327,8 @@ describe('action', () => {
       )
       expect(setOutputMock).toHaveBeenNthCalledWith(
         4,
-        'storage-record-id',
-        storageRecordID
+        'storage-record-ids',
+        storageRecordID.toString()
       )
       expect(setFailedMock).not.toHaveBeenCalled()
     })
