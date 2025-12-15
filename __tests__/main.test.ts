@@ -332,6 +332,70 @@ describe('action', () => {
       )
       expect(setFailedMock).not.toHaveBeenCalled()
     })
+
+    it('when storage record creation fails, it logs a warning and continues', async () => {
+      // Mock the storage record endpoint to return an error
+      const pool = mockAgent.get('https://api.github.com')
+      pool
+        .intercept({
+          path: /^\/orgs\/.*\/artifacts\/metadata\/storage-record$/,
+          method: 'post'
+        })
+        .reply(404, { message: 'Artifacts not found' })
+
+      await main.run(inputs)
+
+      expect(runMock).toHaveReturned()
+      expect(setFailedMock).not.toHaveBeenCalled()
+      expect(getRegCredsSpy).toHaveBeenCalledWith(subjectName)
+      expect(attachArtifactSpy).toHaveBeenCalled()
+      expect(infoMock).toHaveBeenNthCalledWith(
+        1,
+        expect.stringMatching(
+          `Attestation created for ${subjectName}@${subjectDigest}`
+        )
+      )
+      expect(startGroupMock).toHaveBeenNthCalledWith(
+        1,
+        expect.stringMatching('Public Good Sigstore')
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        2,
+        expect.stringMatching('-----BEGIN CERTIFICATE-----')
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        3,
+        expect.stringMatching(/signature uploaded/i)
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        4,
+        expect.stringMatching(SEARCH_PUBLIC_GOOD_URL)
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        5,
+        expect.stringMatching(/attestation uploaded/i)
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        6,
+        expect.stringMatching(attestationID)
+      )
+      expect(setOutputMock).toHaveBeenNthCalledWith(
+        1,
+        'bundle-path',
+        expect.stringMatching('attestation.json')
+      )
+      expect(setOutputMock).toHaveBeenNthCalledWith(
+        2,
+        'attestation-id',
+        expect.stringMatching(attestationID)
+      )
+      expect(setOutputMock).toHaveBeenNthCalledWith(
+        3,
+        'attestation-url',
+        expect.stringContaining(`foo/bar/attestations/${attestationID}`)
+      )
+      expect(setFailedMock).not.toHaveBeenCalled()
+    })
   })
 
   describe('when the subject count is greater than 1', () => {

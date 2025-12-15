@@ -73941,18 +73941,24 @@ const createAttestation = async (subjects, predicate, opts) => {
         // Add the attestation's digest to the result
         result.attestationDigest = artifact.digest;
         if (opts.createStorageRecord) {
-            const artifactOpts = {
-                name: subject.name,
-                digest: subjectDigest
-            };
-            const urlObject = new URL(subject.name);
-            const registryUrl = urlObject.origin;
-            const packageRegistryOpts = {
-                registryUrl,
-                artifactUrl: subject.name
-            };
-            const records = await (0, attest_1.createStorageRecord)(artifactOpts, packageRegistryOpts, opts.githubToken);
-            result.storageRecordIds = records;
+            try {
+                const artifactOpts = {
+                    name: subject.name,
+                    digest: subjectDigest
+                };
+                const urlObject = new URL(subject.name);
+                const registryUrl = urlObject.origin;
+                const packageRegistryOpts = {
+                    registryUrl,
+                    artifactUrl: subject.name
+                };
+                const records = await (0, attest_1.createStorageRecord)(artifactOpts, packageRegistryOpts, opts.githubToken);
+                result.storageRecordIds = records;
+            }
+            catch (error) {
+                console.warn(`Failed to create storage record: ${error}`);
+                console.warn('Please check that the "artifact-metadata:write" permission has been included');
+            }
         }
     }
     return result;
