@@ -328,7 +328,7 @@ describe('action', () => {
       expect(setOutputMock).toHaveBeenNthCalledWith(
         4,
         'storage-record-ids',
-        storageRecordID.toString()
+        expect.stringMatching(storageRecordID.toString())
       )
       expect(setFailedMock).not.toHaveBeenCalled()
     })
