@@ -61,7 +61,10 @@ export const createAttestation = async (
     if (opts.createStorageRecord) {
       try {
         let subjectName = subject.name
-        if (!subject.name.startsWith('https://') && !subject.name.startsWith('http://')) {
+        if (
+          !subject.name.startsWith('https://') &&
+          !subject.name.startsWith('http://')
+        ) {
           subjectName = `https://${subject.name}`
         }
 
