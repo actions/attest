@@ -30,7 +30,7 @@
     "lint:eslint": "npx eslint",
     "lint:markdown": "npx markdownlint --config .markdown-lint.yml \"*.md\"",
     "lint": "npm run lint:eslint && npm run lint:markdown",
-    "package": "ncc build src/index.ts --license licenses.txt",
+    "package": "ncc build src/index.ts --license licenses.txt --minify --source-map",
     "package:watch": "npm run package -- --watch",
     "test": "jest",
     "all": "npm run format:write && npm run lint && npm run test && npm run package"
