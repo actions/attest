@@ -60,15 +60,20 @@ export const createAttestation = async (
 
     if (opts.createStorageRecord) {
       try {
+        let subjectName = subject.name
+        if (!subject.name.startsWith('https://') && !subject.name.startsWith('http://')) {
+          subjectName = `https://${subject.name}`
+        }
+
         const artifactOpts = {
-          name: subject.name,
+          name: subjectName,
           digest: subjectDigest
         }
-        const urlObject = new URL(subject.name)
+        const urlObject = new URL(subjectName)
         const registryUrl = urlObject.origin
         const packageRegistryOpts = {
           registryUrl,
-          artifactUrl: subject.name
+          artifactUrl: subjectName
         }
 
         const records = await createStorageRecord(
