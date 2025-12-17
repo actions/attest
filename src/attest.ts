@@ -69,7 +69,7 @@ export const createAttestation = async (
         const isHttps = subjectName.startsWith('https://')
         if (hasProtocol && !isHttps) {
           throw new Error(`Unsupported protocol in subject name`)
-        } else {
+        } else if (!hasProtocol) {
           // if the subject name does not start with a protocol, prefix with "https://"
           subjectName = `https://${subjectName}`
         }
