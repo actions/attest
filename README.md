@@ -121,9 +121,9 @@ See [action.yml](action.yml)
     push-to-registry:
 
     # Whether to create a storage record for the artifact.
-    # Requires that push-to-registry is set to true. 
+    # Requires that push-to-registry is set to true.
     # Requires that the "subject-name" parameter specify the fully-qualified
-    # image name Defaults to true.
+    # image name. Defaults to true.
     create-storage-record:
 
     # Whether to attach a list of generated attestations to the workflow run
