@@ -7,6 +7,7 @@ import {
 } from '@actions/attest'
 import { attachArtifactToImage, getRegistryCredentials } from '@sigstore/oci'
 import { formatSubjectDigest } from './subject'
+import * as core from '@actions/core'
 
 const OCI_TIMEOUT = 30000
 const OCI_RETRY = 3
@@ -63,16 +64,16 @@ export const createAttestation = async (
     // attestation process if the token does not have the correct permissions.'
     if (opts.createStorageRecord) {
       try {
-        const subjectURL = new URL(subject.name)
-        const protocol = subjectURL.protocol
-        let registryUrl = subjectURL.origin
-        if (protocol == 'http://') {
-          throw new Error('Insecure subject names (http://) are not supported')
-        } else if (protocol == '') {
-          registryUrl = `https://${registryUrl}`
-        } else if (protocol != 'https://') {
-          throw new Error(`Unsupported protocol "${protocol}" in subject name`)
+        let subjectName = subject.name
+        const hasProtocol = /^[\w+.-]+:\/\//.test(subjectName)
+        const isHttps = subjectName.startsWith('https://')
+        if (hasProtocol && !isHttps) {
+          throw new Error(`Unsupported protocol in subject name`)
+        } else {
+          // if the subject name does not start with a protocol, prefix with "https://"
+          subjectName = `https://${subjectName}`
         }
+        const registryUrl = new URL(subjectName).origin
 
         const artifactOpts = {
           name: subject.name,
@@ -86,10 +87,15 @@ export const createAttestation = async (
           packageRegistryOpts,
           opts.githubToken
         )
+
+        if (!records || records.length === 0) {
+          throw new Error('No storage records were created')
+        }
+
         result.storageRecordIds = records
       } catch (error) {
-        console.warn(`Failed to create storage record: ${error}`)
-        console.warn(
+        core.warning(`Failed to create storage record: ${error}`)
+        core.warning(
           'Please check that the "artifact-metadata:write" permission has been included'
         )
       }

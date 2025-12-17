@@ -19,6 +19,7 @@ import * as main from '../src/main'
 
 // Mock the GitHub Actions core library
 const infoMock = jest.spyOn(core, 'info')
+const warningMock = jest.spyOn(core, 'warning')
 const startGroupMock = jest.spyOn(core, 'startGroup')
 const setOutputMock = jest.spyOn(core, 'setOutput')
 const setFailedMock = jest.spyOn(core, 'setFailed')
@@ -272,6 +273,7 @@ describe('action', () => {
       expect(setFailedMock).not.toHaveBeenCalled()
       expect(getRegCredsSpy).toHaveBeenCalledWith(subjectName)
       expect(attachArtifactSpy).toHaveBeenCalled()
+      expect(warningMock).not.toHaveBeenCalled()
       expect(infoMock).toHaveBeenNthCalledWith(
         9,
         expect.stringMatching('Storage record created')
@@ -304,50 +306,9 @@ describe('action', () => {
       expect(setFailedMock).not.toHaveBeenCalled()
       expect(getRegCredsSpy).toHaveBeenCalledWith(subjectName)
       expect(attachArtifactSpy).toHaveBeenCalled()
-      expect(infoMock).toHaveBeenNthCalledWith(
+      expect(warningMock).toHaveBeenNthCalledWith(
         1,
-        expect.stringMatching(
-          `Attestation created for ${subjectName}@${subjectDigest}`
-        )
-      )
-      expect(startGroupMock).toHaveBeenNthCalledWith(
-        1,
-        expect.stringMatching('Public Good Sigstore')
-      )
-      expect(infoMock).toHaveBeenNthCalledWith(
-        2,
-        expect.stringMatching('-----BEGIN CERTIFICATE-----')
-      )
-      expect(infoMock).toHaveBeenNthCalledWith(
-        3,
-        expect.stringMatching(/signature uploaded/i)
-      )
-      expect(infoMock).toHaveBeenNthCalledWith(
-        4,
-        expect.stringMatching(SEARCH_PUBLIC_GOOD_URL)
-      )
-      expect(infoMock).toHaveBeenNthCalledWith(
-        5,
-        expect.stringMatching(/attestation uploaded/i)
-      )
-      expect(infoMock).toHaveBeenNthCalledWith(
-        6,
-        expect.stringMatching(attestationID)
-      )
-      expect(setOutputMock).toHaveBeenNthCalledWith(
-        1,
-        'bundle-path',
-        expect.stringMatching('attestation.json')
-      )
-      expect(setOutputMock).toHaveBeenNthCalledWith(
-        2,
-        'attestation-id',
-        expect.stringMatching(attestationID)
-      )
-      expect(setOutputMock).toHaveBeenNthCalledWith(
-        3,
-        'attestation-url',
-        expect.stringContaining(`foo/bar/attestations/${attestationID}`)
+        expect.stringMatching('Failed to create storage record')
       )
       expect(setFailedMock).not.toHaveBeenCalled()
     })

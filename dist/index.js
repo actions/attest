@@ -73901,15 +73901,49 @@ function wrappy (fn, cb) {
 /***/ }),
 
 /***/ 93738:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.createAttestation = void 0;
 const attest_1 = __nccwpck_require__(11485);
 const oci_1 = __nccwpck_require__(81057);
 const subject_1 = __nccwpck_require__(36303);
+const core = __importStar(__nccwpck_require__(37484));
 const OCI_TIMEOUT = 30000;
 const OCI_RETRY = 3;
 const createAttestation = async (subjects, predicate, opts) => {
@@ -73945,18 +73979,17 @@ const createAttestation = async (subjects, predicate, opts) => {
         // attestation process if the token does not have the correct permissions.'
         if (opts.createStorageRecord) {
             try {
-                const subjectURL = new URL(subject.name);
-                const protocol = subjectURL.protocol;
-                let registryUrl = subjectURL.origin;
-                if (protocol == 'http://') {
-                    throw new Error('Insecure subject names (http://) are not supported');
+                let subjectName = subject.name;
+                const hasProtocol = /^[\w+.-]+:\/\//.test(subjectName);
+                const isHttps = subjectName.startsWith('https://');
+                if (hasProtocol && !isHttps) {
+                    throw new Error(`Unsupported protocol in subject name`);
                 }
-                else if (protocol == '') {
-                    registryUrl = `https://${registryUrl}`;
+                else {
+                    // if the subject name does not start with a protocol, prefix with "https://"
+                    subjectName = `https://${subjectName}`;
                 }
-                else if (protocol != 'https://') {
-                    throw new Error(`Unsupported protocol "${protocol}" in subject name`);
-                }
+                const registryUrl = new URL(subjectName).origin;
                 const artifactOpts = {
                     name: subject.name,
                     digest: subjectDigest
@@ -73965,11 +73998,14 @@ const createAttestation = async (subjects, predicate, opts) => {
                     registryUrl
                 };
                 const records = await (0, attest_1.createStorageRecord)(artifactOpts, packageRegistryOpts, opts.githubToken);
+                if (!records || records.length === 0) {
+                    throw new Error('No storage records were created');
+                }
                 result.storageRecordIds = records;
             }
             catch (error) {
-                console.warn(`Failed to create storage record: ${error}`);
-                console.warn('Please check that the "artifact-metadata:write" permission has been included');
+                core.warning(`Failed to create storage record: ${error}`);
+                core.warning('Please check that the "artifact-metadata:write" permission has been included');
             }
         }
     }
