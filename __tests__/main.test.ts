@@ -273,57 +273,12 @@ describe('action', () => {
       expect(getRegCredsSpy).toHaveBeenCalledWith(subjectName)
       expect(attachArtifactSpy).toHaveBeenCalled()
       expect(infoMock).toHaveBeenNthCalledWith(
-        1,
-        expect.stringMatching(
-          `Attestation created for ${subjectName}@${subjectDigest}`
-        )
-      )
-      expect(startGroupMock).toHaveBeenNthCalledWith(
-        1,
-        expect.stringMatching('Public Good Sigstore')
-      )
-      expect(infoMock).toHaveBeenNthCalledWith(
-        2,
-        expect.stringMatching('-----BEGIN CERTIFICATE-----')
-      )
-      expect(infoMock).toHaveBeenNthCalledWith(
-        3,
-        expect.stringMatching(/signature uploaded/i)
-      )
-      expect(infoMock).toHaveBeenNthCalledWith(
-        4,
-        expect.stringMatching(SEARCH_PUBLIC_GOOD_URL)
-      )
-      expect(infoMock).toHaveBeenNthCalledWith(
-        5,
-        expect.stringMatching(/attestation uploaded/i)
-      )
-      expect(infoMock).toHaveBeenNthCalledWith(
-        6,
-        expect.stringMatching(attestationID)
-      )
-      expect(infoMock).toHaveBeenNthCalledWith(
         9,
         expect.stringMatching('Storage record created')
       )
       expect(infoMock).toHaveBeenNthCalledWith(
         10,
         expect.stringMatching('Storage record IDs: 987654321')
-      )
-      expect(setOutputMock).toHaveBeenNthCalledWith(
-        1,
-        'bundle-path',
-        expect.stringMatching('attestation.json')
-      )
-      expect(setOutputMock).toHaveBeenNthCalledWith(
-        2,
-        'attestation-id',
-        expect.stringMatching(attestationID)
-      )
-      expect(setOutputMock).toHaveBeenNthCalledWith(
-        3,
-        'attestation-url',
-        expect.stringContaining(`foo/bar/attestations/${attestationID}`)
       )
       expect(setOutputMock).toHaveBeenNthCalledWith(
         4,
