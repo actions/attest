@@ -289,10 +289,38 @@ describe('action', () => {
       )
       expect(setFailedMock).not.toHaveBeenCalled()
     })
+  })
 
-    it('when storage record creation fails, it logs a warning and continues', async () => {
-      // Mock the storage record endpoint to return an error
+  describe('handles failure to create storage record gracefully', () => {
+    const getRegCredsSpy = jest.spyOn(oci, 'getRegistryCredentials')
+    const attachArtifactSpy = jest.spyOn(oci, 'attachArtifactToImage')
+
+    const inputs: main.RunInputs = {
+      ...defaultInputs,
+      subjectDigest,
+      subjectName,
+      predicateType,
+      predicate,
+      githubToken: 'gh-token',
+      pushToRegistry: true
+    }
+    
+    beforeEach(() => {
+      jest.clearAllMocks()
+
+      nock(tokenURL)
+        .get('/')
+        .query({ audience: 'sigstore' })
+        .reply(200, { value: oidcToken })
+
       const pool = mockAgent.get('https://api.github.com')
+      pool
+        .intercept({
+          path: /^\/repos\/.*\/.*\/attestations$/,
+          method: 'post'
+        })
+        .reply(201, { id: attestationID })
+
       pool
         .intercept({
           path: /^\/orgs\/.*\/artifacts\/metadata\/storage-record$/,
@@ -300,12 +328,30 @@ describe('action', () => {
         })
         .reply(404, { message: 'Artifacts not found' })
 
+      process.env = {
+        ...originalEnv,
+        ACTIONS_ID_TOKEN_REQUEST_URL: tokenURL,
+        ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'token',
+        RUNNER_TEMP: process.env.RUNNER_TEMP || '/tmp'
+      }
+    })
+
+    afterEach(() => {
+      // Restore the original environment
+      process.env = originalEnv
+      
+      // Restore the original github.context
+      setGHContext(originalContext)
+    })
+
+    it('when storage record creation fails, it logs a warning and continues', async () => {
       await main.run(inputs)
 
       expect(runMock).toHaveReturned()
       expect(setFailedMock).not.toHaveBeenCalled()
       expect(getRegCredsSpy).toHaveBeenCalledWith(subjectName)
       expect(attachArtifactSpy).toHaveBeenCalled()
+      expect(warningMock).toHaveBeenCalled()
       expect(warningMock).toHaveBeenNthCalledWith(
         1,
         expect.stringMatching('Failed to create storage record')
