@@ -71,9 +71,7 @@ export const createAttestation = async (
         } else if (protocol == '') {
           registryUrl = `https://${registryUrl}`
         } else if (protocol != 'https://') {
-          throw new Error(
-            `Unsupported protocol "${protocol}" in subject name`
-          )
+          throw new Error(`Unsupported protocol "${protocol}" in subject name`)
         }
 
         const artifactOpts = {

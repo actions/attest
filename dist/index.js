@@ -73945,15 +73945,17 @@ const createAttestation = async (subjects, predicate, opts) => {
         // attestation process if the token does not have the correct permissions.'
         if (opts.createStorageRecord) {
             try {
-                let registryUrl = new URL(subject.name).origin;
-                if (registryUrl.startsWith('http://')) {
+                const subjectURL = new URL(subject.name);
+                const protocol = subjectURL.protocol;
+                let registryUrl = subjectURL.origin;
+                if (protocol == 'http://') {
                     throw new Error('Insecure subject names (http://) are not supported');
                 }
-                else if (registryUrl.startsWith('oci://')) {
-                    throw new Error('OCI scheme (oci://) not supported');
-                }
-                else if (!registryUrl.startsWith('https://')) {
+                else if (protocol == '') {
                     registryUrl = `https://${registryUrl}`;
+                }
+                else if (protocol != 'https://') {
+                    throw new Error(`Unsupported protocol "${protocol}" in subject name`);
                 }
                 const artifactOpts = {
                     name: subject.name,
