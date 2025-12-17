@@ -58,27 +58,27 @@ export const createAttestation = async (
     // Add the attestation's digest to the result
     result.attestationDigest = artifact.digest
 
+    // Because creating a storage record requires the 'artifact-metadata:write'
+    // permission, we wrap this in a try/catch to avoid failing the entire
+    // attestation process if the token does not have the correct permissions.'
     if (opts.createStorageRecord) {
       try {
-        let subjectName = subject.name
-        if (
-          !subject.name.startsWith('https://') &&
-          !subject.name.startsWith('http://')
-        ) {
-          subjectName = `https://${subject.name}`
+        let registryUrl = new URL(subject.name).origin
+        if (registryUrl.startsWith('http://')) {
+          throw new Error('Insecure subject names (http://) are not supported')
+        } else if (registryUrl.startsWith('oci://')) {
+          throw new Error('OCI scheme (oci://) not supported')
+        } else if (!registryUrl.startsWith('https://')) {
+          registryUrl = `https://${registryUrl}`
         }
 
         const artifactOpts = {
-          name: subjectName,
+          name: subject.name,
           digest: subjectDigest
         }
-        const urlObject = new URL(subjectName)
-        const registryUrl = urlObject.origin
         const packageRegistryOpts = {
-          registryUrl,
-          artifactUrl: subjectName
+          registryUrl
         }
-
         const records = await createStorageRecord(
           artifactOpts,
           packageRegistryOpts,

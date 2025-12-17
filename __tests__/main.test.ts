@@ -67,7 +67,7 @@ describe('action', () => {
     'base64'
   )}.}`
 
-  const subjectName = 'https://ghcr.io/registry/foo/bar'
+  const subjectName = 'ghcr.io/registry/foo/bar'
   const subjectDigest =
     'sha256:7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32'
   const predicate = '{}'
