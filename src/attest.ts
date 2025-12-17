@@ -61,7 +61,7 @@ export const createAttestation = async (
 
     // Because creating a storage record requires the 'artifact-metadata:write'
     // permission, we wrap this in a try/catch to avoid failing the entire
-    // attestation process if the token does not have the correct permissions.'
+    // attestation process if the token does not have the correct permissions.
     if (opts.createStorageRecord) {
       try {
         let subjectName = subject.name
