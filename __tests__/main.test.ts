@@ -275,6 +275,36 @@ describe('action', () => {
       expect(attachArtifactSpy).toHaveBeenCalled()
       expect(warningMock).not.toHaveBeenCalled()
       expect(infoMock).toHaveBeenNthCalledWith(
+        1,
+        expect.stringMatching(
+          `Attestation created for ${subjectName}@${subjectDigest}`
+        )
+      )
+      expect(startGroupMock).toHaveBeenNthCalledWith(
+        1,
+        expect.stringMatching('Public Good Sigstore')
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        2,
+        expect.stringMatching('-----BEGIN CERTIFICATE-----')
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        3,
+        expect.stringMatching(/signature uploaded/i)
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        4,
+        expect.stringMatching(SEARCH_PUBLIC_GOOD_URL)
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        5,
+        expect.stringMatching(/attestation uploaded/i)
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        6,
+        expect.stringMatching(attestationID)
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
         9,
         expect.stringMatching('Storage record created')
       )
@@ -304,7 +334,7 @@ describe('action', () => {
       githubToken: 'gh-token',
       pushToRegistry: true
     }
-    
+
     beforeEach(() => {
       jest.clearAllMocks()
 
@@ -339,7 +369,7 @@ describe('action', () => {
     afterEach(() => {
       // Restore the original environment
       process.env = originalEnv
-      
+
       // Restore the original github.context
       setGHContext(originalContext)
     })
