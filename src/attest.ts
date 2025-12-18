@@ -64,17 +64,7 @@ export const createAttestation = async (
     // attestation process if the token does not have the correct permissions.
     if (opts.createStorageRecord) {
       try {
-        let subjectName = subject.name
-        const hasProtocol = /^[\w+.-]+:\/\//.test(subjectName)
-        const isHttps = subjectName.startsWith('https://')
-        if (hasProtocol && !isHttps) {
-          throw new Error(`Unsupported protocol in subject name`)
-        } else if (!hasProtocol) {
-          // if the subject name does not start with a protocol, prefix with "https://"
-          subjectName = `https://${subjectName}`
-        }
-        const registryUrl = new URL(subjectName).origin
-
+        const registryUrl = getRegistryURL(subject.name)
         const artifactOpts = {
           name: subject.name,
           digest: subjectDigest
@@ -89,7 +79,7 @@ export const createAttestation = async (
         )
 
         if (!records || records.length === 0) {
-          throw new Error('No storage records were created')
+          core.warning('No storage records were created.')
         }
 
         result.storageRecordIds = records
@@ -103,4 +93,22 @@ export const createAttestation = async (
   }
 
   return result
+}
+
+function getRegistryURL(subjectName: string): string {
+  let url: URL
+
+  try {
+    url = new URL(subjectName)
+  } catch {
+    url = new URL(`https://${subjectName}`)
+  }
+
+  if (url.protocol !== 'https:') {
+    throw new Error(
+      `Unsupported protocol ${url.protocol} in subject name ${subjectName}`
+    )
+  }
+
+  return url.origin
 }

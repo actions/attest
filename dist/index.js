@@ -73976,20 +73976,10 @@ const createAttestation = async (subjects, predicate, opts) => {
         result.attestationDigest = artifact.digest;
         // Because creating a storage record requires the 'artifact-metadata:write'
         // permission, we wrap this in a try/catch to avoid failing the entire
-        // attestation process if the token does not have the correct permissions.'
+        // attestation process if the token does not have the correct permissions.
         if (opts.createStorageRecord) {
             try {
-                let subjectName = subject.name;
-                const hasProtocol = /^[\w+.-]+:\/\//.test(subjectName);
-                const isHttps = subjectName.startsWith('https://');
-                if (hasProtocol && !isHttps) {
-                    throw new Error(`Unsupported protocol in subject name`);
-                }
-                else {
-                    // if the subject name does not start with a protocol, prefix with "https://"
-                    subjectName = `https://${subjectName}`;
-                }
-                const registryUrl = new URL(subjectName).origin;
+                const registryUrl = getRegistryURL(subject.name);
                 const artifactOpts = {
                     name: subject.name,
                     digest: subjectDigest
@@ -73999,7 +73989,7 @@ const createAttestation = async (subjects, predicate, opts) => {
                 };
                 const records = await (0, attest_1.createStorageRecord)(artifactOpts, packageRegistryOpts, opts.githubToken);
                 if (!records || records.length === 0) {
-                    throw new Error('No storage records were created');
+                    core.warning('No storage records were created.');
                 }
                 result.storageRecordIds = records;
             }
@@ -74012,6 +74002,19 @@ const createAttestation = async (subjects, predicate, opts) => {
     return result;
 };
 exports.createAttestation = createAttestation;
+function getRegistryURL(subjectName) {
+    let url;
+    try {
+        url = new URL(subjectName);
+    }
+    catch {
+        url = new URL(`https://${subjectName}`);
+    }
+    if (url.protocol !== 'https:') {
+        throw new Error(`Unsupported protocol ${url.protocol} in subject name ${subjectName}`);
+    }
+    return url.origin;
+}
 
 
 /***/ }),
