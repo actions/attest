@@ -350,8 +350,32 @@ describe('action', () => {
       pushToRegistry: true
     }
 
-    beforeEach(() => {
+    beforeEach(async () => {
       jest.clearAllMocks()
+
+      // Set the GH context with public repository visibility and a repo owner.
+      setGHContext({
+        payload: { repository: { visibility: 'public' } },
+        repo: { owner: 'foo', repo: 'bar' }
+      })
+
+      await mockFulcio({
+        baseURL: 'https://fulcio.sigstore.dev',
+        strict: false
+      })
+      await mockRekor({ baseURL: 'https://rekor.sigstore.dev' })
+
+      getRegCredsSpy.mockImplementation(() => ({
+        username: 'username',
+        password: 'password'
+      }))
+      attachArtifactSpy.mockImplementation(async () =>
+        Promise.resolve({
+          digest: 'sha256:123456',
+          mediaType: 'application/vnd.cncf.notary.v2',
+          size: 123456
+        })
+      )
 
       nock(tokenURL)
         .get('/')
@@ -396,7 +420,6 @@ describe('action', () => {
       expect(setFailedMock).not.toHaveBeenCalled()
       expect(getRegCredsSpy).toHaveBeenCalledWith(subjectName)
       expect(attachArtifactSpy).toHaveBeenCalled()
-      expect(warningMock).toHaveBeenCalled()
       expect(warningMock).toHaveBeenNthCalledWith(
         1,
         expect.stringMatching('Failed to create storage record')
