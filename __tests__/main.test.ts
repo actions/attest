@@ -9,6 +9,7 @@ import * as core from '@actions/core'
 import * as github from '@actions/github'
 import { mockFulcio, mockRekor, mockTSA } from '@sigstore/mock'
 import * as oci from '@sigstore/oci'
+import * as attest from '@actions/attest'
 import fs from 'fs/promises'
 import nock from 'nock'
 import os from 'os'
@@ -334,97 +335,22 @@ describe('action', () => {
       )
       expect(setFailedMock).not.toHaveBeenCalled()
     })
-  })
 
-  describe('handles failure to create storage record gracefully', () => {
-    const getRegCredsSpy = jest.spyOn(oci, 'getRegistryCredentials')
-    const attachArtifactSpy = jest.spyOn(oci, 'attachArtifactToImage')
-
-    const inputs: main.RunInputs = {
-      ...defaultInputs,
-      subjectDigest,
-      subjectName,
-      predicateType,
-      predicate,
-      githubToken: 'gh-token',
-      pushToRegistry: true
-    }
-
-    beforeEach(async () => {
-      jest.clearAllMocks()
-
-      // Set the GH context with public repository visibility and a repo owner.
-      setGHContext({
-        payload: { repository: { visibility: 'public' } },
-        repo: { owner: 'foo', repo: 'bar' }
-      })
-
-      await mockFulcio({
-        baseURL: 'https://fulcio.sigstore.dev',
-        strict: false
-      })
-      await mockRekor({ baseURL: 'https://rekor.sigstore.dev' })
-
-      getRegCredsSpy.mockImplementation(() => ({
-        username: 'username',
-        password: 'password'
-      }))
-      attachArtifactSpy.mockImplementation(async () =>
-        Promise.resolve({
-          digest: 'sha256:123456',
-          mediaType: 'application/vnd.cncf.notary.v2',
-          size: 123456
-        })
+    it('catches error when storage record creation fails and continues', async () => {
+      // Mock the createStorageRecord function and throw an error
+      const createStorageRecordSpy = jest.spyOn(attest, 'createStorageRecord')
+      createStorageRecordSpy.mockRejectedValueOnce(
+        new Error('Failed to persist storage record: Not Found')
       )
 
-      nock(tokenURL)
-        .get('/')
-        .query({ audience: 'sigstore' })
-        .reply(200, { value: oidcToken })
-
-      const pool = mockAgent.get('https://api.github.com')
-      pool
-        .intercept({
-          path: /^\/repos\/.*\/.*\/attestations$/,
-          method: 'post'
-        })
-        .reply(201, { id: attestationID })
-
-      pool
-        .intercept({
-          path: /^\/orgs\/.*\/artifacts\/metadata\/storage-record$/,
-          method: 'post'
-        })
-        .reply(404, { message: 'Artifacts not found' })
-
-      process.env = {
-        ...originalEnv,
-        ACTIONS_ID_TOKEN_REQUEST_URL: tokenURL,
-        ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'token',
-        RUNNER_TEMP: process.env.RUNNER_TEMP || '/tmp'
-      }
-    })
-
-    afterEach(() => {
-      // Restore the original environment
-      process.env = originalEnv
-
-      // Restore the original github.context
-      setGHContext(originalContext)
-    })
-
-    it('when storage record creation fails, it logs a warning and continues', async () => {
       await main.run(inputs)
 
       expect(runMock).toHaveReturned()
       expect(setFailedMock).not.toHaveBeenCalled()
-      expect(getRegCredsSpy).toHaveBeenCalledWith(subjectName)
-      expect(attachArtifactSpy).toHaveBeenCalled()
       expect(warningMock).toHaveBeenNthCalledWith(
         1,
         expect.stringMatching('Failed to create storage record')
       )
-      expect(setFailedMock).not.toHaveBeenCalled()
     })
   })
 
