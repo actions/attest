@@ -53,6 +53,12 @@ inputs:
       the "subject-digest" parameter be specified. Defaults to false.
     default: false
     required: false
+  create-storage-record:
+    description: >
+      Whether to create a storage record for the artifact.
+      Requires that push-to-registry is set to true. Defaults to true.
+    default: true
+    required: false
   show-summary:
     description: >
       Whether to attach a list of generated attestations to the workflow run
@@ -71,6 +77,8 @@ outputs:
     description: 'The ID of the attestation.'
   attestation-url:
     description: 'The URL for the attestation summary.'
+  storage-record-ids:
+    description: 'The IDs of the storage records created for the artifact.'
 
 runs:
   using: node24

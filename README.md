@@ -52,11 +52,13 @@ attest:
    permissions:
      id-token: write
      attestations: write
+     artifact-metadata: write
    ```
 
    The `id-token` permission gives the action the ability to mint the OIDC token
    necessary to request a Sigstore signing certificate. The `attestations`
-   permission is necessary to persist the attestation.
+   permission is necessary to persist the attestation. The `artifact-metadata`
+   permission is necessary to create the artifact storage record.
 
 1. Add the following to your workflow after your artifact has been built:
 
@@ -118,6 +120,12 @@ See [action.yml](action.yml)
     # the "subject-digest" parameter be specified. Defaults to false.
     push-to-registry:
 
+    # Whether to create a storage record for the artifact.
+    # Requires that push-to-registry is set to true.
+    # Requires that the "subject-name" parameter specify the fully-qualified
+    # image name. Defaults to true.
+    create-storage-record:
+
     # Whether to attach a list of generated attestations to the workflow run
     # summary page. Defaults to true.
     show-summary:
@@ -131,11 +139,12 @@ See [action.yml](action.yml)
 
 <!-- markdownlint-disable MD013 -->
 
-| Name              | Description                                                    | Example                                          |
-| ----------------- | -------------------------------------------------------------- | ------------------------------------------------ |
-| `attestation-id`  | GitHub ID for the attestation                                  | `123456`                                         |
-| `attestation-url` | URL for the attestation summary                                | `https://github.com/foo/bar/attestations/123456` |
-| `bundle-path`     | Absolute path to the file containing the generated attestation | `/tmp/attestation.json`                          |
+| Name                 | Description                                                    | Example                                          |
+| -------------------  | -------------------------------------------------------------- | ------------------------------------------------ |
+| `attestation-id`     | GitHub ID for the attestation                                  | `123456`                                         |
+| `attestation-url`    | URL for the attestation summary                                | `https://github.com/foo/bar/attestations/123456` |
+| `bundle-path`        | Absolute path to the file containing the generated attestation | `/tmp/attestation.json`                          |
+| `storage-record-ids` | GitHub IDs for the storage records                             | `987654`                                         |
 
 <!-- markdownlint-enable MD013 -->
 
@@ -269,6 +278,10 @@ fully-qualified image name (e.g. "ghcr.io/user/app" or
 "acme.azurecr.io/user/app"). Do NOT include a tag as part of the image name --
 the specific image being attested is identified by the supplied digest.
 
+If the `push-to-registry` option is set to true, the Action will also
+emit an Artifact Metadata Storage Record. If you do not want to emit a
+storage record, set `create-storage-record` to `false`.
+
 > **NOTE**: When pushing to Docker Hub, please use "docker.io" as the registry
 > portion of the image name.
 
@@ -287,6 +300,7 @@ jobs:
       packages: write
       contents: read
       attestations: write
+      artifact-metadata: write
     env:
       REGISTRY: ghcr.io
       IMAGE_NAME: ${{ github.repository }}

@@ -9,6 +9,7 @@ import * as core from '@actions/core'
 import * as github from '@actions/github'
 import { mockFulcio, mockRekor, mockTSA } from '@sigstore/mock'
 import * as oci from '@sigstore/oci'
+import * as attest from '@actions/attest'
 import fs from 'fs/promises'
 import nock from 'nock'
 import os from 'os'
@@ -19,6 +20,7 @@ import * as main from '../src/main'
 
 // Mock the GitHub Actions core library
 const infoMock = jest.spyOn(core, 'info')
+const warningMock = jest.spyOn(core, 'warning')
 const startGroupMock = jest.spyOn(core, 'startGroup')
 const setOutputMock = jest.spyOn(core, 'setOutput')
 const setFailedMock = jest.spyOn(core, 'setFailed')
@@ -45,6 +47,7 @@ const defaultInputs: main.RunInputs = {
   subjectPath: '',
   subjectChecksums: '',
   pushToRegistry: false,
+  createStorageRecord: true,
   showSummary: true,
   githubToken: '',
   privateSigning: false
@@ -66,13 +69,14 @@ describe('action', () => {
     'base64'
   )}.}`
 
-  const subjectName = 'registry/foo/bar'
+  const subjectName = 'ghcr.io/registry/foo/bar'
   const subjectDigest =
     'sha256:7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32'
   const predicate = '{}'
   const predicateType = 'https://in-toto.io/attestation/release/v0.1'
 
   const attestationID = '1234567890'
+  const storageRecordID = 987654321
 
   beforeEach(() => {
     jest.clearAllMocks()
@@ -82,13 +86,20 @@ describe('action', () => {
       .query({ audience: 'sigstore' })
       .reply(200, { value: oidcToken })
 
-    mockAgent
-      .get('https://api.github.com')
+    const pool = mockAgent.get('https://api.github.com')
+    pool
       .intercept({
         path: /^\/repos\/.*\/.*\/attestations$/,
         method: 'post'
       })
       .reply(201, { id: attestationID })
+
+    pool
+      .intercept({
+        path: /^\/orgs\/.*\/artifacts\/metadata\/storage-record$/,
+        method: 'post'
+      })
+      .reply(200, { storage_records: [{ id: storageRecordID }] })
 
     process.env = {
       ...originalEnv,
@@ -263,6 +274,7 @@ describe('action', () => {
       expect(setFailedMock).not.toHaveBeenCalled()
       expect(getRegCredsSpy).toHaveBeenCalledWith(subjectName)
       expect(attachArtifactSpy).toHaveBeenCalled()
+      expect(warningMock).not.toHaveBeenCalled()
       expect(infoMock).toHaveBeenNthCalledWith(
         1,
         expect.stringMatching(
@@ -293,6 +305,14 @@ describe('action', () => {
         6,
         expect.stringMatching(attestationID)
       )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        9,
+        expect.stringMatching('Storage record created')
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        10,
+        expect.stringMatching('Storage record IDs: 987654321')
+      )
       expect(setOutputMock).toHaveBeenNthCalledWith(
         1,
         'bundle-path',
@@ -308,7 +328,29 @@ describe('action', () => {
         'attestation-url',
         expect.stringContaining(`foo/bar/attestations/${attestationID}`)
       )
+      expect(setOutputMock).toHaveBeenNthCalledWith(
+        4,
+        'storage-record-ids',
+        expect.stringMatching(storageRecordID.toString())
+      )
       expect(setFailedMock).not.toHaveBeenCalled()
+    })
+
+    it('catches error when storage record creation fails and continues', async () => {
+      // Mock the createStorageRecord function and throw an error
+      const createStorageRecordSpy = jest.spyOn(attest, 'createStorageRecord')
+      createStorageRecordSpy.mockRejectedValueOnce(
+        new Error('Failed to persist storage record: Not Found')
+      )
+
+      await main.run(inputs)
+
+      expect(runMock).toHaveReturned()
+      expect(setFailedMock).not.toHaveBeenCalled()
+      expect(warningMock).toHaveBeenNthCalledWith(
+        1,
+        expect.stringMatching('Failed to create storage record')
+      )
     })
   })
 

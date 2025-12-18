@@ -1,7 +1,7 @@
 {
   "name": "actions/attest",
   "description": "Generate signed attestations for workflow artifacts",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "author": "",
   "private": true,
   "homepage": "https://github.com/actions/attest",
@@ -69,7 +69,7 @@
     ]
   },
   "dependencies": {
-    "@actions/attest": "^2.0.0",
+    "@actions/attest": "^2.1.0",
     "@actions/core": "^2.0.1",
     "@actions/github": "^6.0.1",
     "@actions/glob": "^0.5.0",
