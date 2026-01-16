@@ -113,7 +113,7 @@ export async function repoOwnerIsOrg(githubToken: string): Promise<boolean> {
   const { data: repo } = await octokit.rest.repos.get({
     owner: github.context.repo.owner,
     repo: github.context.repo.repo
-  });
+  })
   return repo.owner?.type === 'Organization'
 }
 
