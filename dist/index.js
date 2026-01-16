@@ -79720,10 +79720,12 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.createAttestation = void 0;
+exports.repoOwnerIsOrg = repoOwnerIsOrg;
 const attest_1 = __nccwpck_require__(11485);
 const oci_1 = __nccwpck_require__(81057);
 const subject_1 = __nccwpck_require__(36303);
 const core = __importStar(__nccwpck_require__(37484));
+const github = __importStar(__nccwpck_require__(93228));
 const OCI_TIMEOUT = 30000;
 const OCI_RETRY = 3;
 const createAttestation = async (subjects, predicate, opts) => {
@@ -79759,6 +79761,14 @@ const createAttestation = async (subjects, predicate, opts) => {
         // attestation process if the token does not have the correct permissions.
         if (opts.createStorageRecord) {
             try {
+                const token = opts.githubToken;
+                const isOrg = await repoOwnerIsOrg(token);
+                if (!isOrg) {
+                    // The Artifact Metadata Storage Record API is only available to
+                    // organizations. So if the repo owner is not an organization,
+                    // storage record creation should not be attempted.
+                    return result;
+                }
                 const registryUrl = getRegistryURL(subject.name);
                 const artifactOpts = {
                     name: subject.name,
@@ -79767,7 +79777,7 @@ const createAttestation = async (subjects, predicate, opts) => {
                 const packageRegistryOpts = {
                     registryUrl
                 };
-                const records = await (0, attest_1.createStorageRecord)(artifactOpts, packageRegistryOpts, opts.githubToken);
+                const records = await (0, attest_1.createStorageRecord)(artifactOpts, packageRegistryOpts, token);
                 if (!records || records.length === 0) {
                     core.warning('No storage records were created.');
                 }
@@ -79782,6 +79792,17 @@ const createAttestation = async (subjects, predicate, opts) => {
     return result;
 };
 exports.createAttestation = createAttestation;
+// Call the GET /repos/{owner}/{repo} endpoint to determine if the repo
+// owner is an organization. This is used to determine if storage
+// record creation should be attempted.
+async function repoOwnerIsOrg(githubToken) {
+    const octokit = github.getOctokit(githubToken);
+    const { data: repo } = await octokit.rest.repos.get({
+        owner: github.context.repo.owner,
+        repo: github.context.repo.repo
+    });
+    return repo.owner?.type === 'Organization';
+}
 function getRegistryURL(subjectName) {
     let url;
     try {
