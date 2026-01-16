@@ -8,6 +8,7 @@ import {
 import { attachArtifactToImage, getRegistryCredentials } from '@sigstore/oci'
 import { formatSubjectDigest } from './subject'
 import * as core from '@actions/core'
+import * as github from '@actions/github'
 
 const OCI_TIMEOUT = 30000
 const OCI_RETRY = 3
@@ -64,6 +65,15 @@ export const createAttestation = async (
     // attestation process if the token does not have the correct permissions.
     if (opts.createStorageRecord) {
       try {
+        const token = opts.githubToken
+        const isOrg = await repoOwnerIsOrg(token)
+        if (!isOrg) {
+          // The Artifact Metadata Storage Record API is only available to
+          // organizations. So if the repo owner is not an organization,
+          // storage record creation should not be attempted.
+          return result
+        }
+
         const registryUrl = getRegistryURL(subject.name)
         const artifactOpts = {
           name: subject.name,
@@ -75,7 +85,7 @@ export const createAttestation = async (
         const records = await createStorageRecord(
           artifactOpts,
           packageRegistryOpts,
-          opts.githubToken
+          token
         )
 
         if (!records || records.length === 0) {
@@ -93,6 +103,18 @@ export const createAttestation = async (
   }
 
   return result
+}
+
+// Call the GET /repos/{owner}/{repo} endpoint to determine if the repo
+// owner is an organization. This is used to determine if storage
+// record creation should be attempted.
+export async function repoOwnerIsOrg(githubToken: string): Promise<boolean> {
+  const octokit = github.getOctokit(githubToken)
+  const { data: repo } = await octokit.rest.repos.get({
+    owner: github.context.repo.owner,
+    repo: github.context.repo.repo
+  });
+  return repo.owner?.type === 'Organization'
 }
 
 function getRegistryURL(subjectName: string): string {
