@@ -98,7 +98,8 @@ describe('action', () => {
     pool
       .intercept({
         path: /^\/repos\/[^/]+\/[^/]+$/,
-        method: 'GET'
+        method: 'GET',
+        headers: { authorization: 'token gh-token' }
       })
       .reply(200, {
         id: 1,
@@ -247,6 +248,7 @@ describe('action', () => {
     const getRegCredsSpy = jest.spyOn(oci, 'getRegistryCredentials')
     const attachArtifactSpy = jest.spyOn(oci, 'attachArtifactToImage')
     const repoOwnerIsOrgSpy = jest.spyOn(localAttest, 'repoOwnerIsOrg')
+    const createStorageRecordSpy = jest.spyOn(attest, 'createStorageRecord')
     const createAttestationSpy = jest.spyOn(localAttest, 'createAttestation')
 
     const inputs: main.RunInputs = {
@@ -283,10 +285,11 @@ describe('action', () => {
           size: 123456
         })
       )
-      repoOwnerIsOrgSpy.mockImplementation(async () => Promise.resolve(true))
+      repoOwnerIsOrgSpy.mockResolvedValue(true)
     })
 
     it('invokes the action w/o error', async () => {
+      //repoOwnerIsOrgSpy.mockResolvedValue(true)
       await main.run(inputs)
 
       expect(runMock).toHaveReturned()
@@ -295,6 +298,7 @@ describe('action', () => {
       expect(attachArtifactSpy).toHaveBeenCalled()
       expect(createAttestationSpy).toHaveBeenCalled()
       //expect(repoOwnerIsOrgSpy).toHaveBeenCalled()
+      //expect(createStorageRecordSpy).toHaveBeenCalled()
       expect(warningMock).not.toHaveBeenCalled()
       expect(infoMock).toHaveBeenNthCalledWith(
         1,
@@ -359,7 +363,6 @@ describe('action', () => {
 
     it('catches error when storage record creation fails and continues', async () => {
       // Mock the createStorageRecord function and throw an error
-      const createStorageRecordSpy = jest.spyOn(attest, 'createStorageRecord')
       createStorageRecordSpy.mockRejectedValueOnce(
         new Error('Failed to persist storage record: Not Found')
       )
