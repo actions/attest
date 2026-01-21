@@ -10,11 +10,12 @@ import * as github from '@actions/github'
 import { mockFulcio, mockRekor, mockTSA } from '@sigstore/mock'
 import * as oci from '@sigstore/oci'
 import * as attest from '@actions/attest'
+import * as localAttest from '../src/attest'
 import fs from 'fs/promises'
 import nock from 'nock'
 import os from 'os'
 import path from 'path'
-import { MockAgent, setGlobalDispatcher } from 'undici'
+import { MockAgent, setGlobalDispatcher, getGlobalDispatcher } from 'undici'
 import { SEARCH_PUBLIC_GOOD_URL } from '../src/endpoints'
 import * as main from '../src/main'
 
@@ -93,6 +94,21 @@ describe('action', () => {
         method: 'post'
       })
       .reply(201, { id: attestationID })
+    
+    pool
+      .intercept({
+        path: /^\/repos\/[^/]+\/[^/]+$/,
+        method: 'GET'
+      })
+      .reply(200, { 
+        id: 1,
+        name: 'bar',
+        full_name: 'foo/bar',
+        owner: { 
+          type: 'Organization',
+          login: 'foo'
+        } 
+      })
 
     pool
       .intercept({
@@ -179,6 +195,9 @@ describe('action', () => {
         strict: false
       })
       await mockTSA({ baseURL: 'https://timestamp.githubapp.com' })
+
+      const createStorageRecordSpy = jest.spyOn(attest, 'createStorageRecord')
+      createStorageRecordSpy.mockResolvedValue([storageRecordID])
     })
 
     it('invokes the action w/o error', async () => {
@@ -230,6 +249,7 @@ describe('action', () => {
   describe('when the repository is public', () => {
     const getRegCredsSpy = jest.spyOn(oci, 'getRegistryCredentials')
     const attachArtifactSpy = jest.spyOn(oci, 'attachArtifactToImage')
+    const repoOwnerIsOrgSpy = jest.spyOn(localAttest, 'repoOwnerIsOrg')
 
     const inputs: main.RunInputs = {
       ...defaultInputs,
@@ -265,15 +285,20 @@ describe('action', () => {
           size: 123456
         })
       )
+      repoOwnerIsOrgSpy.mockImplementation(async () => Promise.resolve(true))
     })
 
     it('invokes the action w/o error', async () => {
+      const createAttestationSpy = jest.spyOn(localAttest, 'createAttestation')
+  
       await main.run(inputs)
 
       expect(runMock).toHaveReturned()
       expect(setFailedMock).not.toHaveBeenCalled()
       expect(getRegCredsSpy).toHaveBeenCalledWith(subjectName)
       expect(attachArtifactSpy).toHaveBeenCalled()
+      expect(createAttestationSpy).toHaveBeenCalled()
+      //expect(repoOwnerIsOrgSpy).toHaveBeenCalled()
       expect(warningMock).not.toHaveBeenCalled()
       expect(infoMock).toHaveBeenNthCalledWith(
         1,
