@@ -30,7 +30,7 @@ const setFailedMock = jest.spyOn(core, 'setFailed')
 setFailedMock.mockImplementation(() => {})
 
 const summaryWriteMock = jest.spyOn(core.summary, 'write')
-summaryWriteMock.mockImplementation(async () => Promise.resolve(core.summary))
+summaryWriteMock.mockResolvedValue(core.summary)
 
 // Mock the action's main function
 const runMock = jest.spyOn(main, 'run')
@@ -278,13 +278,11 @@ describe('action', () => {
         username: 'username',
         password: 'password'
       }))
-      attachArtifactSpy.mockImplementation(async () =>
-        Promise.resolve({
-          digest: 'sha256:123456',
-          mediaType: 'application/vnd.cncf.notary.v2',
-          size: 123456
-        })
-      )
+      attachArtifactSpy.mockResolvedValue({
+        digest: 'sha256:123456',
+        mediaType: 'application/vnd.cncf.notary.v2',
+        size: 123456
+      })
       repoOwnerIsOrgSpy.mockResolvedValue(true)
     })
 
@@ -296,8 +294,7 @@ describe('action', () => {
       expect(getRegCredsSpy).toHaveBeenCalledWith(subjectName)
       expect(attachArtifactSpy).toHaveBeenCalled()
       expect(createAttestationSpy).toHaveBeenCalled()
-      //expect(repoOwnerIsOrgSpy).toHaveBeenCalled()
-      //expect(createStorageRecordSpy).toHaveBeenCalled()
+      expect(repoOwnerIsOrgSpy).toHaveBeenCalled()
       expect(warningMock).not.toHaveBeenCalled()
       expect(infoMock).toHaveBeenNthCalledWith(
         1,
@@ -369,6 +366,7 @@ describe('action', () => {
       await main.run(inputs)
 
       expect(runMock).toHaveReturned()
+      expect(repoOwnerIsOrgSpy).toHaveBeenCalled()
       expect(setFailedMock).not.toHaveBeenCalled()
       expect(warningMock).toHaveBeenNthCalledWith(
         1,
@@ -386,6 +384,7 @@ describe('action', () => {
       expect(getRegCredsSpy).toHaveBeenCalledWith(subjectName)
       expect(attachArtifactSpy).toHaveBeenCalled()
       expect(createAttestationSpy).toHaveBeenCalled()
+      expect(repoOwnerIsOrgSpy).toHaveBeenCalled()
       expect(warningMock).not.toHaveBeenCalled()
       expect(infoMock).toHaveBeenCalledWith(
         expect.stringMatching(
