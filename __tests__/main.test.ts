@@ -375,6 +375,39 @@ describe('action', () => {
         expect.stringMatching('Failed to create storage record')
       )
     })
+
+    it('does not create a storage record when the repo is owned by a user', async () => {
+      repoOwnerIsOrgSpy.mockResolvedValueOnce(false)
+      
+      await main.run(inputs)
+
+      expect(runMock).toHaveReturned()
+      expect(setFailedMock).not.toHaveBeenCalled()
+      expect(getRegCredsSpy).toHaveBeenCalledWith(subjectName)
+      expect(attachArtifactSpy).toHaveBeenCalled()
+      expect(createAttestationSpy).toHaveBeenCalled()
+      expect(warningMock).not.toHaveBeenCalled()
+      expect(infoMock).toHaveBeenCalledWith(
+        expect.stringMatching(
+          `Attestation created for ${subjectName}@${subjectDigest}`
+        )
+      )
+      expect(infoMock).not.toHaveBeenCalledWith(
+        expect.stringMatching('Storage record created')
+      )
+      expect(infoMock).not.toHaveBeenCalledWith(
+        expect.stringMatching('Storage record IDs: 987654321')
+      )
+      expect(setOutputMock).toHaveBeenCalledWith(
+        'attestation-id',
+        expect.stringMatching(attestationID)
+      )
+      expect(setOutputMock).not.toHaveBeenCalledWith(
+        'storage-record-ids',
+        expect.stringMatching(storageRecordID.toString())
+      )
+      expect(setFailedMock).not.toHaveBeenCalled()
+    })
   })
 
   describe('when the subject count is greater than 1', () => {
