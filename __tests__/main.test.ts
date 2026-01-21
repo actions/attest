@@ -15,7 +15,7 @@ import fs from 'fs/promises'
 import nock from 'nock'
 import os from 'os'
 import path from 'path'
-import { MockAgent, setGlobalDispatcher, getGlobalDispatcher } from 'undici'
+import { MockAgent, setGlobalDispatcher } from 'undici'
 import { SEARCH_PUBLIC_GOOD_URL } from '../src/endpoints'
 import * as main from '../src/main'
 
@@ -195,9 +195,6 @@ describe('action', () => {
         strict: false
       })
       await mockTSA({ baseURL: 'https://timestamp.githubapp.com' })
-
-      const createStorageRecordSpy = jest.spyOn(attest, 'createStorageRecord')
-      createStorageRecordSpy.mockResolvedValue([storageRecordID])
     })
 
     it('invokes the action w/o error', async () => {
@@ -250,6 +247,7 @@ describe('action', () => {
     const getRegCredsSpy = jest.spyOn(oci, 'getRegistryCredentials')
     const attachArtifactSpy = jest.spyOn(oci, 'attachArtifactToImage')
     const repoOwnerIsOrgSpy = jest.spyOn(localAttest, 'repoOwnerIsOrg')
+    const createAttestationSpy = jest.spyOn(localAttest, 'createAttestation')
 
     const inputs: main.RunInputs = {
       ...defaultInputs,
@@ -289,8 +287,6 @@ describe('action', () => {
     })
 
     it('invokes the action w/o error', async () => {
-      const createAttestationSpy = jest.spyOn(localAttest, 'createAttestation')
-
       await main.run(inputs)
 
       expect(runMock).toHaveReturned()
