@@ -94,20 +94,20 @@ describe('action', () => {
         method: 'post'
       })
       .reply(201, { id: attestationID })
-    
+
     pool
       .intercept({
         path: /^\/repos\/[^/]+\/[^/]+$/,
         method: 'GET'
       })
-      .reply(200, { 
+      .reply(200, {
         id: 1,
         name: 'bar',
         full_name: 'foo/bar',
-        owner: { 
+        owner: {
           type: 'Organization',
           login: 'foo'
-        } 
+        }
       })
 
     pool
@@ -290,7 +290,7 @@ describe('action', () => {
 
     it('invokes the action w/o error', async () => {
       const createAttestationSpy = jest.spyOn(localAttest, 'createAttestation')
-  
+
       await main.run(inputs)
 
       expect(runMock).toHaveReturned()
