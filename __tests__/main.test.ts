@@ -97,22 +97,6 @@ describe('action', () => {
 
     pool
       .intercept({
-        path: /^\/repos\/[^/]+\/[^/]+$/,
-        method: 'GET',
-        headers: { authorization: 'token gh-token' }
-      })
-      .reply(200, {
-        id: 1,
-        name: 'bar',
-        full_name: 'foo/bar',
-        owner: {
-          type: 'Organization',
-          login: 'foo'
-        }
-      })
-
-    pool
-      .intercept({
         path: /^\/orgs\/.*\/artifacts\/metadata\/storage-record$/,
         method: 'post'
       })
@@ -295,6 +279,7 @@ describe('action', () => {
       expect(attachArtifactSpy).toHaveBeenCalled()
       expect(createAttestationSpy).toHaveBeenCalled()
       expect(repoOwnerIsOrgSpy).toHaveBeenCalled()
+      expect(createStorageRecordSpy).toHaveBeenCalled()
       expect(warningMock).not.toHaveBeenCalled()
       expect(infoMock).toHaveBeenNthCalledWith(
         1,
@@ -366,7 +351,9 @@ describe('action', () => {
       await main.run(inputs)
 
       expect(runMock).toHaveReturned()
+      expect(createAttestationSpy).toHaveBeenCalled()
       expect(repoOwnerIsOrgSpy).toHaveBeenCalled()
+      expect(createStorageRecordSpy).toHaveBeenCalled()
       expect(setFailedMock).not.toHaveBeenCalled()
       expect(warningMock).toHaveBeenNthCalledWith(
         1,
@@ -385,6 +372,7 @@ describe('action', () => {
       expect(attachArtifactSpy).toHaveBeenCalled()
       expect(createAttestationSpy).toHaveBeenCalled()
       expect(repoOwnerIsOrgSpy).toHaveBeenCalled()
+      expect(createStorageRecordSpy).not.toHaveBeenCalled()
       expect(warningMock).not.toHaveBeenCalled()
       expect(infoMock).toHaveBeenCalledWith(
         expect.stringMatching(
