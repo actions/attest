@@ -108,7 +108,7 @@ export const createAttestation = async (
 // Call the GET /repos/{owner}/{repo} endpoint to determine if the repo
 // owner is an organization. This is used to determine if storage
 // record creation should be attempted.
-export async function repoOwnerIsOrg(githubToken: string): Promise<boolean> {
+export const repoOwnerIsOrg = async (githubToken: string): Promise<boolean> => {
   const octokit = github.getOctokit(githubToken)
   const { data: repo } = await octokit.rest.repos.get({
     owner: github.context.repo.owner,
