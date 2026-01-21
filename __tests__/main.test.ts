@@ -376,7 +376,7 @@ describe('action', () => {
 
     it('does not create a storage record when the repo is owned by a user', async () => {
       repoOwnerIsOrgSpy.mockResolvedValueOnce(false)
-      
+
       await main.run(inputs)
 
       expect(runMock).toHaveReturned()
