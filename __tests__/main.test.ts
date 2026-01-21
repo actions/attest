@@ -289,7 +289,6 @@ describe('action', () => {
     })
 
     it('invokes the action w/o error', async () => {
-      //repoOwnerIsOrgSpy.mockResolvedValue(true)
       await main.run(inputs)
 
       expect(runMock).toHaveReturned()
