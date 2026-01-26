@@ -70,7 +70,7 @@
   },
   "dependencies": {
     "@actions/attest": "^2.1.0",
-    "@actions/core": "^2.0.1",
+    "@actions/core": "^2.0.2",
     "@actions/github": "^6.0.1",
     "@actions/glob": "^0.5.0",
     "@sigstore/oci": "^0.6.0",
