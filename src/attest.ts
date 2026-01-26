@@ -68,45 +68,48 @@ export const createAttestation = async (
   // Add the attestation's digest to the result
   result.attestationDigest = artifact.digest
 
+  // If createStorageRecord is false, return early
+  if (!opts.createStorageRecord) {
+    return result
+  }
+
   // Because creating a storage record requires the 'artifact-metadata:write'
   // permission, we wrap this in a try/catch to avoid failing the entire
   // attestation process if the token does not have the correct permissions.
-  if (opts.createStorageRecord) {
-    try {
-      const token = opts.githubToken
-      const isOrg = await repoOwnerIsOrg(token)
-      if (!isOrg) {
-        // The Artifact Metadata Storage Record API is only available to
-        // organizations. So if the repo owner is not an organization,
-        // storage record creation should not be attempted.
-        return result
-      }
-
-      const registryUrl = getRegistryURL(subject.name)
-      const artifactOpts = {
-        name: subject.name,
-        digest: subjectDigest
-      }
-      const packageRegistryOpts = {
-        registryUrl
-      }
-      const records = await createStorageRecord(
-        artifactOpts,
-        packageRegistryOpts,
-        token
-      )
-
-      if (!records || records.length === 0) {
-        core.warning('No storage records were created.')
-      }
-
-      result.storageRecordIds = records
-    } catch (error) {
-      core.warning(`Failed to create storage record: ${error}`)
-      core.warning(
-        'Please check that the "artifact-metadata:write" permission has been included'
-      )
+  try {
+    const token = opts.githubToken
+    const isOrg = await repoOwnerIsOrg(token)
+    if (!isOrg) {
+      // The Artifact Metadata Storage Record API is only available to
+      // organizations. So if the repo owner is not an organization,
+      // storage record creation should not be attempted.
+      return result
     }
+
+    const registryUrl = getRegistryURL(subject.name)
+    const artifactOpts = {
+      name: subject.name,
+      digest: subjectDigest
+    }
+    const packageRegistryOpts = {
+      registryUrl
+    }
+    const records = await createStorageRecord(
+      artifactOpts,
+      packageRegistryOpts,
+      token
+    )
+
+    if (!records || records.length === 0) {
+      core.warning('No storage records were created.')
+    }
+
+    result.storageRecordIds = records
+  } catch (error) {
+    core.warning(`Failed to create storage record: ${error}`)
+    core.warning(
+      'Please check that the "artifact-metadata:write" permission has been included'
+    )
   }
 
   return result
