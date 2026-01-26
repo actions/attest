@@ -10,6 +10,7 @@ import * as github from '@actions/github'
 import { mockFulcio, mockRekor, mockTSA } from '@sigstore/mock'
 import * as oci from '@sigstore/oci'
 import * as attest from '@actions/attest'
+import * as localAttest from '../src/attest'
 import fs from 'fs/promises'
 import nock from 'nock'
 import os from 'os'
@@ -29,7 +30,7 @@ const setFailedMock = jest.spyOn(core, 'setFailed')
 setFailedMock.mockImplementation(() => {})
 
 const summaryWriteMock = jest.spyOn(core.summary, 'write')
-summaryWriteMock.mockImplementation(async () => Promise.resolve(core.summary))
+summaryWriteMock.mockResolvedValue(core.summary)
 
 // Mock the action's main function
 const runMock = jest.spyOn(main, 'run')
@@ -230,6 +231,9 @@ describe('action', () => {
   describe('when the repository is public', () => {
     const getRegCredsSpy = jest.spyOn(oci, 'getRegistryCredentials')
     const attachArtifactSpy = jest.spyOn(oci, 'attachArtifactToImage')
+    const repoOwnerIsOrgSpy = jest.spyOn(localAttest, 'repoOwnerIsOrg')
+    const createStorageRecordSpy = jest.spyOn(attest, 'createStorageRecord')
+    const createAttestationSpy = jest.spyOn(localAttest, 'createAttestation')
 
     const inputs: main.RunInputs = {
       ...defaultInputs,
@@ -258,13 +262,12 @@ describe('action', () => {
         username: 'username',
         password: 'password'
       }))
-      attachArtifactSpy.mockImplementation(async () =>
-        Promise.resolve({
-          digest: 'sha256:123456',
-          mediaType: 'application/vnd.cncf.notary.v2',
-          size: 123456
-        })
-      )
+      attachArtifactSpy.mockResolvedValue({
+        digest: 'sha256:123456',
+        mediaType: 'application/vnd.cncf.notary.v2',
+        size: 123456
+      })
+      repoOwnerIsOrgSpy.mockResolvedValue(true)
     })
 
     it('invokes the action w/o error', async () => {
@@ -274,6 +277,9 @@ describe('action', () => {
       expect(setFailedMock).not.toHaveBeenCalled()
       expect(getRegCredsSpy).toHaveBeenCalledWith(subjectName)
       expect(attachArtifactSpy).toHaveBeenCalled()
+      expect(createAttestationSpy).toHaveBeenCalled()
+      expect(repoOwnerIsOrgSpy).toHaveBeenCalled()
+      expect(createStorageRecordSpy).toHaveBeenCalled()
       expect(warningMock).not.toHaveBeenCalled()
       expect(infoMock).toHaveBeenNthCalledWith(
         1,
@@ -338,7 +344,6 @@ describe('action', () => {
 
     it('catches error when storage record creation fails and continues', async () => {
       // Mock the createStorageRecord function and throw an error
-      const createStorageRecordSpy = jest.spyOn(attest, 'createStorageRecord')
       createStorageRecordSpy.mockRejectedValueOnce(
         new Error('Failed to persist storage record: Not Found')
       )
@@ -346,11 +351,49 @@ describe('action', () => {
       await main.run(inputs)
 
       expect(runMock).toHaveReturned()
+      expect(createAttestationSpy).toHaveBeenCalled()
+      expect(repoOwnerIsOrgSpy).toHaveBeenCalled()
+      expect(createStorageRecordSpy).toHaveBeenCalled()
       expect(setFailedMock).not.toHaveBeenCalled()
       expect(warningMock).toHaveBeenNthCalledWith(
         1,
         expect.stringMatching('Failed to create storage record')
       )
+    })
+
+    it('does not create a storage record when the repo is owned by a user', async () => {
+      repoOwnerIsOrgSpy.mockResolvedValueOnce(false)
+
+      await main.run(inputs)
+
+      expect(runMock).toHaveReturned()
+      expect(setFailedMock).not.toHaveBeenCalled()
+      expect(getRegCredsSpy).toHaveBeenCalledWith(subjectName)
+      expect(attachArtifactSpy).toHaveBeenCalled()
+      expect(createAttestationSpy).toHaveBeenCalled()
+      expect(repoOwnerIsOrgSpy).toHaveBeenCalled()
+      expect(createStorageRecordSpy).not.toHaveBeenCalled()
+      expect(warningMock).not.toHaveBeenCalled()
+      expect(infoMock).toHaveBeenCalledWith(
+        expect.stringMatching(
+          `Attestation created for ${subjectName}@${subjectDigest}`
+        )
+      )
+      expect(infoMock).not.toHaveBeenCalledWith(
+        expect.stringMatching('Storage record created')
+      )
+      expect(infoMock).not.toHaveBeenCalledWith(
+        expect.stringMatching('Storage record IDs: 987654321')
+      )
+      expect(setOutputMock).toHaveBeenCalledWith(
+        'attestation-id',
+        expect.stringMatching(attestationID)
+      )
+      expect(setOutputMock).not.toHaveBeenCalledWith(
+        'storage-record-ids',
+        expect.stringMatching(storageRecordID.toString())
+      )
+      expect(setFailedMock).not.toHaveBeenCalled()
     })
   })
 
