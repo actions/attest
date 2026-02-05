@@ -3,15 +3,15 @@ import * as github from '@actions/github'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import { AttestResult, SigstoreInstance, createAttestation } from './attest'
-import { SEARCH_PUBLIC_GOOD_URL } from './endpoints'
-import { PredicateInputs, predicateFromInputs } from './predicate'
-import * as style from './style'
+import { AttestResult, SigstoreInstance, createAttestation } from './attest.js'
+import { SEARCH_PUBLIC_GOOD_URL } from './endpoints.js'
+import { PredicateInputs, predicateFromInputs } from './predicate.js'
+import * as style from './style.js'
 import {
   SubjectInputs,
   formatSubjectDigest,
   subjectFromInputs
-} from './subject'
+} from './subject.js'
 
 import type { Subject } from '@actions/attest'
 

@@ -89,6 +89,13 @@ export default tseslint.config(
           allowObject: true
         }
       ]
+    },
+    settings: {
+      'import/resolver': {
+        typescript: {
+          project: './tsconfig.lint.json'
+        }
+      }
     }
   }
 )
