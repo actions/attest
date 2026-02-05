@@ -44,9 +44,7 @@ jest.unstable_mockModule('@actions/core', () => ({
   endGroup: endGroupMock,
   setOutput: setOutputMock,
   setFailed: setFailedMock,
-  summary: mockSummary,
-  getInput: jest.fn(() => ''),
-  getBooleanInput: jest.fn(() => false)
+  summary: mockSummary
 }))
 
 // Create mocks for OCI and attest modules
