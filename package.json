@@ -25,7 +25,7 @@
   },
   "scripts": {
     "bundle": "npm run format:write && npm run package",
-    "ci-test": "jest",
+    "ci-test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "format:write": "prettier --write **/*.ts",
     "format:check": "prettier --check **/*.ts",
     "lint:eslint": "npx eslint",
@@ -33,42 +33,10 @@
     "lint": "npm run lint:eslint && npm run lint:markdown",
     "package": "ncc build src/index.ts --license licenses.txt",
     "package:watch": "npm run package -- --watch",
-    "test": "jest",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "all": "npm run format:write && npm run lint && npm run test && npm run package"
   },
   "license": "MIT",
-  "jest": {
-    "preset": "ts-jest",
-    "setupFilesAfterEnv": [
-      "./jest.setup.js"
-    ],
-    "verbose": true,
-    "clearMocks": true,
-    "testEnvironment": "node",
-    "moduleFileExtensions": [
-      "js",
-      "ts"
-    ],
-    "testMatch": [
-      "**/*.test.ts"
-    ],
-    "testPathIgnorePatterns": [
-      "/node_modules/",
-      "/dist/"
-    ],
-    "transform": {
-      "^.+\\.ts$": "ts-jest"
-    },
-    "coverageReporters": [
-      "json-summary",
-      "text",
-      "lcov"
-    ],
-    "collectCoverage": true,
-    "collectCoverageFrom": [
-      "./src/**"
-    ]
-  },
   "dependencies": {
     "@actions/attest": "^2.2.1",
     "@actions/core": "^2.0.2",
@@ -79,12 +47,14 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "@jest/globals": "^30.2.0",
     "@sigstore/mock": "^0.11.0",
     "@types/jest": "^30.0.0",
     "@types/make-fetch-happen": "^10.0.4",
     "@types/node": "^25.2.0",
     "@vercel/ncc": "^0.38.4",
     "eslint": "^9.39.2",
+    "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-jest": "^29.12.1",
     "jest": "^30.2.0",
