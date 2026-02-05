@@ -6,7 +6,7 @@ import {
   createStorageRecord
 } from '@actions/attest'
 import { attachArtifactToImage, getRegistryCredentials } from '@sigstore/oci'
-import { formatSubjectDigest } from './subject'
+import { formatSubjectDigest } from './subject.js'
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 

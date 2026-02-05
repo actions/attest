@@ -2,7 +2,7 @@
  * The entrypoint for the action.
  */
 import * as core from '@actions/core'
-import { run, RunInputs } from './main'
+import { run, RunInputs } from './main.js'
 
 const inputs: RunInputs = {
   subjectPath: core.getInput('subject-path'),
