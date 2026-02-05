@@ -231,7 +231,6 @@ describe('action', () => {
     it('sets a failed status', async () => {
       await run(inputs)
 
-      // run completed
       expect(setFailedMock).toHaveBeenCalledWith(
         new Error(
           'missing "id-token" permission. Please add "permissions: id-token: write" to your workflow.'
@@ -244,7 +243,6 @@ describe('action', () => {
     it('sets a failed status', async () => {
       await run(defaultInputs)
 
-      // run completed
       expect(setFailedMock).toHaveBeenCalledWith(
         new Error(
           'One of subject-path, subject-digest, or subject-checksums must be provided'
@@ -280,7 +278,6 @@ describe('action', () => {
     it('invokes the action w/o error', async () => {
       await run(inputs)
 
-      // run completed
       expect(setFailedMock).not.toHaveBeenCalled()
       expect(infoMock).toHaveBeenNthCalledWith(
         1,
@@ -386,7 +383,6 @@ describe('action', () => {
     it('invokes the action w/o error', async () => {
       await run(inputs)
 
-      // run completed
       expect(setFailedMock).not.toHaveBeenCalled()
       expect(getRegistryCredentialsMock).toHaveBeenCalledWith(subjectName)
       expect(attachArtifactToImageMock).toHaveBeenCalled()
@@ -462,7 +458,6 @@ describe('action', () => {
 
       await run(inputs)
 
-      // run completed
       expect(attestMock).toHaveBeenCalled()
       expect(createStorageRecordMock).toHaveBeenCalled()
       expect(setFailedMock).not.toHaveBeenCalled()
@@ -478,7 +473,6 @@ describe('action', () => {
 
       await run(inputs)
 
-      // run completed
       expect(setFailedMock).not.toHaveBeenCalled()
       expect(getRegistryCredentialsMock).toHaveBeenCalledWith(subjectName)
       expect(attachArtifactToImageMock).toHaveBeenCalled()
@@ -556,7 +550,6 @@ describe('action', () => {
       }
       await run(inputs)
 
-      // run completed
       expect(setFailedMock).not.toHaveBeenCalled()
       expect(infoMock).toHaveBeenNthCalledWith(
         1,
@@ -604,7 +597,6 @@ describe('action', () => {
       }
       await run(inputs)
 
-      // run completed
       expect(setFailedMock).toHaveBeenCalledWith(
         new Error(
           'Too many subjects specified. The maximum number of subjects is 1024.'
