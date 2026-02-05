@@ -6,7 +6,7 @@ import {
   formatSubjectDigest,
   subjectFromInputs,
   SubjectInputs
-} from '../src/subject'
+} from '../src/subject.js'
 
 describe('subjectFromInputs', () => {
   const blankInputs: SubjectInputs = {
@@ -264,10 +264,15 @@ describe('subjectFromInputs', () => {
         expect(subjects).toBeDefined()
         expect(subjects).toHaveLength(3)
 
-        subjects.forEach((subject, i) => {
-          expect(subject.name).toEqual(`${filename}-${i}`)
-          expect(subject.digest).toEqual({ sha256: expectedDigest })
-        })
+        subjects.forEach(
+          (
+            subject: { name: string; digest: Record<string, string> },
+            i: number
+          ) => {
+            expect(subject.name).toEqual(`${filename}-${i}`)
+            expect(subject.digest).toEqual({ sha256: expectedDigest })
+          }
+        )
       })
     })
 

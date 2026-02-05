@@ -1,4 +1,4 @@
-import { highlight, mute } from '../src/style'
+import { highlight, mute } from '../src/style.js'
 
 describe('style', () => {
   describe('highlight', () => {

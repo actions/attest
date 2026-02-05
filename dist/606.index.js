@@ -18,7 +18,7 @@ async function pMap(
 		signal,
 	} = {},
 ) {
-	return new Promise((resolve, reject_) => {
+	return new Promise((resolve_, reject_) => {
 		if (iterable[Symbol.iterator] === undefined && iterable[Symbol.asyncIterator] === undefined) {
 			throw new TypeError(`Expected \`input\` to be either an \`Iterable\` or \`AsyncIterable\`, got (${typeof iterable})`);
 		}
@@ -41,10 +41,24 @@ async function pMap(
 		let currentIndex = 0;
 		const iterator = iterable[Symbol.iterator] === undefined ? iterable[Symbol.asyncIterator]() : iterable[Symbol.iterator]();
 
+		const signalListener = () => {
+			reject(signal.reason);
+		};
+
+		const cleanup = () => {
+			signal?.removeEventListener('abort', signalListener);
+		};
+
+		const resolve = value => {
+			resolve_(value);
+			cleanup();
+		};
+
 		const reject = reason => {
 			isRejected = true;
 			isResolved = true;
 			reject_(reason);
+			cleanup();
 		};
 
 		if (signal) {
@@ -52,9 +66,7 @@ async function pMap(
 				reject(signal.reason);
 			}
 
-			signal.addEventListener('abort', () => {
-				reject(signal.reason);
-			});
+			signal.addEventListener('abort', signalListener, {once: true});
 		}
 
 		const next = async () => {
@@ -202,23 +214,24 @@ function pMapIterable(
 			const iterator = iterable[Symbol.asyncIterator] === undefined ? iterable[Symbol.iterator]() : iterable[Symbol.asyncIterator]();
 
 			const promises = [];
-			let runningMappersCount = 0;
+			let pendingPromisesCount = 0;
 			let isDone = false;
 			let index = 0;
 
 			function trySpawn() {
-				if (isDone || !(runningMappersCount < concurrency && promises.length < backpressure)) {
+				if (isDone || !(pendingPromisesCount < concurrency && promises.length < backpressure)) {
 					return;
 				}
+
+				pendingPromisesCount++;
 
 				const promise = (async () => {
 					const {done, value} = await iterator.next();
 
 					if (done) {
+						pendingPromisesCount--;
 						return {done: true};
 					}
-
-					runningMappersCount++;
 
 					// Spawn if still below concurrency and backpressure limit
 					trySpawn();
@@ -226,7 +239,7 @@ function pMapIterable(
 					try {
 						const returnValue = await mapper(await value, index++);
 
-						runningMappersCount--;
+						pendingPromisesCount--;
 
 						if (returnValue === pMapSkip) {
 							const index = promises.indexOf(promise);
@@ -241,6 +254,7 @@ function pMapIterable(
 
 						return {done: false, value: returnValue};
 					} catch (error) {
+						pendingPromisesCount--;
 						isDone = true;
 						return {error};
 					}

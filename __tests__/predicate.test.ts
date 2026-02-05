@@ -1,7 +1,7 @@
 import fs from 'fs/promises'
 import os from 'os'
 import path from 'path'
-import { predicateFromInputs, PredicateInputs } from '../src/predicate'
+import { predicateFromInputs, PredicateInputs } from '../src/predicate.js'
 
 describe('subjectFromInputs', () => {
   const blankInputs: PredicateInputs = {
