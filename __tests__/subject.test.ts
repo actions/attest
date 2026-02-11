@@ -524,6 +524,39 @@ f861e68a080799ca83104630b56abb90d8dbcc5f8b5a8639cb691e269838f29e  demo_0.0.1_lin
     })
   })
 
+  describe('when specifying a subject checksums string with duplicates', () => {
+    const checksums = `
+f861e68a080799ca83104630b56abb90d8dbcc5f8b5a8639cb691e269838f29e  demo_0.0.1_linux_386
+f861e68a080799ca83104630b56abb90d8dbcc5f8b5a8639cb691e269838f29e  demo_0.0.1_linux_386
+187dcd1506a170337415589ff00c8743f19d41cc31fca246c2739dfd450d0b9d *demo_0.0.1_linux_amd64`
+
+    it('returns de-duplicated subjects', async () => {
+      const inputs: SubjectInputs = {
+        ...blankInputs,
+        subjectChecksums: checksums
+      }
+      const subjects = await subjectFromInputs(inputs)
+
+      expect(subjects).toBeDefined()
+      expect(subjects).toHaveLength(2)
+
+      expect(subjects).toContainEqual({
+        name: 'demo_0.0.1_linux_386',
+        digest: {
+          sha256:
+            'f861e68a080799ca83104630b56abb90d8dbcc5f8b5a8639cb691e269838f29e'
+        }
+      })
+      expect(subjects).toContainEqual({
+        name: 'demo_0.0.1_linux_amd64',
+        digest: {
+          sha256:
+            '187dcd1506a170337415589ff00c8743f19d41cc31fca246c2739dfd450d0b9d'
+        }
+      })
+    })
+  })
+
   describe('when specifying a subject checksums string with an unrecognized digest', () => {
     const checksums = `f861e  demo_0.0.1_linux_386`
 

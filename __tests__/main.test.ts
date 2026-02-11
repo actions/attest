@@ -18,6 +18,7 @@ import path from 'path'
 import { MockAgent, setGlobalDispatcher } from 'undici'
 import { SEARCH_PUBLIC_GOOD_URL } from '../src/endpoints'
 import * as main from '../src/main'
+import * as provenance from '../src/provenance'
 
 // Mock the GitHub Actions core library
 const infoMock = jest.spyOn(core, 'info')
@@ -43,6 +44,7 @@ const defaultInputs: main.RunInputs = {
   predicate: '',
   predicateType: '',
   predicatePath: '',
+  sbomPath: '',
   subjectName: '',
   subjectDigest: '',
   subjectPath: '',
@@ -187,8 +189,9 @@ describe('action', () => {
 
       expect(runMock).toHaveReturned()
       expect(setFailedMock).not.toHaveBeenCalledWith()
+      expect(infoMock).toHaveBeenNthCalledWith(1, 'Attestation type: Custom')
       expect(infoMock).toHaveBeenNthCalledWith(
-        1,
+        2,
         expect.stringMatching(
           `Attestation created for ${subjectName}@${subjectDigest}`
         )
@@ -198,15 +201,15 @@ describe('action', () => {
         expect.stringMatching('GitHub Sigstore')
       )
       expect(infoMock).toHaveBeenNthCalledWith(
-        2,
+        3,
         expect.stringMatching('-----BEGIN CERTIFICATE-----')
       )
       expect(infoMock).toHaveBeenNthCalledWith(
-        3,
+        4,
         expect.stringMatching(/attestation uploaded/i)
       )
       expect(infoMock).toHaveBeenNthCalledWith(
-        4,
+        5,
         expect.stringMatching(attestationID)
       )
       expect(setOutputMock).toHaveBeenNthCalledWith(
@@ -281,8 +284,9 @@ describe('action', () => {
       expect(repoOwnerIsOrgSpy).toHaveBeenCalled()
       expect(createStorageRecordSpy).toHaveBeenCalled()
       expect(warningMock).not.toHaveBeenCalled()
+      expect(infoMock).toHaveBeenNthCalledWith(1, 'Attestation type: Custom')
       expect(infoMock).toHaveBeenNthCalledWith(
-        1,
+        2,
         expect.stringMatching(
           `Attestation created for ${subjectName}@${subjectDigest}`
         )
@@ -292,31 +296,31 @@ describe('action', () => {
         expect.stringMatching('Public Good Sigstore')
       )
       expect(infoMock).toHaveBeenNthCalledWith(
-        2,
+        3,
         expect.stringMatching('-----BEGIN CERTIFICATE-----')
       )
       expect(infoMock).toHaveBeenNthCalledWith(
-        3,
+        4,
         expect.stringMatching(/signature uploaded/i)
       )
       expect(infoMock).toHaveBeenNthCalledWith(
-        4,
+        5,
         expect.stringMatching(SEARCH_PUBLIC_GOOD_URL)
       )
       expect(infoMock).toHaveBeenNthCalledWith(
-        5,
+        6,
         expect.stringMatching(/attestation uploaded/i)
       )
       expect(infoMock).toHaveBeenNthCalledWith(
-        6,
+        7,
         expect.stringMatching(attestationID)
       )
       expect(infoMock).toHaveBeenNthCalledWith(
-        9,
+        10,
         expect.stringMatching('Storage record created')
       )
       expect(infoMock).toHaveBeenNthCalledWith(
-        10,
+        11,
         expect.stringMatching('Storage record IDs: 987654321')
       )
       expect(setOutputMock).toHaveBeenNthCalledWith(
@@ -447,8 +451,9 @@ describe('action', () => {
 
       expect(runMock).toHaveReturned()
       expect(setFailedMock).not.toHaveBeenCalled()
+      expect(infoMock).toHaveBeenNthCalledWith(1, 'Attestation type: Custom')
       expect(infoMock).toHaveBeenNthCalledWith(
-        1,
+        2,
         expect.stringMatching('Attestation created for 5 subjects')
       )
     })
@@ -499,6 +504,173 @@ describe('action', () => {
           'Too many subjects specified. The maximum number of subjects is 1024.'
         )
       )
+    })
+  })
+
+  describe('attestation type detection', () => {
+    describe('when sbom-path is provided with predicate inputs', () => {
+      it('sets a failed status for conflicting inputs', async () => {
+        const inputs: main.RunInputs = {
+          ...defaultInputs,
+          subjectDigest,
+          subjectName,
+          sbomPath: '/path/to/sbom.json',
+          predicateType: 'https://example.com/predicate',
+          githubToken: 'gh-token'
+        }
+
+        await main.run(inputs)
+
+        expect(runMock).toHaveReturned()
+        expect(setFailedMock).toHaveBeenCalledWith(
+          new Error(
+            'Cannot specify sbom-path together with predicate-type, predicate, or predicate-path'
+          )
+        )
+      })
+    })
+
+    describe('when predicate is provided without predicate-type', () => {
+      it('sets a failed status for missing predicate-type', async () => {
+        const inputs: main.RunInputs = {
+          ...defaultInputs,
+          subjectDigest,
+          subjectName,
+          predicate: '{}',
+          githubToken: 'gh-token'
+        }
+
+        await main.run(inputs)
+
+        expect(runMock).toHaveReturned()
+        expect(setFailedMock).toHaveBeenCalledWith(
+          new Error(
+            'predicate-type is required when using predicate or predicate-path'
+          )
+        )
+      })
+    })
+
+    describe('when custom attestation inputs are provided', () => {
+      const inputs: main.RunInputs = {
+        ...defaultInputs,
+        subjectDigest,
+        subjectName,
+        predicateType,
+        predicate,
+        githubToken: 'gh-token'
+      }
+
+      beforeEach(async () => {
+        setGHContext({
+          payload: { repository: { visibility: 'private' } },
+          repo: { owner: 'foo', repo: 'bar' }
+        })
+
+        await mockFulcio({
+          baseURL: 'https://fulcio.githubapp.com',
+          strict: false
+        })
+        await mockTSA({ baseURL: 'https://timestamp.githubapp.com' })
+      })
+
+      it('logs the attestation type as Custom', async () => {
+        await main.run(inputs)
+
+        expect(runMock).toHaveReturned()
+        expect(setFailedMock).not.toHaveBeenCalled()
+        expect(infoMock).toHaveBeenCalledWith('Attestation type: Custom')
+      })
+    })
+
+    describe('when provenance attestation is detected', () => {
+      const inputs: main.RunInputs = {
+        ...defaultInputs,
+        subjectDigest,
+        subjectName,
+        githubToken: 'gh-token'
+      }
+
+      const mockProvPredicate = {
+        type: 'https://slsa.dev/provenance/v1',
+        params: { buildDefinition: {}, runDetails: {} }
+      }
+
+      beforeEach(async () => {
+        jest
+          .spyOn(provenance, 'generateProvenancePredicate')
+          .mockResolvedValue(mockProvPredicate)
+
+        setGHContext({
+          payload: { repository: { visibility: 'private' } },
+          repo: { owner: 'foo', repo: 'bar' }
+        })
+
+        await mockFulcio({
+          baseURL: 'https://fulcio.githubapp.com',
+          strict: false
+        })
+        await mockTSA({ baseURL: 'https://timestamp.githubapp.com' })
+      })
+
+      it('logs the attestation type as Build Provenance and generates predicate', async () => {
+        await main.run(inputs)
+
+        expect(runMock).toHaveReturned()
+        expect(setFailedMock).not.toHaveBeenCalled()
+        expect(infoMock).toHaveBeenCalledWith(
+          'Attestation type: Build Provenance'
+        )
+      })
+    })
+
+    describe('when sbom attestation is detected', () => {
+      let tmpDir: string
+      let sbomFilePath: string
+
+      const spdxSBOM = {
+        spdxVersion: 'SPDX-2.3',
+        SPDXID: 'SPDXRef-DOCUMENT',
+        name: 'test-package',
+        packages: []
+      }
+
+      beforeEach(async () => {
+        tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'main-test-'))
+        sbomFilePath = path.join(tmpDir, 'sbom.spdx.json')
+        await fs.writeFile(sbomFilePath, JSON.stringify(spdxSBOM))
+
+        setGHContext({
+          payload: { repository: { visibility: 'private' } },
+          repo: { owner: 'foo', repo: 'bar' }
+        })
+
+        await mockFulcio({
+          baseURL: 'https://fulcio.githubapp.com',
+          strict: false
+        })
+        await mockTSA({ baseURL: 'https://timestamp.githubapp.com' })
+      })
+
+      afterEach(async () => {
+        await fs.rm(tmpDir, { recursive: true })
+      })
+
+      it('logs the attestation type as SBOM and generates predicate', async () => {
+        const inputs: main.RunInputs = {
+          ...defaultInputs,
+          subjectDigest,
+          subjectName,
+          sbomPath: sbomFilePath,
+          githubToken: 'gh-token'
+        }
+
+        await main.run(inputs)
+
+        expect(runMock).toHaveReturned()
+        expect(setFailedMock).not.toHaveBeenCalled()
+        expect(infoMock).toHaveBeenCalledWith('Attestation type: SBOM')
+      })
     })
   })
 })

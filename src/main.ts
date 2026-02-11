@@ -4,8 +4,16 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import { AttestResult, SigstoreInstance, createAttestation } from './attest'
+import {
+  AttestationType,
+  DetectionInputs,
+  detectAttestationType,
+  validateAttestationInputs
+} from './detect'
 import { SEARCH_PUBLIC_GOOD_URL } from './endpoints'
 import { PredicateInputs, predicateFromInputs } from './predicate'
+import { generateProvenancePredicate } from './provenance'
+import { parseSBOMFromPath, generateSBOMPredicate } from './sbom'
 import * as style from './style'
 import {
   SubjectInputs,
@@ -13,13 +21,18 @@ import {
   subjectFromInputs
 } from './subject'
 
-import type { Subject } from '@actions/attest'
+import type { Predicate, Subject } from '@actions/attest'
 
 const ATTESTATION_FILE_NAME = 'attestation.json'
 const ATTESTATION_PATHS_FILE_NAME = 'created_attestation_paths.txt'
 
+export type SBOMInputs = {
+  sbomPath: string
+}
+
 export type RunInputs = SubjectInputs &
-  PredicateInputs & {
+  PredicateInputs &
+  SBOMInputs & {
     pushToRegistry: boolean
     createStorageRecord: boolean
     githubToken: string
@@ -58,11 +71,24 @@ export async function run(inputs: RunInputs): Promise<void> {
       )
     }
 
+    // Detect attestation type and validate inputs
+    const detectionInputs: DetectionInputs = {
+      sbomPath: inputs.sbomPath,
+      predicateType: inputs.predicateType,
+      predicate: inputs.predicate,
+      predicatePath: inputs.predicatePath
+    }
+    validateAttestationInputs(detectionInputs)
+    const attestationType = detectAttestationType(detectionInputs)
+    logAttestationType(attestationType)
+
     const subjects = await subjectFromInputs({
       ...inputs,
       downcaseName: inputs.pushToRegistry
     })
-    const predicate = predicateFromInputs(inputs)
+
+    // Generate predicate based on attestation type
+    const predicate = await getPredicateForType(attestationType, inputs)
 
     const outputPath = path.join(tempDir(), ATTESTATION_FILE_NAME)
     core.setOutput('bundle-path', outputPath)
@@ -207,3 +233,30 @@ const tempDir = (): string => {
 
 const attestationURL = (id: string): string =>
   `${github.context.serverUrl}/${github.context.repo.owner}/${github.context.repo.repo}/attestations/${id}`
+
+// Log the detected attestation type
+const logAttestationType = (type: AttestationType): void => {
+  const typeLabels: Record<AttestationType, string> = {
+    provenance: 'Build Provenance',
+    sbom: 'SBOM',
+    custom: 'Custom'
+  }
+  core.info(`Attestation type: ${typeLabels[type]}`)
+}
+
+// Generate predicate based on attestation type
+const getPredicateForType = async (
+  type: AttestationType,
+  inputs: RunInputs
+): Promise<Predicate> => {
+  switch (type) {
+    case 'provenance':
+      return generateProvenancePredicate()
+    case 'sbom': {
+      const sbom = await parseSBOMFromPath(inputs.sbomPath)
+      return generateSBOMPredicate(sbom)
+    }
+    case 'custom':
+      return predicateFromInputs(inputs)
+  }
+}

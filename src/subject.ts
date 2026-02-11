@@ -195,10 +195,15 @@ const getSubjectFromChecksumsString = (checksums: string): Subject[] => {
       throw new Error(`Invalid digest: ${digest}`)
     }
 
-    subjects.push({
-      name,
-      digest: { [digestAlgorithm(digest)]: digest }
-    })
+    const alg = digestAlgorithm(digest)
+
+    // Only add the subject if it is not already in the list (deduplicate by digest)
+    if (!subjects.some(s => s.name === name && s.digest[alg] === digest)) {
+      subjects.push({
+        name,
+        digest: { [alg]: digest }
+      })
+    }
   }
 
   return subjects

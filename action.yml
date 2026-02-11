@@ -30,21 +30,29 @@ inputs:
       attestation. Must specify exactly one of "subject-path", "subject-digest",
       or "subject-checksums".
     required: false
+  sbom-path:
+    description: >
+      Path to the JSON-formatted SBOM file (SPDX or CycloneDX) to attest.
+      File size cannot exceed 16MB. When provided, creates an SBOM attestation.
+      Cannot be used together with "predicate-type", "predicate", or
+      "predicate-path".
+    required: false
   predicate-type:
     description: >
-      URI identifying the type of the predicate.
-    required: true
+      URI identifying the type of the predicate. Required when using "predicate"
+      or "predicate-path" for custom attestations.
+    required: false
   predicate:
     description: >
       String containing the value for the attestation predicate. String length
       cannot exceed 16MB. Must supply exactly one of "predicate-path" or
-      "predicate".
+      "predicate" when creating custom attestations.
     required: false
   predicate-path:
     description: >
       Path to the file which contains the content for the attestation predicate.
       File size cannot exceed 16MB. Must supply exactly one of "predicate-path"
-      or "predicate".
+      or "predicate" when creating custom attestations.
     required: false
   push-to-registry:
     description: >

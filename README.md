@@ -41,6 +41,21 @@ information on artifact attestations.
 > Artifact attestations are NOT supported on GitHub Enterprise Server.
 <!-- prettier-ignore-end -->
 
+## Attestation Modes
+
+This action supports three attestation modes, automatically detected based on
+the inputs you provide:
+
+<!-- markdownlint-disable MD013 -->
+
+| Mode           | When Used                                              | Description                                      |
+| -------------- | ------------------------------------------------------ | ------------------------------------------------ |
+| **Provenance** | No `sbom-path` or predicate inputs                     | Auto-generates [SLSA build provenance][10]       |
+| **SBOM**       | `sbom-path` is provided                                | Creates attestation from SPDX or CycloneDX SBOM  |
+| **Custom**     | `predicate-type`/`predicate`/`predicate-path` provided | User-supplied predicate                          |
+
+<!-- markdownlint-enable MD013 -->
+
 ## Usage
 
 Within the GitHub Actions workflow which builds some artifact you would like to
@@ -63,24 +78,21 @@ attest:
 1. Add the following to your workflow after your artifact has been built:
 
    ```yaml
-   - uses: actions/attest@v2
+   - uses: actions/attest@v4
      with:
        subject-path: '<PATH TO ARTIFACT>'
-       predicate-type: '<PREDICATE URI>'
-       predicate-path: '<PATH TO PREDICATE>'
    ```
 
-   The `subject-path` parameter should identify the artifact for which you want
-   to generate an attestation. The `predicate-type` can be any of the the
-   [vetted predicate types][3] or a custom value. The `predicate-path`
-   identifies a file containing the JSON-encoded predicate parameters.
+   By default, this generates a [SLSA build provenance][10] attestation. For
+   SBOM or custom attestations, see the [Attestation Modes](#attestation-modes)
+   section.
 
 ### Inputs
 
 See [action.yml](action.yml)
 
 ```yaml
-- uses: actions/attest@v2
+- uses: actions/attest@v4
   with:
     # Path to the artifact serving as the subject of the attestation. Must
     # specify exactly one of "subject-path", "subject-digest", or
@@ -102,17 +114,24 @@ See [action.yml](action.yml)
     # or "subject-checksums".
     subject-checksums:
 
-    # URI identifying the type of the predicate.
+    # Path to the JSON-formatted SBOM file (SPDX or CycloneDX) to attest.
+    # File size cannot exceed 16MB. When provided, creates an SBOM attestation.
+    # Cannot be used together with "predicate-type", "predicate", or
+    # "predicate-path".
+    sbom-path:
+
+    # URI identifying the type of the predicate. Required when using "predicate"
+    # or "predicate-path" for custom attestations.
     predicate-type:
 
     # String containing the value for the attestation predicate. String length
     # cannot exceed 16MB. Must supply exactly one of "predicate-path" or
-    # "predicate".
+    # "predicate" when creating custom attestations.
     predicate:
 
     # Path to the file which contains the content for the attestation predicate.
     # File size cannot exceed 16MB. Must supply exactly one of "predicate-path"
-    # or "predicate".
+    # or "predicate" when creating custom attestations.
     predicate-path:
 
     # Whether to push the attestation to the image registry. Requires that the
@@ -166,13 +185,13 @@ string cannot exceed 16MB.
 
 ## Examples
 
-### Identify Subject by Path
+### Provenance Attestation (Default)
 
-For the basic use case, simply add the `attest` action to your workflow and
-supply the path to the artifact for which you want to generate attestation.
+The simplest use case - just specify the artifact path and a SLSA build
+provenance attestation is automatically generated:
 
 ```yaml
-name: build-attest
+name: build-attest-provenance
 
 on:
   workflow_dispatch:
@@ -190,11 +209,36 @@ jobs:
       - name: Build artifact
         run: make my-app
       - name: Attest
-        uses: actions/attest@v2
+        uses: actions/attest@v4
         with:
           subject-path: '${{ github.workspace }}/my-app'
-          predicate-type: 'https://example.com/predicate/v1'
-          predicate: '{}'
+```
+
+### SBOM Attestation
+
+To create an SBOM attestation, provide the path to an SPDX or CycloneDX JSON
+file:
+
+```yaml
+- name: Generate SBOM
+  run: syft . -o spdx-json > sbom.spdx.json
+
+- uses: actions/attest@v4
+  with:
+    subject-path: '${{ github.workspace }}/my-app'
+    sbom-path: '${{ github.workspace }}/sbom.spdx.json'
+```
+
+### Custom Attestation
+
+For custom attestations, provide your own predicate type and content:
+
+```yaml
+- uses: actions/attest@v4
+  with:
+    subject-path: '${{ github.workspace }}/my-app'
+    predicate-type: 'https://example.com/predicate/v1'
+    predicate: '{}'
 ```
 
 ### Identify Multiple Subjects
@@ -203,7 +247,7 @@ If you are generating multiple artifacts, you can attest all of them at the same
 time by using a wildcard in the `subject-path` input.
 
 ```yaml
-- uses: actions/attest@v2
+- uses: actions/attest@v4
   with:
     subject-path: 'dist/**/my-bin-*'
     predicate-type: 'https://example.com/predicate/v1'
@@ -217,13 +261,13 @@ Alternatively, you can explicitly list multiple subjects with either a comma or
 newline delimited list:
 
 ```yaml
-- uses: actions/attest@v2
+- uses: actions/attest@v4
   with:
     subject-path: 'dist/foo, dist/bar'
 ```
 
 ```yaml
-- uses: actions/attest@v2
+- uses: actions/attest@v4
   with:
     subject-path: |
       dist/foo
@@ -245,11 +289,9 @@ attestation.
   run: |
     shasum -a 256 foo_0.0.1_* > subject.checksums.txt
 
-- uses: actions/attest@v2
+- uses: actions/attest@v4
   with:
     subject-checksums: subject.checksums.txt
-    predicate-type: 'https://example.com/predicate/v1'
-    predicate: '{}'
 ```
 
 <!-- markdownlint-disable MD038 -->
@@ -322,13 +364,11 @@ jobs:
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
       - name: Attest
-        uses: actions/attest@v2
+        uses: actions/attest@v4
         id: attest
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.push.outputs.digest }}
-          predicate-type: 'https://in-toto.io/attestation/release/v0.1'
-          predicate: '{"purl":"pkg:oci/..."}'
           push-to-registry: true
 ```
 
@@ -343,3 +383,4 @@ jobs:
 [8]: https://github.com/actions/toolkit/tree/main/packages/glob#patterns
 [9]:
   https://docs.github.com/en/actions/security-guides/using-artifact-attestations-to-establish-provenance-for-builds
+[10]: https://slsa.dev/spec/v1.0/provenance
