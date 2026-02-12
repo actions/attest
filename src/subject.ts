@@ -197,7 +197,7 @@ const getSubjectFromChecksumsString = (checksums: string): Subject[] => {
 
     const alg = digestAlgorithm(digest)
 
-    // Only add the subject if it is not already in the list (deduplicate by digest)
+    // Only add the subject if it is not already in the list (deduplicate by name & digest)
     if (!subjects.some(s => s.name === name && s.digest[alg] === digest)) {
       subjects.push({
         name,
