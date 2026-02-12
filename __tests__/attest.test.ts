@@ -1,5 +1,5 @@
-import * as github from '@actions/github'
 import * as attest from '@actions/attest'
+import * as github from '@actions/github'
 import * as oci from '@sigstore/oci'
 import * as localAttest from '../src/attest'
 import { createAttestation, repoOwnerIsOrg } from '../src/attest'
@@ -64,7 +64,7 @@ describe('createAttestation', () => {
   const originalEnv = process.env
   const originalContext = { ...github.context }
 
-  beforeEach(async () => {
+  beforeEach(() => {
     jest.clearAllMocks()
 
     setGHContext({
@@ -104,7 +104,12 @@ describe('createAttestation', () => {
 
     it('skips storage record creation', async () => {
       const createStorageRecordSpy = jest.spyOn(attest, 'createStorageRecord')
-      const subjects = [{ name: subjectName, digest: { sha256: subjectDigest.replace('sha256:', '') } }]
+      const subjects = [
+        {
+          name: subjectName,
+          digest: { sha256: subjectDigest.replace('sha256:', '') }
+        }
+      ]
 
       const result = await createAttestation(subjects, predicate, {
         sigstoreInstance: 'github',
@@ -145,7 +150,12 @@ describe('createAttestation', () => {
     })
 
     it('handles empty storage records gracefully', async () => {
-      const subjects = [{ name: subjectName, digest: { sha256: subjectDigest.replace('sha256:', '') } }]
+      const subjects = [
+        {
+          name: subjectName,
+          digest: { sha256: subjectDigest.replace('sha256:', '') }
+        }
+      ]
 
       // This exercises the empty records code path for coverage
       const result = await createAttestation(subjects, predicate, {

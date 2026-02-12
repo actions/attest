@@ -5,17 +5,17 @@
  * Specifically, the inputs listed in `action.yml` should be set as environment
  * variables following the pattern `INPUT_<INPUT_NAME>`.
  */
+import * as attest from '@actions/attest'
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 import { mockFulcio, mockRekor, mockTSA } from '@sigstore/mock'
 import * as oci from '@sigstore/oci'
-import * as attest from '@actions/attest'
-import * as localAttest from '../src/attest'
 import fs from 'fs/promises'
 import nock from 'nock'
 import os from 'os'
 import path from 'path'
 import { MockAgent, setGlobalDispatcher } from 'undici'
+import * as localAttest from '../src/attest'
 import { SEARCH_PUBLIC_GOOD_URL } from '../src/endpoints'
 import * as main from '../src/main'
 import * as provenance from '../src/provenance'
@@ -501,7 +501,7 @@ describe('action', () => {
       expect(runMock).toHaveReturned()
       expect(setFailedMock).toHaveBeenCalledWith(
         new Error(
-          'Too many subjects specified. The maximum number of subjects is 1024.'
+          'Too many subjects specified (1025). The maximum number of subjects is 1024.'
         )
       )
     })

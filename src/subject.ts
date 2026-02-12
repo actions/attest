@@ -98,7 +98,7 @@ const getSubjectFromPath = async (
 
   if (files.length > MAX_SUBJECT_COUNT) {
     throw new Error(
-      `Too many subjects specified. The maximum number of subjects is ${MAX_SUBJECT_COUNT}.`
+      `Too many subjects specified (${files.length}). The maximum number of subjects is ${MAX_SUBJECT_COUNT}.`
     )
   }
 
