@@ -7,6 +7,7 @@ export type SBOM = {
   object: object
 }
 
+// SBOMs cannot exceed 16MB.
 const MAX_SBOM_SIZE_BYTES = 16 * 1024 * 1024
 
 export const parseSBOMFromPath = async (filePath: string): Promise<SBOM> => {
