@@ -98,7 +98,7 @@ const getSubjectFromPath = async (
 
   if (files.length > MAX_SUBJECT_COUNT) {
     throw new Error(
-      `Too many subjects specified. The maximum number of subjects is ${MAX_SUBJECT_COUNT}.`
+      `Too many subjects specified (${files.length}). The maximum number of subjects is ${MAX_SUBJECT_COUNT}.`
     )
   }
 
@@ -195,10 +195,15 @@ const getSubjectFromChecksumsString = (checksums: string): Subject[] => {
       throw new Error(`Invalid digest: ${digest}`)
     }
 
-    subjects.push({
-      name,
-      digest: { [digestAlgorithm(digest)]: digest }
-    })
+    const alg = digestAlgorithm(digest)
+
+    // Only add the subject if it is not already in the list (deduplicate by name & digest)
+    if (!subjects.some(s => s.name === name && s.digest[alg] === digest)) {
+      subjects.push({
+        name,
+        digest: { [alg]: digest }
+      })
+    }
   }
 
   return subjects

@@ -9,6 +9,7 @@ const inputs: RunInputs = {
   subjectName: core.getInput('subject-name'),
   subjectDigest: core.getInput('subject-digest'),
   subjectChecksums: core.getInput('subject-checksums'),
+  sbomPath: core.getInput('sbom-path'),
   predicateType: core.getInput('predicate-type'),
   predicate: core.getInput('predicate'),
   predicatePath: core.getInput('predicate-path'),
