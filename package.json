@@ -25,7 +25,7 @@
   },
   "scripts": {
     "bundle": "npm run format:write && npm run package",
-    "ci-test": "jest",
+    "ci-test": "NODE_OPTIONS='--experimental-vm-modules' jest",
     "format:write": "prettier --write **/*.ts",
     "format:check": "prettier --check **/*.ts",
     "lint:eslint": "npx eslint",
