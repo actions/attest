@@ -1,6 +1,6 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import fs from 'fs'
+import fs from 'fs/promises'
 import os from 'os'
 import path from 'path'
 import { AttestResult, SigstoreInstance, createAttestation } from './attest'
@@ -90,7 +90,7 @@ export async function run(inputs: RunInputs): Promise<void> {
     // Generate predicate based on attestation type
     const predicate = await getPredicateForType(attestationType, inputs)
 
-    const outputPath = path.join(tempDir(), ATTESTATION_FILE_NAME)
+    const outputPath = path.join(await tempDir(), ATTESTATION_FILE_NAME)
     core.setOutput('bundle-path', outputPath)
 
     const att = await createAttestation(subjects, predicate, {
@@ -103,7 +103,7 @@ export async function run(inputs: RunInputs): Promise<void> {
     logAttestation(subjects, att, sigstoreInstance)
 
     // Write attestation bundle to output file
-    fs.writeFileSync(outputPath, JSON.stringify(att.bundle) + os.EOL, {
+    await fs.writeFile(outputPath, JSON.stringify(att.bundle) + os.EOL, {
       encoding: 'utf-8',
       flag: 'a'
     })
@@ -113,7 +113,7 @@ export async function run(inputs: RunInputs): Promise<void> {
     if (baseDir) {
       const outputSummaryPath = path.join(baseDir, ATTESTATION_PATHS_FILE_NAME)
       // Append the output path to the attestations paths file
-      fs.appendFileSync(outputSummaryPath, outputPath + os.EOL, {
+      await fs.appendFile(outputSummaryPath, outputPath + os.EOL, {
         encoding: 'utf-8',
         flag: 'a'
       })
@@ -221,7 +221,7 @@ const logSummary = async (attestation: AttestResult): Promise<void> => {
   }
 }
 
-const tempDir = (): string => {
+const tempDir = async (): Promise<string> => {
   const basePath = process.env['RUNNER_TEMP']
 
   /* istanbul ignore if */
@@ -229,7 +229,7 @@ const tempDir = (): string => {
     throw new Error('Missing RUNNER_TEMP environment variable')
   }
 
-  return fs.mkdtempSync(path.join(basePath, path.sep))
+  return fs.mkdtemp(path.join(basePath, path.sep))
 }
 
 const attestationURL = (id: string): string =>
