@@ -16,6 +16,7 @@ const startGroupMock = jest.fn()
 const endGroupMock = jest.fn()
 const setOutputMock = jest.fn()
 const setFailedMock = jest.fn()
+const debugMock = jest.fn()
 
 // OCI mocks
 const getRegCredsMock = jest.fn()
@@ -69,6 +70,7 @@ jest.unstable_mockModule('@actions/core', () => ({
   endGroup: endGroupMock,
   setOutput: setOutputMock,
   setFailed: setFailedMock,
+  debug: debugMock,
   summary: summaryMock
 }))
 
