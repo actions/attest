@@ -26,6 +26,7 @@ const attestMock = jest.fn()
 const createStorageRecordMock = jest.fn()
 
 // Local attest mocks
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const createAttestationMock = jest.fn<() => Promise<any>>()
 const repoOwnerIsOrgMock = jest.fn()
 

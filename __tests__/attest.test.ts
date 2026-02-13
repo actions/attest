@@ -2,6 +2,7 @@ import { jest } from '@jest/globals'
 import type { Descriptor } from '@sigstore/oci'
 // Mock functions
 const mockGetOctokit = jest.fn()
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockAttest = jest.fn<() => Promise<any>>()
 const mockCreateStorageRecord = jest.fn<() => Promise<number[]>>()
 const mockGetRegistryCredentials = jest.fn()
@@ -66,6 +67,7 @@ describe('repoOwnerIsOrg', () => {
     mockGetOctokit.mockReturnValue({
       rest: {
         repos: {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           get: jest.fn<() => Promise<any>>().mockResolvedValue({
             data: { owner: { type: 'User' } }
           })
@@ -128,6 +130,7 @@ describe('createAttestation', () => {
       mockGetOctokit.mockReturnValue({
         rest: {
           repos: {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             get: jest.fn<() => Promise<any>>().mockResolvedValue({
               data: { owner: { type: 'Organization' } }
             })
@@ -161,6 +164,7 @@ describe('createAttestation', () => {
       mockGetOctokit.mockReturnValue({
         rest: {
           repos: {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             get: jest.fn<() => Promise<any>>().mockResolvedValue({
               data: { owner: { type: 'Organization' } }
             })
