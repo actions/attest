@@ -5,10 +5,10 @@ import {
   attest,
   createStorageRecord
 } from '@actions/attest'
-import { attachArtifactToImage, getRegistryCredentials } from '@sigstore/oci'
-import { formatSubjectDigest } from './subject'
 import * as core from '@actions/core'
 import * as github from '@actions/github'
+import { attachArtifactToImage, getRegistryCredentials } from '@sigstore/oci'
+import { formatSubjectDigest } from './subject'
 
 const OCI_TIMEOUT = 30000
 const OCI_RETRY = 3

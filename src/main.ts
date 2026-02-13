@@ -13,7 +13,7 @@ import {
 import { SEARCH_PUBLIC_GOOD_URL } from './endpoints'
 import { PredicateInputs, predicateFromInputs } from './predicate'
 import { generateProvenancePredicate } from './provenance'
-import { parseSBOMFromPath, generateSBOMPredicate } from './sbom'
+import { generateSBOMPredicate, parseSBOMFromPath } from './sbom'
 import * as style from './style'
 import {
   SubjectInputs,
@@ -128,6 +128,7 @@ export async function run(inputs: RunInputs): Promise<void> {
       core.setOutput('attestation-id', att.attestationID)
       core.setOutput('attestation-url', attestationURL(att.attestationID))
     }
+
     if (att.storageRecordIds) {
       core.setOutput('storage-record-ids', att.storageRecordIds.join(','))
     }

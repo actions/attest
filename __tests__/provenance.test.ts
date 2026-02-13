@@ -1,9 +1,16 @@
-import { generateProvenancePredicate } from '../src/provenance'
-import { buildSLSAProvenancePredicate } from '@actions/attest'
+import type { Predicate } from '@actions/attest'
+import { jest } from '@jest/globals'
 
-jest.mock('@actions/attest', () => ({
-  buildSLSAProvenancePredicate: jest.fn()
+// Mock function
+const mockBuildSLSAProvenancePredicate = jest.fn<() => Promise<Predicate>>()
+
+// Mock @actions/attest
+jest.unstable_mockModule('@actions/attest', () => ({
+  buildSLSAProvenancePredicate: mockBuildSLSAProvenancePredicate
 }))
+
+// Dynamic import after mocking
+const { generateProvenancePredicate } = await import('../src/provenance')
 
 describe('generateProvenancePredicate', () => {
   const mockPredicate = {
@@ -20,21 +27,19 @@ describe('generateProvenancePredicate', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    ;(buildSLSAProvenancePredicate as jest.Mock).mockResolvedValue(
-      mockPredicate
-    )
+    mockBuildSLSAProvenancePredicate.mockResolvedValue(mockPredicate)
   })
 
   it('returns the SLSA provenance predicate', async () => {
     const result = await generateProvenancePredicate()
 
-    expect(buildSLSAProvenancePredicate).toHaveBeenCalledTimes(1)
+    expect(mockBuildSLSAProvenancePredicate).toHaveBeenCalledTimes(1)
     expect(result).toEqual(mockPredicate)
   })
 
   it('propagates errors from buildSLSAProvenancePredicate', async () => {
     const error = new Error('Failed to build provenance')
-    ;(buildSLSAProvenancePredicate as jest.Mock).mockRejectedValue(error)
+    mockBuildSLSAProvenancePredicate.mockRejectedValue(error)
 
     await expect(generateProvenancePredicate()).rejects.toThrow(
       'Failed to build provenance'
