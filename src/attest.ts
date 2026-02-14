@@ -126,6 +126,7 @@ function getRegistryURL(subjectName: string): string {
     url = new URL(`https://${subjectName}`)
   }
 
+  /* istanbul ignore if */
   if (url.protocol !== 'https:') {
     throw new Error(
       `Unsupported protocol ${url.protocol} in subject name ${subjectName}`
