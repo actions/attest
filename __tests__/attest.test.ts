@@ -1,8 +1,36 @@
-import * as attest from '@actions/attest'
-import * as github from '@actions/github'
-import * as oci from '@sigstore/oci'
-import * as localAttest from '../src/attest'
-import { createAttestation, repoOwnerIsOrg } from '../src/attest'
+import { jest } from '@jest/globals'
+import type { Descriptor } from '@sigstore/oci'
+// Mock functions
+const mockGetOctokit = jest.fn()
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockAttest = jest.fn<() => Promise<any>>()
+const mockCreateStorageRecord = jest.fn<() => Promise<number[]>>()
+const mockGetRegistryCredentials = jest.fn()
+const mockAttachArtifactToImage = jest.fn<() => Promise<Descriptor>>()
+
+// Mock @actions/github
+jest.unstable_mockModule('@actions/github', () => ({
+  getOctokit: mockGetOctokit,
+  context: {
+    repo: { owner: 'foo', repo: 'bar' },
+    payload: { repository: { visibility: 'private' } }
+  }
+}))
+
+// Mock @actions/attest
+jest.unstable_mockModule('@actions/attest', () => ({
+  attest: mockAttest,
+  createStorageRecord: mockCreateStorageRecord
+}))
+
+// Mock @sigstore/oci
+jest.unstable_mockModule('@sigstore/oci', () => ({
+  getRegistryCredentials: mockGetRegistryCredentials,
+  attachArtifactToImage: mockAttachArtifactToImage
+}))
+
+// Dynamic imports after mocking
+const { createAttestation, repoOwnerIsOrg } = await import('../src/attest')
 
 const subjectName = 'ghcr.io/foo/bar'
 const subjectDigest =
@@ -14,46 +42,38 @@ const predicate = {
 }
 
 describe('repoOwnerIsOrg', () => {
-  const originalContext = { ...github.context }
-
-  afterEach(() => {
-    setGHContext(originalContext)
-    jest.restoreAllMocks()
+  beforeEach(() => {
+    jest.clearAllMocks()
   })
 
   it('returns true when repo owner is an organization', async () => {
-    setGHContext({
-      repo: { owner: 'my-org', repo: 'my-repo' }
-    })
-
-    jest.spyOn(github, 'getOctokit').mockReturnValue({
+    mockGetOctokit.mockReturnValue({
       rest: {
         repos: {
-          get: jest.fn().mockResolvedValue({
-            data: { owner: { type: 'Organization' } }
-          })
+          get: jest
+            .fn<() => Promise<{ data: { owner: { type: string } } }>>()
+            .mockResolvedValue({
+              data: { owner: { type: 'Organization' } }
+            })
         }
       }
-    } as unknown as ReturnType<typeof github.getOctokit>)
+    })
 
     const result = await repoOwnerIsOrg('gh-token')
     expect(result).toBe(true)
   })
 
   it('returns false when repo owner is a user', async () => {
-    setGHContext({
-      repo: { owner: 'my-user', repo: 'my-repo' }
-    })
-
-    jest.spyOn(github, 'getOctokit').mockReturnValue({
+    mockGetOctokit.mockReturnValue({
       rest: {
         repos: {
-          get: jest.fn().mockResolvedValue({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          get: jest.fn<() => Promise<any>>().mockResolvedValue({
             data: { owner: { type: 'User' } }
           })
         }
       }
-    } as unknown as ReturnType<typeof github.getOctokit>)
+    })
 
     const result = await repoOwnerIsOrg('gh-token')
     expect(result).toBe(false)
@@ -61,49 +81,31 @@ describe('repoOwnerIsOrg', () => {
 })
 
 describe('createAttestation', () => {
-  const originalEnv = process.env
-  const originalContext = { ...github.context }
-
   beforeEach(() => {
     jest.clearAllMocks()
 
-    setGHContext({
-      payload: { repository: { visibility: 'private' } },
-      repo: { owner: 'foo', repo: 'bar' }
+    // Default mock implementations
+    mockAttest.mockResolvedValue({
+      bundle: { mediaType: 'application/vnd.dev.sigstore.bundle.v0.3+json' },
+      certificate: 'cert',
+      tlogID: 'tlog-123',
+      attestationID: 'att-123'
     })
-  })
 
-  afterEach(() => {
-    process.env = originalEnv
-    setGHContext(originalContext)
+    mockGetRegistryCredentials.mockReturnValue({
+      username: 'user',
+      password: 'pass'
+    })
+
+    mockAttachArtifactToImage.mockResolvedValue({
+      digest: 'sha256:abc123',
+      mediaType: 'application/vnd.dev.sigstore.bundle.v0.3+json',
+      size: 100
+    })
   })
 
   describe('when createStorageRecord is false', () => {
-    beforeEach(() => {
-      // Mock the core attest function
-      jest.spyOn(attest, 'attest').mockResolvedValue({
-        bundle: {
-          mediaType: 'application/vnd.dev.sigstore.bundle.v0.3+json'
-        },
-        certificate: 'cert',
-        tlogID: 'tlog-123',
-        attestationID: 'att-123'
-      } as attest.Attestation)
-
-      // Mock OCI functions
-      jest.spyOn(oci, 'getRegistryCredentials').mockReturnValue({
-        username: 'user',
-        password: 'pass'
-      })
-      jest.spyOn(oci, 'attachArtifactToImage').mockResolvedValue({
-        digest: 'sha256:abc123',
-        mediaType: 'application/vnd.dev.sigstore.bundle.v0.3+json',
-        size: 100
-      })
-    })
-
     it('skips storage record creation', async () => {
-      const createStorageRecordSpy = jest.spyOn(attest, 'createStorageRecord')
       const subjects = [
         {
           name: subjectName,
@@ -119,34 +121,23 @@ describe('createAttestation', () => {
       })
 
       expect(result.attestationDigest).toBe('sha256:abc123')
-      expect(createStorageRecordSpy).not.toHaveBeenCalled()
+      expect(mockCreateStorageRecord).not.toHaveBeenCalled()
     })
   })
 
   describe('when storage records are empty', () => {
     beforeEach(() => {
-      jest.spyOn(attest, 'attest').mockResolvedValue({
-        bundle: { mediaType: 'application/vnd.dev.sigstore.bundle.v0.3+json' },
-        certificate: 'cert',
-        tlogID: 'tlog-123',
-        attestationID: 'att-123'
-      } as attest.Attestation)
-
-      jest.spyOn(oci, 'getRegistryCredentials').mockReturnValue({
-        username: 'user',
-        password: 'pass'
+      mockGetOctokit.mockReturnValue({
+        rest: {
+          repos: {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            get: jest.fn<() => Promise<any>>().mockResolvedValue({
+              data: { owner: { type: 'Organization' } }
+            })
+          }
+        }
       })
-      jest.spyOn(oci, 'attachArtifactToImage').mockResolvedValue({
-        digest: 'sha256:abc123',
-        mediaType: 'application/vnd.dev.sigstore.bundle.v0.3+json',
-        size: 100
-      })
-
-      // Mock repoOwnerIsOrg
-      jest.spyOn(localAttest, 'repoOwnerIsOrg').mockResolvedValue(true)
-
-      // Mock createStorageRecord to return empty array
-      jest.spyOn(attest, 'createStorageRecord').mockResolvedValue([])
+      mockCreateStorageRecord.mockResolvedValue([])
     })
 
     it('handles empty storage records gracefully', async () => {
@@ -157,7 +148,6 @@ describe('createAttestation', () => {
         }
       ]
 
-      // This exercises the empty records code path for coverage
       const result = await createAttestation(subjects, predicate, {
         sigstoreInstance: 'github',
         pushToRegistry: true,
@@ -171,25 +161,17 @@ describe('createAttestation', () => {
 
   describe('when subject has unsupported protocol', () => {
     beforeEach(() => {
-      jest.spyOn(attest, 'attest').mockResolvedValue({
-        bundle: { mediaType: 'application/vnd.dev.sigstore.bundle.v0.3+json' },
-        certificate: 'cert',
-        tlogID: 'tlog-123',
-        attestationID: 'att-123'
-      } as attest.Attestation)
-
-      jest.spyOn(oci, 'getRegistryCredentials').mockReturnValue({
-        username: 'user',
-        password: 'pass'
+      mockGetOctokit.mockReturnValue({
+        rest: {
+          repos: {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            get: jest.fn<() => Promise<any>>().mockResolvedValue({
+              data: { owner: { type: 'Organization' } }
+            })
+          }
+        }
       })
-      jest.spyOn(oci, 'attachArtifactToImage').mockResolvedValue({
-        digest: 'sha256:abc123',
-        mediaType: 'application/vnd.dev.sigstore.bundle.v0.3+json',
-        size: 100
-      })
-
-      // Mock repoOwnerIsOrg
-      jest.spyOn(localAttest, 'repoOwnerIsOrg').mockResolvedValue(true)
+      mockCreateStorageRecord.mockResolvedValue([123])
     })
 
     it('handles unsupported protocol gracefully', async () => {
@@ -200,7 +182,6 @@ describe('createAttestation', () => {
         }
       ]
 
-      // This exercises the unsupported protocol code path for coverage
       const result = await createAttestation(subjects, predicate, {
         sigstoreInstance: 'github',
         pushToRegistry: true,
@@ -208,12 +189,7 @@ describe('createAttestation', () => {
         githubToken: 'gh-token'
       })
 
-      // Should complete without throwing (error is caught and logged as warning)
       expect(result.attestationDigest).toBe('sha256:abc123')
     })
   })
 })
-
-function setGHContext(context: object): void {
-  Object.defineProperty(github, 'context', { value: context })
-}

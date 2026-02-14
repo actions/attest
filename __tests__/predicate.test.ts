@@ -11,33 +11,35 @@ describe('subjectFromInputs', () => {
   }
 
   describe('when no inputs are provided', () => {
-    it('throws an error', () => {
-      expect(() => predicateFromInputs(blankInputs)).toThrow(/predicate-type/i)
+    it('throws an error', async () => {
+      await expect(predicateFromInputs(blankInputs)).rejects.toThrow(
+        /predicate-type/i
+      )
     })
   })
 
   describe('when neither predicate path nor predicate are provided', () => {
-    it('throws an error', () => {
+    it('throws an error', async () => {
       const inputs: PredicateInputs = {
         ...blankInputs,
         predicateType: 'https://example.com/predicate'
       }
 
-      expect(() => predicateFromInputs(inputs)).toThrow(
+      await expect(predicateFromInputs(inputs)).rejects.toThrow(
         /one of predicate-path or predicate must be provided/i
       )
     })
   })
 
   describe('when both predicate path and predicate are provided', () => {
-    it('throws an error', () => {
+    it('throws an error', async () => {
       const inputs: PredicateInputs = {
         predicateType: 'https://example.com/predicate',
         predicate: '{}',
         predicatePath: 'path/to/predicate'
       }
 
-      expect(() => predicateFromInputs(inputs)).toThrow(
+      await expect(predicateFromInputs(inputs)).rejects.toThrow(
         /only one of predicate-path or predicate may be provided/i
       )
     })
@@ -65,13 +67,13 @@ describe('subjectFromInputs', () => {
       await fs.rm(path.parse(predicatePath).dir, { recursive: true })
     })
 
-    it('returns the predicate', () => {
+    it('returns the predicate', async () => {
       const inputs: PredicateInputs = {
         ...blankInputs,
         predicateType,
         predicatePath
       }
-      expect(predicateFromInputs(inputs)).toEqual({
+      await expect(predicateFromInputs(inputs)).resolves.toEqual({
         type: predicateType,
         params: JSON.parse(content)
       })
@@ -82,13 +84,15 @@ describe('subjectFromInputs', () => {
     const predicateType = 'https://example.com/predicate'
     const predicatePath = 'foo'
 
-    it('returns the predicate', () => {
+    it('returns the predicate', async () => {
       const inputs: PredicateInputs = {
         ...blankInputs,
         predicateType,
         predicatePath
       }
-      expect(() => predicateFromInputs(inputs)).toThrow(/file not found/)
+      await expect(predicateFromInputs(inputs)).rejects.toThrow(
+        /file not found/
+      )
     })
   })
 
@@ -96,14 +100,14 @@ describe('subjectFromInputs', () => {
     const predicateType = 'https://example.com/predicate'
     const content = '{}'
 
-    it('returns the predicate', () => {
+    it('returns the predicate', async () => {
       const inputs: PredicateInputs = {
         ...blankInputs,
         predicateType,
         predicate: content
       }
 
-      expect(predicateFromInputs(inputs)).toEqual({
+      await expect(predicateFromInputs(inputs)).resolves.toEqual({
         type: predicateType,
         params: JSON.parse(content)
       })
@@ -114,14 +118,14 @@ describe('subjectFromInputs', () => {
     const predicateType = 'https://example.com/predicate'
     const content = JSON.stringify({ a: 'a'.repeat(16 * 1024 * 1024) })
 
-    it('throws an error', () => {
+    it('throws an error', async () => {
       const inputs: PredicateInputs = {
         ...blankInputs,
         predicateType,
         predicate: content
       }
 
-      expect(() => predicateFromInputs(inputs)).toThrow(
+      await expect(predicateFromInputs(inputs)).rejects.toThrow(
         /predicate string exceeds maximum/
       )
     })

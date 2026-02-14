@@ -2,7 +2,8 @@ import * as glob from '@actions/glob'
 import assert from 'assert'
 import crypto from 'crypto'
 import { parse } from 'csv-parse/sync'
-import fs from 'fs'
+import { createReadStream } from 'fs'
+import fs from 'fs/promises'
 import os from 'os'
 import path from 'path'
 
@@ -64,7 +65,7 @@ export const subjectFromInputs = async (
     case !!subjectDigest:
       return [getSubjectFromDigest(subjectDigest, name)]
     case !!subjectChecksums:
-      return getSubjectFromChecksums(subjectChecksums)
+      return await getSubjectFromChecksums(subjectChecksums)
     /* istanbul ignore next */
     default:
       // This should be unreachable, but TS requires a default case
@@ -94,7 +95,8 @@ const getSubjectFromPath = async (
   const paths = await glob.create(subjectPaths).then(async g => g.glob())
 
   // Filter path list to just the files (not directories)
-  const files = paths.filter(p => fs.statSync(p).isFile())
+  const stats = await Promise.all(paths.map(async p => fs.stat(p)))
+  const files = paths.filter((_, i) => stats[i].isFile())
 
   if (files.length > MAX_SUBJECT_COUNT) {
     throw new Error(
@@ -142,16 +144,21 @@ const getSubjectFromDigest = (
   }
 }
 
-const getSubjectFromChecksums = (subjectChecksums: string): Subject[] => {
-  if (fs.existsSync(subjectChecksums)) {
+const getSubjectFromChecksums = async (
+  subjectChecksums: string
+): Promise<Subject[]> => {
+  try {
+    await fs.access(subjectChecksums)
     return getSubjectFromChecksumsFile(subjectChecksums)
-  } else {
+  } catch {
     return getSubjectFromChecksumsString(subjectChecksums)
   }
 }
 
-const getSubjectFromChecksumsFile = (checksumsPath: string): Subject[] => {
-  const stats = fs.statSync(checksumsPath)
+const getSubjectFromChecksumsFile = async (
+  checksumsPath: string
+): Promise<Subject[]> => {
+  const stats = await fs.stat(checksumsPath)
   if (!stats.isFile()) {
     throw new Error(`subject checksums file not found: ${checksumsPath}`)
   }
@@ -163,7 +170,7 @@ const getSubjectFromChecksumsFile = (checksumsPath: string): Subject[] => {
     )
   }
 
-  const checksums = fs.readFileSync(checksumsPath, 'utf-8')
+  const checksums = await fs.readFile(checksumsPath, 'utf-8')
   return getSubjectFromChecksumsString(checksums)
 }
 
@@ -218,7 +225,7 @@ const digestFile = async (
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
     const hash = crypto.createHash(algorithm).setEncoding('hex')
-    fs.createReadStream(filePath)
+    createReadStream(filePath)
       .once('error', reject)
       .pipe(hash)
       .once('finish', () => resolve(hash.read()))
