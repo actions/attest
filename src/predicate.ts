@@ -38,8 +38,8 @@ export const predicateFromInputs = async (
       throw new Error(`predicate file not found: ${predicatePath}`)
     }
 
-    /* istanbul ignore next */
     const stat = await fs.stat(predicatePath)
+
     /* istanbul ignore next */
     if (stat.size > MAX_PREDICATE_SIZE_BYTES) {
       throw new Error(
