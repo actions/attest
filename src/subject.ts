@@ -99,12 +99,12 @@ const getSubjectFromPath = async (
   for (const p of paths) {
     const stat = await fs.stat(p)
     if (stat.isFile()) {
-      files.push(p)
-      if (files.length > MAX_SUBJECT_COUNT) {
+      if (files.length >= MAX_SUBJECT_COUNT) {
         throw new Error(
-          `Too many subjects specified (${files.length}). The maximum number of subjects is ${MAX_SUBJECT_COUNT}.`
+          `Too many subjects specified (at least ${files.length + 1}). The maximum number of subjects is ${MAX_SUBJECT_COUNT}.`
         )
       }
+      files.push(p)
     }
   }
 
