@@ -11,15 +11,24 @@ export type SBOM = {
 const MAX_SBOM_SIZE_BYTES = 16 * 1024 * 1024
 
 export const parseSBOMFromPath = async (filePath: string): Promise<SBOM> => {
-  const fileContent = await fs.readFile(filePath, 'utf8')
+  let stats
+  try {
+    stats = await fs.stat(filePath)
+  } catch (error) {
+    const err = error as NodeJS.ErrnoException
+    if (err.code === 'ENOENT') {
+      throw new Error('SBOM file not found')
+    }
+    throw error
+  }
 
-  const stats = await fs.stat(filePath)
   if (stats.size > MAX_SBOM_SIZE_BYTES) {
     throw new Error(
       `SBOM file exceeds maximum allowed size: ${MAX_SBOM_SIZE_BYTES} bytes`
     )
   }
 
+  const fileContent = await fs.readFile(filePath, 'utf8')
   const sbom = JSON.parse(fileContent) as object
 
   if (checkIsSPDX(sbom)) {
