@@ -484,7 +484,7 @@ describe('action', () => {
 
       expect(setFailedMock).toHaveBeenCalledWith(
         new Error(
-          'Too many subjects specified (1025). The maximum number of subjects is 1024.'
+          'Too many subjects specified (>1024). The maximum number of subjects is 1024.'
         )
       )
     })
