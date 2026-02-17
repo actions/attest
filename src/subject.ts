@@ -94,14 +94,18 @@ const getSubjectFromPath = async (
   // Expand the globbed paths to a list of actual paths
   const paths = await glob.create(subjectPaths).then(async g => g.glob())
 
-  // Filter path list to just the files (not directories)
-  const stats = await Promise.all(paths.map(async p => fs.stat(p)))
-  const files = paths.filter((_, i) => stats[i].isFile())
-
-  if (files.length > MAX_SUBJECT_COUNT) {
-    throw new Error(
-      `Too many subjects specified (${files.length}). The maximum number of subjects is ${MAX_SUBJECT_COUNT}.`
-    )
+  // Filter path list to just the files (not directories), enforcing the maximum
+  const files: string[] = []
+  for (const p of paths) {
+    const stat = await fs.stat(p)
+    if (stat.isFile()) {
+      files.push(p)
+      if (files.length > MAX_SUBJECT_COUNT) {
+        throw new Error(
+          `Too many subjects specified (${files.length}). The maximum number of subjects is ${MAX_SUBJECT_COUNT}.`
+        )
+      }
+    }
   }
 
   for (const file of files) {
