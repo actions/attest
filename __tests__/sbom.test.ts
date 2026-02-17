@@ -17,7 +17,7 @@ describe('parseSBOMFromPath', () => {
   describe('when file does not exist', () => {
     it('throws an error', async () => {
       await expect(parseSBOMFromPath('/nonexistent/file.json')).rejects.toThrow(
-        /ENOENT/
+        /SBOM file not found/
       )
     })
   })
