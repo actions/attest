@@ -90,7 +90,7 @@ describe('predicateFromInputs', () => {
         predicate: 'not valid json'
       }
 
-      await expect(predicateFromInputs(inputs)).rejects.toThrow()
+      await expect(predicateFromInputs(inputs)).rejects.toThrow(/JSON/)
     })
   })
 
@@ -136,7 +136,7 @@ describe('predicateFromInputs', () => {
         predicatePath: filePath
       }
 
-      await expect(predicateFromInputs(inputs)).rejects.toThrow()
+      await expect(predicateFromInputs(inputs)).rejects.toThrow(/JSON/)
     })
   })
 })

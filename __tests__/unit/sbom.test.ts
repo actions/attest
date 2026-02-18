@@ -38,7 +38,7 @@ describe('parseSBOMFromPath', () => {
       const filePath = path.join(tempDir, 'invalid.json')
       await fs.writeFile(filePath, 'not valid json')
 
-      await expect(parseSBOMFromPath(filePath)).rejects.toThrow()
+      await expect(parseSBOMFromPath(filePath)).rejects.toThrow(/JSON/)
     })
 
     it('should throw when file exceeds maximum size', async () => {
