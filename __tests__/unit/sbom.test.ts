@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals'
 import fs from 'fs/promises'
 import os from 'os'
 import path from 'path'
@@ -17,8 +18,20 @@ describe('parseSBOMFromPath', () => {
   describe('file handling', () => {
     it('should throw when file does not exist', async () => {
       await expect(parseSBOMFromPath('/nonexistent/file.json')).rejects.toThrow(
-        /ENOENT/
+        /SBOM file not found/
       )
+    })
+
+    it('should rethrow non-ENOENT errors', async () => {
+      const statSpy = jest.spyOn(fs, 'stat').mockRejectedValueOnce(
+        Object.assign(new Error('Permission denied'), { code: 'EACCES' })
+      )
+
+      await expect(parseSBOMFromPath('/some/file.json')).rejects.toThrow(
+        /Permission denied/
+      )
+
+      statSpy.mockRestore()
     })
 
     it('should throw when file contains invalid JSON', async () => {
