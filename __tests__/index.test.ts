@@ -1,22 +1,35 @@
 /**
  * Unit tests for the action's entrypoint, src/index.ts
  */
+import { jest } from '@jest/globals'
 
-import * as core from '@actions/core'
-import * as main from '../src/main'
+// Mock functions
+const mockRun = jest.fn()
+const mockGetInput = jest.fn()
+const mockGetBooleanInput = jest.fn()
 
-// Mock the action's entrypoint
-const runMock = jest.spyOn(main, 'run').mockImplementation()
-const getBooleanInputMock = jest.spyOn(core, 'getBooleanInput')
+// Mock @actions/core
+jest.unstable_mockModule('@actions/core', () => ({
+  getInput: mockGetInput,
+  getBooleanInput: mockGetBooleanInput
+}))
+
+// Mock ../src/main
+jest.unstable_mockModule('../src/main', () => ({
+  run: mockRun
+}))
 
 describe('index', () => {
   beforeEach(() => {
-    getBooleanInputMock.mockImplementation(() => false)
+    jest.clearAllMocks()
+    mockGetBooleanInput.mockReturnValue(false)
+    mockGetInput.mockReturnValue('')
   })
-  it('calls run when imported', () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    require('../src/index')
 
-    expect(runMock).toHaveBeenCalled()
+  it('calls run when imported', async () => {
+    // Dynamic import after mocking
+    await import('../src/index')
+
+    expect(mockRun).toHaveBeenCalled()
   })
 })

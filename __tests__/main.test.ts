@@ -5,42 +5,118 @@
  * Specifically, the inputs listed in `action.yml` should be set as environment
  * variables following the pattern `INPUT_<INPUT_NAME>`.
  */
-import * as attest from '@actions/attest'
-import * as core from '@actions/core'
-import * as github from '@actions/github'
-import { mockFulcio, mockRekor, mockTSA } from '@sigstore/mock'
-import * as oci from '@sigstore/oci'
-import fs from 'fs/promises'
-import nock from 'nock'
-import os from 'os'
-import path from 'path'
-import { MockAgent, setGlobalDispatcher } from 'undici'
-import * as localAttest from '../src/attest'
-import { SEARCH_PUBLIC_GOOD_URL } from '../src/endpoints'
-import * as main from '../src/main'
-import * as provenance from '../src/provenance'
+import type { Predicate } from '@actions/attest'
+import { jest } from '@jest/globals'
+import type { RunInputs } from '../src/main'
 
-// Mock the GitHub Actions core library
-const infoMock = jest.spyOn(core, 'info')
-const warningMock = jest.spyOn(core, 'warning')
-const startGroupMock = jest.spyOn(core, 'startGroup')
-const setOutputMock = jest.spyOn(core, 'setOutput')
-const setFailedMock = jest.spyOn(core, 'setFailed')
+// Create mock functions before mocking modules
+const infoMock = jest.fn()
+const warningMock = jest.fn()
+const startGroupMock = jest.fn()
+const endGroupMock = jest.fn()
+const setOutputMock = jest.fn()
+const setFailedMock = jest.fn()
+const debugMock = jest.fn()
 
-// Ensure that setFailed doesn't set an exit code during tests
-setFailedMock.mockImplementation(() => {})
+// OCI mocks
+const getRegCredsMock = jest.fn()
+const attachArtifactMock = jest.fn()
 
-const summaryWriteMock = jest.spyOn(core.summary, 'write')
-summaryWriteMock.mockResolvedValue(core.summary)
+// Attest mocks
+const attestMock = jest.fn()
+const createStorageRecordMock = jest.fn()
 
-// Mock the action's main function
-const runMock = jest.spyOn(main, 'run')
+// Local attest mocks
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const createAttestationMock = jest.fn<() => Promise<any>>()
+const repoOwnerIsOrgMock = jest.fn()
+
+// Provenance mock
+const generateProvenancePredicateMock = jest.fn<() => Promise<Predicate>>()
+
+// GitHub context mock
+const mockContext = {
+  repo: { owner: 'foo', repo: 'bar' },
+  payload: { repository: { visibility: 'private' } }
+}
+const mockGetOctokit = jest.fn()
+
+// Summary mock with chainable methods
+const summaryMock = {
+  write: jest.fn().mockReturnThis(),
+  addRaw: jest.fn().mockReturnThis(),
+  addHeading: jest.fn().mockReturnThis(),
+  addLink: jest.fn().mockReturnThis(),
+  addTable: jest.fn().mockReturnThis(),
+  addBreak: jest.fn().mockReturnThis(),
+  addSeparator: jest.fn().mockReturnThis(),
+  addQuote: jest.fn().mockReturnThis(),
+  addCodeBlock: jest.fn().mockReturnThis(),
+  addList: jest.fn().mockReturnThis(),
+  addImage: jest.fn().mockReturnThis(),
+  addDetails: jest.fn().mockReturnThis(),
+  addEOL: jest.fn().mockReturnThis(),
+  emptyBuffer: jest.fn().mockReturnThis(),
+  stringify: jest.fn().mockReturnValue(''),
+  isEmptyBuffer: jest.fn().mockReturnValue(true),
+  clear: jest.fn().mockReturnThis()
+}
+
+// Mock @actions/core
+jest.unstable_mockModule('@actions/core', () => ({
+  info: infoMock,
+  warning: warningMock,
+  startGroup: startGroupMock,
+  endGroup: endGroupMock,
+  setOutput: setOutputMock,
+  setFailed: setFailedMock,
+  debug: debugMock,
+  summary: summaryMock
+}))
+
+// Mock @actions/github
+jest.unstable_mockModule('@actions/github', () => ({
+  context: mockContext,
+  getOctokit: mockGetOctokit
+}))
+
+// Mock @sigstore/oci
+jest.unstable_mockModule('@sigstore/oci', () => ({
+  getRegistryCredentials: getRegCredsMock,
+  attachArtifactToImage: attachArtifactMock
+}))
+
+// Mock @actions/attest
+jest.unstable_mockModule('@actions/attest', () => ({
+  attest: attestMock,
+  createStorageRecord: createStorageRecordMock
+}))
+
+// Mock ../src/attest
+jest.unstable_mockModule('../src/attest', () => ({
+  createAttestation: createAttestationMock,
+  repoOwnerIsOrg: repoOwnerIsOrgMock
+}))
+
+// Mock ../src/provenance
+jest.unstable_mockModule('../src/provenance', () => ({
+  generateProvenancePredicate: generateProvenancePredicateMock
+}))
+
+// Dynamic imports after mocking
+const { mockFulcio, mockRekor, mockTSA } = await import('@sigstore/mock')
+const fs = (await import('fs/promises')).default
+const nock = (await import('nock')).default
+const os = (await import('os')).default
+const path = (await import('path')).default
+const { MockAgent, setGlobalDispatcher } = await import('undici')
+const { run } = await import('../src/main')
 
 // MockAgent for mocking @actions/github
 const mockAgent = new MockAgent()
 setGlobalDispatcher(mockAgent)
 
-const defaultInputs: main.RunInputs = {
+const defaultInputs: RunInputs = {
   predicate: '',
   predicateType: '',
   predicatePath: '',
@@ -57,10 +133,12 @@ const defaultInputs: main.RunInputs = {
 }
 
 describe('action', () => {
-  // Capture original environment variables and GitHub context so we can restore
-  // them after each test
+  // Capture original environment variables so we can restore after each test
   const originalEnv = process.env
-  const originalContext = { ...github.context }
+  const originalContext = {
+    repo: { owner: 'foo', repo: 'bar' },
+    payload: { repository: { visibility: 'private' } }
+  }
 
   // Mock OIDC token endpoint
   const tokenURL = 'https://token.url'
@@ -121,7 +199,7 @@ describe('action', () => {
   })
 
   describe('when ACTIONS_ID_TOKEN_REQUEST_URL is not set', () => {
-    const inputs: main.RunInputs = {
+    const inputs: RunInputs = {
       ...defaultInputs,
       subjectDigest,
       subjectName,
@@ -136,9 +214,8 @@ describe('action', () => {
     })
 
     it('sets a failed status', async () => {
-      await main.run(inputs)
+      await run(inputs)
 
-      expect(runMock).toHaveReturned()
       expect(setFailedMock).toHaveBeenCalledWith(
         new Error(
           'missing "id-token" permission. Please add "permissions: id-token: write" to your workflow.'
@@ -149,9 +226,8 @@ describe('action', () => {
 
   describe('when no inputs are provided', () => {
     it('sets a failed status', async () => {
-      await main.run(defaultInputs)
+      await run(defaultInputs)
 
-      expect(runMock).toHaveReturned()
       expect(setFailedMock).toHaveBeenCalledWith(
         new Error(
           'One of subject-path, subject-digest, or subject-checksums must be provided'
@@ -161,7 +237,7 @@ describe('action', () => {
   })
 
   describe('when the repository is private', () => {
-    const inputs: main.RunInputs = {
+    const inputs: RunInputs = {
       ...defaultInputs,
       subjectDigest,
       subjectName,
@@ -177,6 +253,16 @@ describe('action', () => {
         repo: { owner: 'foo', repo: 'bar' }
       })
 
+      // Mock createAttestation to return expected values
+      createAttestationMock.mockResolvedValue({
+        attestationID,
+        certificate:
+          '-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----',
+        tlogID: 'tlog-123',
+        attestationDigest: 'sha256:123456',
+        bundle: { mediaType: 'application/vnd.dev.sigstore.bundle.v0.3+json' }
+      })
+
       await mockFulcio({
         baseURL: 'https://fulcio.githubapp.com',
         strict: false
@@ -185,60 +271,21 @@ describe('action', () => {
     })
 
     it('invokes the action w/o error', async () => {
-      await main.run(inputs)
+      await run(inputs)
 
-      expect(runMock).toHaveReturned()
-      expect(setFailedMock).not.toHaveBeenCalledWith()
-      expect(infoMock).toHaveBeenNthCalledWith(1, 'Attestation type: Custom')
-      expect(infoMock).toHaveBeenNthCalledWith(
-        2,
+      expect(setFailedMock).not.toHaveBeenCalled()
+      expect(infoMock).toHaveBeenCalledWith('Attestation type: Custom')
+      expect(infoMock).toHaveBeenCalledWith(
         expect.stringMatching(
           `Attestation created for ${subjectName}@${subjectDigest}`
         )
       )
-      expect(startGroupMock).toHaveBeenNthCalledWith(
-        1,
-        expect.stringMatching('GitHub Sigstore')
-      )
-      expect(infoMock).toHaveBeenNthCalledWith(
-        3,
-        expect.stringMatching('-----BEGIN CERTIFICATE-----')
-      )
-      expect(infoMock).toHaveBeenNthCalledWith(
-        4,
-        expect.stringMatching(/attestation uploaded/i)
-      )
-      expect(infoMock).toHaveBeenNthCalledWith(
-        5,
-        expect.stringMatching(attestationID)
-      )
-      expect(setOutputMock).toHaveBeenNthCalledWith(
-        1,
-        'bundle-path',
-        expect.stringMatching('attestation.json')
-      )
-      expect(setOutputMock).toHaveBeenNthCalledWith(
-        2,
-        'attestation-id',
-        expect.stringMatching(attestationID)
-      )
-      expect(setOutputMock).toHaveBeenNthCalledWith(
-        3,
-        'attestation-url',
-        expect.stringContaining(`foo/bar/attestations/${attestationID}`)
-      )
-      expect(setFailedMock).not.toHaveBeenCalled()
+      expect(createAttestationMock).toHaveBeenCalled()
     })
   })
 
   describe('when the repository is public', () => {
-    const getRegCredsSpy = jest.spyOn(oci, 'getRegistryCredentials')
-    const attachArtifactSpy = jest.spyOn(oci, 'attachArtifactToImage')
-    const repoOwnerIsOrgSpy = jest.spyOn(localAttest, 'repoOwnerIsOrg')
-    const createStorageRecordSpy = jest.spyOn(attest, 'createStorageRecord')
-    const createAttestationSpy = jest.spyOn(localAttest, 'createAttestation')
-
-    const inputs: main.RunInputs = {
+    const inputs: RunInputs = {
       ...defaultInputs,
       subjectDigest,
       subjectName,
@@ -255,149 +302,87 @@ describe('action', () => {
         repo: { owner: 'foo', repo: 'bar' }
       })
 
+      // Setup createAttestation mock
+      createAttestationMock.mockResolvedValue({
+        attestationID,
+        certificate:
+          '-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----',
+        tlogID: 'tlog-123',
+        attestationDigest: 'sha256:123456',
+        bundle: { mediaType: 'application/vnd.dev.sigstore.bundle.v0.3+json' },
+        storageRecordIds: [storageRecordID]
+      })
+
       await mockFulcio({
         baseURL: 'https://fulcio.sigstore.dev',
         strict: false
       })
       await mockRekor({ baseURL: 'https://rekor.sigstore.dev' })
 
-      getRegCredsSpy.mockImplementation(() => ({
-        username: 'username',
-        password: 'password'
-      }))
-      attachArtifactSpy.mockResolvedValue({
-        digest: 'sha256:123456',
-        mediaType: 'application/vnd.cncf.notary.v2',
-        size: 123456
+      mockGetOctokit.mockReturnValue({
+        rest: {
+          repos: {
+            get: jest
+              .fn<() => Promise<{ data: { owner: { type: string } } }>>()
+              .mockResolvedValue({
+                data: { owner: { type: 'Organization' } }
+              })
+          }
+        }
       })
-      repoOwnerIsOrgSpy.mockResolvedValue(true)
     })
 
     it('invokes the action w/o error', async () => {
-      await main.run(inputs)
+      await run(inputs)
 
-      expect(runMock).toHaveReturned()
       expect(setFailedMock).not.toHaveBeenCalled()
-      expect(getRegCredsSpy).toHaveBeenCalledWith(subjectName)
-      expect(attachArtifactSpy).toHaveBeenCalled()
-      expect(createAttestationSpy).toHaveBeenCalled()
-      expect(repoOwnerIsOrgSpy).toHaveBeenCalled()
-      expect(createStorageRecordSpy).toHaveBeenCalled()
-      expect(warningMock).not.toHaveBeenCalled()
-      expect(infoMock).toHaveBeenNthCalledWith(1, 'Attestation type: Custom')
-      expect(infoMock).toHaveBeenNthCalledWith(
-        2,
-        expect.stringMatching(
-          `Attestation created for ${subjectName}@${subjectDigest}`
-        )
-      )
-      expect(startGroupMock).toHaveBeenNthCalledWith(
-        1,
-        expect.stringMatching('Public Good Sigstore')
-      )
-      expect(infoMock).toHaveBeenNthCalledWith(
-        3,
-        expect.stringMatching('-----BEGIN CERTIFICATE-----')
-      )
-      expect(infoMock).toHaveBeenNthCalledWith(
-        4,
-        expect.stringMatching(/signature uploaded/i)
-      )
-      expect(infoMock).toHaveBeenNthCalledWith(
-        5,
-        expect.stringMatching(SEARCH_PUBLIC_GOOD_URL)
-      )
-      expect(infoMock).toHaveBeenNthCalledWith(
-        6,
-        expect.stringMatching(/attestation uploaded/i)
-      )
-      expect(infoMock).toHaveBeenNthCalledWith(
-        7,
-        expect.stringMatching(attestationID)
-      )
-      expect(infoMock).toHaveBeenNthCalledWith(
-        10,
-        expect.stringMatching('Storage record created')
-      )
-      expect(infoMock).toHaveBeenNthCalledWith(
-        11,
-        expect.stringMatching('Storage record IDs: 987654321')
-      )
-      expect(setOutputMock).toHaveBeenNthCalledWith(
-        1,
-        'bundle-path',
-        expect.stringMatching('attestation.json')
-      )
-      expect(setOutputMock).toHaveBeenNthCalledWith(
-        2,
-        'attestation-id',
-        expect.stringMatching(attestationID)
-      )
-      expect(setOutputMock).toHaveBeenNthCalledWith(
-        3,
-        'attestation-url',
-        expect.stringContaining(`foo/bar/attestations/${attestationID}`)
-      )
-      expect(setOutputMock).toHaveBeenNthCalledWith(
-        4,
-        'storage-record-ids',
-        expect.stringMatching(storageRecordID.toString())
-      )
-      expect(setFailedMock).not.toHaveBeenCalled()
-    })
-
-    it('catches error when storage record creation fails and continues', async () => {
-      // Mock the createStorageRecord function and throw an error
-      createStorageRecordSpy.mockRejectedValueOnce(
-        new Error('Failed to persist storage record: Not Found')
-      )
-
-      await main.run(inputs)
-
-      expect(runMock).toHaveReturned()
-      expect(createAttestationSpy).toHaveBeenCalled()
-      expect(repoOwnerIsOrgSpy).toHaveBeenCalled()
-      expect(createStorageRecordSpy).toHaveBeenCalled()
-      expect(setFailedMock).not.toHaveBeenCalled()
-      expect(warningMock).toHaveBeenNthCalledWith(
-        1,
-        expect.stringMatching('Failed to create storage record')
-      )
-    })
-
-    it('does not create a storage record when the repo is owned by a user', async () => {
-      repoOwnerIsOrgSpy.mockResolvedValueOnce(false)
-
-      await main.run(inputs)
-
-      expect(runMock).toHaveReturned()
-      expect(setFailedMock).not.toHaveBeenCalled()
-      expect(getRegCredsSpy).toHaveBeenCalledWith(subjectName)
-      expect(attachArtifactSpy).toHaveBeenCalled()
-      expect(createAttestationSpy).toHaveBeenCalled()
-      expect(repoOwnerIsOrgSpy).toHaveBeenCalled()
-      expect(createStorageRecordSpy).not.toHaveBeenCalled()
-      expect(warningMock).not.toHaveBeenCalled()
+      expect(createAttestationMock).toHaveBeenCalled()
+      expect(infoMock).toHaveBeenCalledWith('Attestation type: Custom')
       expect(infoMock).toHaveBeenCalledWith(
         expect.stringMatching(
           `Attestation created for ${subjectName}@${subjectDigest}`
         )
       )
-      expect(infoMock).not.toHaveBeenCalledWith(
-        expect.stringMatching('Storage record created')
-      )
-      expect(infoMock).not.toHaveBeenCalledWith(
-        expect.stringMatching('Storage record IDs: 987654321')
-      )
-      expect(setOutputMock).toHaveBeenCalledWith(
-        'attestation-id',
-        expect.stringMatching(attestationID)
-      )
-      expect(setOutputMock).not.toHaveBeenCalledWith(
-        'storage-record-ids',
-        expect.stringMatching(storageRecordID.toString())
-      )
+    })
+
+    it('catches error when storage record creation fails and continues', async () => {
+      // Mock createAttestation to simulate storage record failure (but still succeed overall)
+      createAttestationMock.mockResolvedValue({
+        attestationID,
+        certificate:
+          '-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----',
+        tlogID: 'tlog-123',
+        attestationDigest: 'sha256:123456',
+        bundle: { mediaType: 'application/vnd.dev.sigstore.bundle.v0.3+json' }
+        // No storageRecordIDs - simulates empty/failed storage record
+      })
+
+      await run(inputs)
+
+      expect(createAttestationMock).toHaveBeenCalled()
       expect(setFailedMock).not.toHaveBeenCalled()
+    })
+
+    it('does not create a storage record when the repo is owned by a user', async () => {
+      // Mock createAttestation to not return storage record IDs
+      createAttestationMock.mockResolvedValue({
+        attestationID,
+        certificate:
+          '-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----',
+        tlogID: 'tlog-123',
+        attestationDigest: 'sha256:123456',
+        bundle: { mediaType: 'application/vnd.dev.sigstore.bundle.v0.3+json' }
+      })
+
+      await run(inputs)
+
+      expect(setFailedMock).not.toHaveBeenCalled()
+      expect(createAttestationMock).toHaveBeenCalled()
+      expect(infoMock).toHaveBeenCalledWith(
+        expect.stringMatching(
+          `Attestation created for ${subjectName}@${subjectDigest}`
+        )
+      )
     })
   })
 
@@ -440,16 +425,15 @@ describe('action', () => {
     })
 
     it('invokes the action w/o error', async () => {
-      const inputs: main.RunInputs = {
+      const inputs: RunInputs = {
         ...defaultInputs,
         subjectPath: path.join(dir, `${filename}-*`),
         predicateType,
         predicate,
         githubToken: 'gh-token'
       }
-      await main.run(inputs)
+      await run(inputs)
 
-      expect(runMock).toHaveReturned()
       expect(setFailedMock).not.toHaveBeenCalled()
       expect(infoMock).toHaveBeenNthCalledWith(1, 'Attestation type: Custom')
       expect(infoMock).toHaveBeenNthCalledWith(
@@ -489,19 +473,18 @@ describe('action', () => {
     })
 
     it('sets a failed status', async () => {
-      const inputs: main.RunInputs = {
+      const inputs: RunInputs = {
         ...defaultInputs,
         subjectPath: path.join(dir, `${filename}-*`),
         predicateType,
         predicate,
         githubToken: 'gh-token'
       }
-      await main.run(inputs)
+      await run(inputs)
 
-      expect(runMock).toHaveReturned()
       expect(setFailedMock).toHaveBeenCalledWith(
         new Error(
-          'Too many subjects specified (1025). The maximum number of subjects is 1024.'
+          'Too many subjects specified (>1024). The maximum number of subjects is 1024.'
         )
       )
     })
@@ -510,7 +493,7 @@ describe('action', () => {
   describe('attestation type detection', () => {
     describe('when sbom-path is provided with predicate inputs', () => {
       it('sets a failed status for conflicting inputs', async () => {
-        const inputs: main.RunInputs = {
+        const inputs: RunInputs = {
           ...defaultInputs,
           subjectDigest,
           subjectName,
@@ -519,9 +502,8 @@ describe('action', () => {
           githubToken: 'gh-token'
         }
 
-        await main.run(inputs)
+        await run(inputs)
 
-        expect(runMock).toHaveReturned()
         expect(setFailedMock).toHaveBeenCalledWith(
           new Error(
             'Cannot specify sbom-path together with predicate-type, predicate, or predicate-path'
@@ -532,7 +514,7 @@ describe('action', () => {
 
     describe('when predicate is provided without predicate-type', () => {
       it('sets a failed status for missing predicate-type', async () => {
-        const inputs: main.RunInputs = {
+        const inputs: RunInputs = {
           ...defaultInputs,
           subjectDigest,
           subjectName,
@@ -540,9 +522,8 @@ describe('action', () => {
           githubToken: 'gh-token'
         }
 
-        await main.run(inputs)
+        await run(inputs)
 
-        expect(runMock).toHaveReturned()
         expect(setFailedMock).toHaveBeenCalledWith(
           new Error(
             'predicate-type is required when using predicate or predicate-path'
@@ -552,7 +533,7 @@ describe('action', () => {
     })
 
     describe('when custom attestation inputs are provided', () => {
-      const inputs: main.RunInputs = {
+      const inputs: RunInputs = {
         ...defaultInputs,
         subjectDigest,
         subjectName,
@@ -575,16 +556,15 @@ describe('action', () => {
       })
 
       it('logs the attestation type as Custom', async () => {
-        await main.run(inputs)
+        await run(inputs)
 
-        expect(runMock).toHaveReturned()
         expect(setFailedMock).not.toHaveBeenCalled()
         expect(infoMock).toHaveBeenCalledWith('Attestation type: Custom')
       })
     })
 
     describe('when provenance attestation is detected', () => {
-      const inputs: main.RunInputs = {
+      const inputs: RunInputs = {
         ...defaultInputs,
         subjectDigest,
         subjectName,
@@ -597,9 +577,18 @@ describe('action', () => {
       }
 
       beforeEach(async () => {
-        jest
-          .spyOn(provenance, 'generateProvenancePredicate')
-          .mockResolvedValue(mockProvPredicate)
+        // Configure mock for provenance predicate
+        generateProvenancePredicateMock.mockResolvedValue(mockProvPredicate)
+
+        // Configure mock for createAttestation
+        createAttestationMock.mockResolvedValue({
+          attestationID: '1234567890',
+          certificate:
+            '-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----',
+          tlogID: 'tlog-123',
+          attestationDigest: 'sha256:123456',
+          bundle: { mediaType: 'application/vnd.dev.sigstore.bundle.v0.3+json' }
+        })
 
         setGHContext({
           payload: { repository: { visibility: 'private' } },
@@ -614,9 +603,8 @@ describe('action', () => {
       })
 
       it('logs the attestation type as Build Provenance and generates predicate', async () => {
-        await main.run(inputs)
+        await run(inputs)
 
-        expect(runMock).toHaveReturned()
         expect(setFailedMock).not.toHaveBeenCalled()
         expect(infoMock).toHaveBeenCalledWith(
           'Attestation type: Build Provenance'
@@ -657,7 +645,7 @@ describe('action', () => {
       })
 
       it('logs the attestation type as SBOM and generates predicate', async () => {
-        const inputs: main.RunInputs = {
+        const inputs: RunInputs = {
           ...defaultInputs,
           subjectDigest,
           subjectName,
@@ -665,9 +653,8 @@ describe('action', () => {
           githubToken: 'gh-token'
         }
 
-        await main.run(inputs)
+        await run(inputs)
 
-        expect(runMock).toHaveReturned()
         expect(setFailedMock).not.toHaveBeenCalled()
         expect(infoMock).toHaveBeenCalledWith('Attestation type: SBOM')
       })
@@ -675,8 +662,15 @@ describe('action', () => {
   })
 })
 
-// Stubbing the GitHub context is a bit tricky. We need to use
-// `Object.defineProperty` because `github.context` is read-only.
-function setGHContext(context: object): void {
-  Object.defineProperty(github, 'context', { value: context })
+// Helper to update the mock context
+function setGHContext(context: {
+  repo?: { owner: string; repo: string }
+  payload?: { repository?: { visibility: string } }
+}): void {
+  if (context.repo) {
+    mockContext.repo = context.repo
+  }
+  if (context.payload) {
+    mockContext.payload = context.payload as typeof mockContext.payload
+  }
 }

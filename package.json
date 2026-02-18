@@ -4,6 +4,7 @@
   "version": "3.2.0",
   "author": "",
   "private": true,
+  "type": "module",
   "homepage": "https://github.com/actions/attest",
   "repository": {
     "type": "git",
@@ -24,7 +25,7 @@
   },
   "scripts": {
     "bundle": "npm run format:write && npm run package",
-    "ci-test": "jest",
+    "ci-test": "NODE_OPTIONS='--experimental-vm-modules' jest",
     "format:write": "prettier --write **/*.ts",
     "format:check": "prettier --check **/*.ts",
     "lint:eslint": "npx eslint",
@@ -32,12 +33,15 @@
     "lint": "npm run lint:eslint && npm run lint:markdown",
     "package": "ncc build src/index.ts --license licenses.txt",
     "package:watch": "npm run package -- --watch",
-    "test": "jest",
+    "test": "NODE_OPTIONS='--experimental-vm-modules' jest",
     "all": "npm run format:write && npm run lint && npm run test && npm run package"
   },
   "license": "MIT",
   "jest": {
-    "preset": "ts-jest",
+    "preset": "ts-jest/presets/default-esm",
+    "extensionsToTreatAsEsm": [
+      ".ts"
+    ],
     "setupFilesAfterEnv": [
       "./jest.setup.js"
     ],
@@ -56,7 +60,12 @@
       "/dist/"
     ],
     "transform": {
-      "^.+\\.ts$": "ts-jest"
+      "^.+\\.ts$": [
+        "ts-jest",
+        {
+          "useESM": true
+        }
+      ]
     },
     "coverageReporters": [
       "json-summary",
@@ -69,15 +78,16 @@
     ]
   },
   "dependencies": {
-    "@actions/attest": "^2.2.1",
-    "@actions/core": "^2.0.2",
-    "@actions/github": "^7.0.0",
-    "@actions/glob": "^0.5.0",
+    "@actions/attest": "^3.0.0",
+    "@actions/core": "^3.0.0",
+    "@actions/github": "^9.0.0",
+    "@actions/glob": "^0.6.1",
     "@sigstore/oci": "^0.6.0",
     "csv-parse": "^5.6.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "@jest/globals": "^30.2.0",
     "@sigstore/mock": "^0.11.0",
     "@types/jest": "^30.0.0",
     "@types/make-fetch-happen": "^10.0.4",

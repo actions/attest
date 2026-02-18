@@ -1,4 +1,4 @@
-import fs from 'fs'
+import fs from 'fs/promises'
 
 import type { Predicate } from '@actions/attest'
 
@@ -12,7 +12,9 @@ const MAX_PREDICATE_SIZE_BYTES = 16 * 1024 * 1024
 
 // Returns the predicate specified by the action's inputs. The predicate value
 // may be specified as a path to a file or as a string.
-export const predicateFromInputs = (inputs: PredicateInputs): Predicate => {
+export const predicateFromInputs = async (
+  inputs: PredicateInputs
+): Promise<Predicate> => {
   const { predicateType, predicate, predicatePath } = inputs
 
   if (!predicateType) {
@@ -30,18 +32,22 @@ export const predicateFromInputs = (inputs: PredicateInputs): Predicate => {
   let params: string = predicate
 
   if (predicatePath) {
-    if (!fs.existsSync(predicatePath)) {
+    try {
+      await fs.access(predicatePath)
+    } catch {
       throw new Error(`predicate file not found: ${predicatePath}`)
     }
 
+    const stat = await fs.stat(predicatePath)
+
     /* istanbul ignore next */
-    if (fs.statSync(predicatePath).size > MAX_PREDICATE_SIZE_BYTES) {
+    if (stat.size > MAX_PREDICATE_SIZE_BYTES) {
       throw new Error(
         `predicate file exceeds maximum allowed size: ${MAX_PREDICATE_SIZE_BYTES} bytes`
       )
     }
 
-    params = fs.readFileSync(predicatePath, 'utf-8')
+    params = await fs.readFile(predicatePath, 'utf-8')
   } else {
     if (predicate.length > MAX_PREDICATE_SIZE_BYTES) {
       throw new Error(
