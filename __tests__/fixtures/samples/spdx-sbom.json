@@ -1,0 +1,15 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "test-package",
+  "dataLicense": "CC0-1.0",
+  "documentNamespace": "https://example.com/test-package",
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-Package",
+      "name": "test-package",
+      "versionInfo": "1.0.0",
+      "downloadLocation": "https://example.com/test-package-1.0.0.tar.gz"
+    }
+  ]
+}

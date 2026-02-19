@@ -1,0 +1,9 @@
+{
+  "buildType": "https://example.com/build/v1",
+  "builder": {
+    "id": "https://github.com/actions/runner"
+  },
+  "metadata": {
+    "buildStartedOn": "2024-01-01T00:00:00Z"
+  }
+}

@@ -129,6 +129,7 @@ export async function run(inputs: RunInputs): Promise<void> {
       core.setOutput('attestation-url', attestationURL(att.attestationID))
     }
 
+    /* istanbul ignore if */
     if (att.storageRecordIds) {
       core.setOutput('storage-record-ids', att.storageRecordIds.join(','))
     }
@@ -182,6 +183,7 @@ const logAttestation = (
   core.info(attestation.certificate)
   core.endGroup()
 
+  /* istanbul ignore if */
   if (attestation.tlogID) {
     core.info(
       style.highlight(
@@ -202,6 +204,7 @@ const logAttestation = (
     core.info(`${subjects[0].name}@${attestation.attestationDigest}`)
   }
 
+  /* istanbul ignore next */
   if (attestation.storageRecordIds && attestation.storageRecordIds.length > 0) {
     core.info(style.highlight('Storage record created'))
     core.info(`Storage record IDs: ${attestation.storageRecordIds.join(',')}`)

@@ -1,6 +1,3 @@
-/**
- * Unit tests for the action's entrypoint, src/index.ts
- */
 import { jest } from '@jest/globals'
 
 // Mock functions
@@ -22,14 +19,53 @@ jest.unstable_mockModule('../src/main', () => ({
 describe('index', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    mockGetBooleanInput.mockReturnValue(false)
     mockGetInput.mockReturnValue('')
+    mockGetBooleanInput.mockReturnValue(false)
   })
 
-  it('calls run when imported', async () => {
-    // Dynamic import after mocking
+  it('should call run with inputs from core.getInput', async () => {
+    mockGetInput.mockImplementation((name: string) => {
+      const inputs: Record<string, string> = {
+        'subject-path': '/path/to/subject',
+        'subject-name': 'my-artifact',
+        'subject-digest': '',
+        'subject-checksums': '',
+        'predicate-type': 'https://example.com/predicate',
+        predicate: '{}',
+        'predicate-path': '',
+        'sbom-path': '',
+        'github-token': 'test-token'
+      }
+      return inputs[name] || ''
+    })
+
+    mockGetBooleanInput.mockImplementation((name: string) => {
+      const inputs: Record<string, boolean> = {
+        'push-to-registry': false,
+        'create-storage-record': true,
+        'show-summary': true,
+        'private-signing': false
+      }
+      return inputs[name] || false
+    })
+
+    // Dynamic import triggers the module
     await import('../src/index')
 
-    expect(mockRun).toHaveBeenCalled()
+    expect(mockRun).toHaveBeenCalledWith({
+      subjectPath: '/path/to/subject',
+      subjectName: 'my-artifact',
+      subjectDigest: '',
+      subjectChecksums: '',
+      predicateType: 'https://example.com/predicate',
+      predicate: '{}',
+      predicatePath: '',
+      sbomPath: '',
+      githubToken: 'test-token',
+      pushToRegistry: false,
+      createStorageRecord: true,
+      showSummary: true,
+      privateSigning: false
+    })
   })
 })

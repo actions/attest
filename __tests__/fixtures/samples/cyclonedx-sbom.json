@@ -1,0 +1,13 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.4",
+  "serialNumber": "urn:uuid:12345678-1234-1234-1234-123456789012",
+  "version": 1,
+  "components": [
+    {
+      "type": "library",
+      "name": "test-component",
+      "version": "1.0.0"
+    }
+  ]
+}
