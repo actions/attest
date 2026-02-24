@@ -1,7 +1,7 @@
 {
   "name": "actions/attest",
   "description": "Generate signed attestations for workflow artifacts",
-  "version": "3.2.0",
+  "version": "4.0.0",
   "author": "",
   "private": true,
   "type": "module",
