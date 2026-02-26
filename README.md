@@ -48,11 +48,11 @@ the inputs you provide:
 
 <!-- markdownlint-disable MD013 -->
 
-| Mode           | When Used                                              | Description                                      |
-| -------------- | ------------------------------------------------------ | ------------------------------------------------ |
-| **Provenance** | No `sbom-path` or predicate inputs                     | Auto-generates [SLSA build provenance][10]       |
-| **SBOM**       | `sbom-path` is provided                                | Creates attestation from SPDX or CycloneDX SBOM  |
-| **Custom**     | `predicate-type`/`predicate`/`predicate-path` provided | User-supplied predicate                          |
+| Mode           | When Used                                              | Description                                     |
+| -------------- | ------------------------------------------------------ | ----------------------------------------------- |
+| **Provenance** | No `sbom-path` or predicate inputs                     | Auto-generates [SLSA build provenance][10]      |
+| **SBOM**       | `sbom-path` is provided                                | Creates attestation from SPDX or CycloneDX SBOM |
+| **Custom**     | `predicate-type`/`predicate`/`predicate-path` provided | User-supplied predicate                         |
 
 <!-- markdownlint-enable MD013 -->
 
@@ -159,7 +159,7 @@ See [action.yml](action.yml)
 <!-- markdownlint-disable MD013 -->
 
 | Name                 | Description                                                    | Example                                          |
-| -------------------  | -------------------------------------------------------------- | ------------------------------------------------ |
+| -------------------- | -------------------------------------------------------------- | ------------------------------------------------ |
 | `attestation-id`     | GitHub ID for the attestation                                  | `123456`                                         |
 | `attestation-url`    | URL for the attestation summary                                | `https://github.com/foo/bar/attestations/123456` |
 | `bundle-path`        | Absolute path to the file containing the generated attestation | `/tmp/attestation.json`                          |
@@ -320,9 +320,25 @@ fully-qualified image name (e.g. "ghcr.io/user/app" or
 "acme.azurecr.io/user/app"). Do NOT include a tag as part of the image name --
 the specific image being attested is identified by the supplied digest.
 
-If the `push-to-registry` option is set to true, the Action will also
-emit an Artifact Metadata Storage Record. If you do not want to emit a
-storage record, set `create-storage-record` to `false`.
+#### Artifact Metadata Storage Records
+
+When generating a build provenance attestation, if the `push-to-registry` option
+is set to true, the Action will also emit an
+[Artifact Metadata Storage Record](https://docs.github.com/en/rest/orgs/artifact-metadata?apiVersion=2022-11-28#create-artifact-metadata-storage-record).
+Storage records enrich artifact metadata by capturing storage related details,
+such as which registry an image is hosted on and whether it's marked as active.
+
+If you do not want to emit a storage record, set `create-storage-record` to
+`false`.
+
+> **NOTE**: Storage records can only be created for artifacts built from
+> [organization-owned](https://docs.github.com/en/organizations/collaborating-with-groups-in-organizations/about-organizations)
+> repositories.
+
+Artifacts associated with a storage record can be viewed by navigating to the
+`Linked Artifacts` page in your organization:
+`https://github.com/orgs/YOUR_ORG/artifacts` (replace `YOUR_ORG` with your
+organization name).
 
 > **NOTE**: When pushing to Docker Hub, please use "docker.io" as the registry
 > portion of the image name.
