@@ -78,7 +78,7 @@
     ]
   },
   "dependencies": {
-    "@actions/attest": "^3.1.0",
+    "@actions/attest": "^3.2.0",
     "@actions/core": "^3.0.0",
     "@actions/github": "^9.0.0",
     "@actions/glob": "^0.6.1",
