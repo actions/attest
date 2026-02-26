@@ -30,6 +30,11 @@ inputs:
       attestation. Must specify exactly one of "subject-path", "subject-digest",
       or "subject-checksums".
     required: false
+  subject-version:
+    description: >
+      Version of the subject for the attestation. Only used when
+      "push-to-registry" and "create-storage-record" are both set to true.
+    required: false
   sbom-path:
     description: >
       Path to the JSON-formatted SBOM file (SPDX or CycloneDX) to attest.

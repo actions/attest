@@ -35,6 +35,7 @@ export type RunInputs = SubjectInputs &
   SBOMInputs & {
     pushToRegistry: boolean
     createStorageRecord: boolean
+    subjectVersion: string
     githubToken: string
     showSummary: boolean
     privateSigning: boolean
@@ -97,6 +98,7 @@ export async function run(inputs: RunInputs): Promise<void> {
       sigstoreInstance,
       pushToRegistry: inputs.pushToRegistry,
       createStorageRecord: inputs.createStorageRecord,
+      subjectVersion: inputs.subjectVersion,
       githubToken: inputs.githubToken
     })
 

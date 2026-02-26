@@ -101,6 +101,7 @@ const defaultInputs: RunInputs = {
   subjectChecksums: '',
   pushToRegistry: false,
   createStorageRecord: false,
+  subjectVersion: '',
   showSummary: false,
   githubToken: 'test-token',
   privateSigning: false

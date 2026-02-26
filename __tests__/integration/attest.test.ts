@@ -145,7 +145,8 @@ describe('createAttestation', () => {
     const storageOpts = {
       ...defaultOpts,
       pushToRegistry: true,
-      createStorageRecord: true
+      createStorageRecord: true,
+      subjectVersion: '1.2.3'
     }
 
     it('should create storage record when enabled and owner is org', async () => {
@@ -157,8 +158,25 @@ describe('createAttestation', () => {
         storageOpts
       )
 
-      expect(mockCreateStorageRecord).toHaveBeenCalled()
+      expect(mockCreateStorageRecord).toHaveBeenCalledWith(
+        expect.objectContaining({ version: '1.2.3' }),
+        expect.anything(),
+        expect.anything()
+      )
       expect(result.storageRecordIds).toEqual([12345])
+    })
+
+    it('should omit version from storage record when subjectVersion is empty', async () => {
+      const subjects = [TEST_SUBJECT_WITH_REGISTRY]
+      const opts = { ...storageOpts, subjectVersion: '' }
+
+      await createAttestation(subjects, TEST_PREDICATE, opts)
+
+      expect(mockCreateStorageRecord).toHaveBeenCalledWith(
+        expect.objectContaining({ version: undefined }),
+        expect.anything(),
+        expect.anything()
+      )
     })
 
     it('should skip storage record when owner is User', async () => {

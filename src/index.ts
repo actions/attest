@@ -15,6 +15,7 @@ const inputs: RunInputs = {
   predicatePath: core.getInput('predicate-path'),
   pushToRegistry: core.getBooleanInput('push-to-registry'),
   createStorageRecord: core.getBooleanInput('create-storage-record'),
+  subjectVersion: core.getInput('subject-version'),
   showSummary: core.getBooleanInput('show-summary'),
   githubToken: core.getInput('github-token'),
   // undocumented -- not part of public interface

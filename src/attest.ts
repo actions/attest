@@ -26,6 +26,7 @@ export const createAttestation = async (
     sigstoreInstance: SigstoreInstance
     pushToRegistry: boolean
     createStorageRecord: boolean
+    subjectVersion?: string
     githubToken: string
   }
 ): Promise<AttestResult> => {
@@ -77,7 +78,8 @@ export const createAttestation = async (
         const registryUrl = getRegistryURL(subject.name)
         const artifactOpts = {
           name: subject.name,
-          digest: subjectDigest
+          digest: subjectDigest,
+          version: opts.subjectVersion || undefined
         }
         const packageRegistryOpts = {
           registryUrl
