@@ -111,10 +111,12 @@ export const createOctokitMock = (
   rest: {
     repos: {
       get: jest
-        .fn<RestEndpointMethodTypes['repos']['get']['response']>()
+        .fn<
+          () => Promise<RestEndpointMethodTypes['repos']['get']['response']>
+        >()
         .mockResolvedValue({
           data: { owner: { type: ownerType } }
-        })
+        } as RestEndpointMethodTypes['repos']['get']['response'])
     }
   }
 })
