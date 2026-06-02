@@ -7,6 +7,12 @@ import fs from 'fs/promises'
 import os from 'os'
 import path from 'path'
 
+import {
+  getSubjectsFromArtifactsList,
+  hasArtifactsListEnv,
+  ARTIFACTS_LIST_ENV
+} from './artifacts'
+
 import type { Subject } from '@actions/attest'
 
 const MAX_SUBJECT_COUNT = 1024
@@ -25,6 +31,11 @@ export type SubjectInputs = {
 // specified as a path to a file or as a digest. If a path is provided, the
 // file's digest is calculated and returned along with the subject's name. If a
 // digest is provided, the name must also be provided.
+//
+// When none of the explicit subject inputs is provided AND the runner has
+// exposed a $GITHUB_ARTIFACTS_LIST file (ADR-0039), the subjects are read
+// from that file instead. This lets the workflow declare artifacts via
+// `$GITHUB_ARTIFACTS` from any step without re-specifying them here.
 export const subjectFromInputs = async (
   inputs: SubjectInputs
 ): Promise<Subject[]> => {
@@ -39,9 +50,24 @@ export const subjectFromInputs = async (
   const enabledInputs = [subjectPath, subjectDigest, subjectChecksums].filter(
     Boolean
   )
+
   if (enabledInputs.length === 0) {
+    if (hasArtifactsListEnv()) {
+      const subjects = await getSubjectsFromArtifactsList()
+      if (subjects.length === 0) {
+        throw new Error(
+          `No artifact subjects were declared via $GITHUB_ARTIFACTS in this job. ` +
+            `Have one or more steps append to $GITHUB_ARTIFACTS, or set ` +
+            `subject-path / subject-digest / subject-checksums on this action.`
+        )
+      }
+      return downcaseName ? subjects.map(downcaseSubjectName) : subjects
+    }
+
     throw new Error(
-      'One of subject-path, subject-digest, or subject-checksums must be provided'
+      `One of subject-path, subject-digest, or subject-checksums must be provided ` +
+        `(or, on a runner that supports it, declare artifacts via $GITHUB_ARTIFACTS and ` +
+        `${ARTIFACTS_LIST_ENV} will be consumed automatically)`
     )
   }
 
@@ -72,6 +98,11 @@ export const subjectFromInputs = async (
       assert.fail('unreachable')
   }
 }
+
+const downcaseSubjectName = (subject: Subject): Subject => ({
+  ...subject,
+  name: subject.name.toLowerCase()
+})
 
 // Returns the subject's digest as a formatted string of the form
 // "<algorithm>:<digest>".

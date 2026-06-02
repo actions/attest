@@ -183,6 +183,56 @@ No more than 1024 subjects can be attested at the same time.
 Whether supplied via the `predicate` or `predicatePath` input, the predicate
 string cannot exceed 16MB.
 
+## Auto-detected Subjects via `$GITHUB_ARTIFACTS`
+
+On a runner that exposes the `GITHUB_ARTIFACTS_LIST` environment variable
+(see [ADR-0039][adr-0039]), this action can pick up artifact subjects
+automatically without any explicit `subject-path` / `subject-digest` /
+`subject-checksums` input. Any step earlier in the same job that appends
+to `$GITHUB_ARTIFACTS` contributes a subject:
+
+```yaml
+- name: Build
+  run: |
+    make my-app
+    echo "dist/my-app"                                      >> "$GITHUB_ARTIFACTS"
+    echo "ghcr.io/octocat/my-app:1.0.0@sha256:1f4e3e6b..."  >> "$GITHUB_ARTIFACTS"
+
+- name: Attest
+  uses: actions/attest@v4
+  # No subject-* input needed — subjects are read from $GITHUB_ARTIFACTS_LIST.
+```
+
+Precedence:
+
+1. If any of `subject-path`, `subject-digest`, or `subject-checksums` is set,
+   the explicit input wins (existing behavior is unchanged).
+1. Otherwise, if `$GITHUB_ARTIFACTS_LIST` is set and the file lists at
+   least one subject, those subjects are used.
+1. Otherwise, the action fails as it does today.
+
+The runner provides the file in this versioned JSON shape:
+
+```json
+{
+  "version": 1,
+  "subjects": [
+    {
+      "name": "my-app",
+      "digest": "sha256:1f4e3e6b...",
+      "kind": "file"
+    },
+    {
+      "name": "ghcr.io/octocat/my-app:1.0.0",
+      "digest": "sha256:9f64a747...",
+      "kind": "oci"
+    }
+  ]
+}
+```
+
+[adr-0039]: https://github.com/github/package-security/blob/main/docs/adrs/0039-github-artifacts-env-file.md
+
 ## Examples
 
 ### Provenance Attestation (Default)

@@ -10,14 +10,18 @@ inputs:
     description: >
       Path to the artifact serving as the subject of the attestation. Must
       specify exactly one of "subject-path",  "subject-digest", or
-      "subject-checksums". May contain a glob pattern or list of paths (total
-      subject count cannot exceed 1024).
+      "subject-checksums" — unless the workflow is running on a runner that
+      exposes the $GITHUB_ARTIFACTS_LIST file, in which case any subjects
+      declared via $GITHUB_ARTIFACTS will be picked up automatically when no
+      explicit subject input is set. May contain a glob pattern or list of
+      paths (total subject count cannot exceed 1024).
     required: false
   subject-digest:
     description: >
       Digest of the subject for the attestation. Must be in the form
       "algorithm:hex_digest" (e.g. "sha256:abc123..."). Must specify exactly one
-      of "subject-path", "subject-digest", or "subject-checksums".
+      of "subject-path", "subject-digest", or "subject-checksums", or omit all
+      three and rely on subjects declared via $GITHUB_ARTIFACTS.
     required: false
   subject-name:
     description: >
@@ -28,7 +32,8 @@ inputs:
     description: >
       Path to checksums file containing digest and name of subjects for
       attestation. Must specify exactly one of "subject-path", "subject-digest",
-      or "subject-checksums".
+      or "subject-checksums", or omit all three and rely on subjects declared
+      via $GITHUB_ARTIFACTS.
     required: false
   subject-version:
     description: >

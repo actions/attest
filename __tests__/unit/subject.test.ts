@@ -2,6 +2,7 @@ import crypto from 'crypto'
 import fs from 'fs/promises'
 import os from 'os'
 import path from 'path'
+import { ARTIFACTS_LIST_ENV } from '../../src/artifacts'
 import {
   subjectFromInputs,
   formatSubjectDigest,
@@ -17,13 +18,23 @@ describe('subjectFromInputs', () => {
   }
 
   let tempDir: string
+  const originalArtifactsListEnv = process.env[ARTIFACTS_LIST_ENV]
 
   beforeEach(async () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'subject-test-'))
+    // Each test starts with the runner-injected env var cleared so the
+    // legacy "no inputs provided" failure path is exercised without
+    // pollution from prior tests or the host environment.
+    delete process.env[ARTIFACTS_LIST_ENV]
   })
 
   afterEach(async () => {
     await fs.rm(tempDir, { recursive: true, force: true })
+    if (originalArtifactsListEnv === undefined) {
+      delete process.env[ARTIFACTS_LIST_ENV]
+    } else {
+      process.env[ARTIFACTS_LIST_ENV] = originalArtifactsListEnv
+    }
   })
 
   describe('input validation', () => {
@@ -434,6 +445,78 @@ badline
           /subject checksums file not found/i
         )
       })
+    })
+  })
+
+  describe('with $GITHUB_ARTIFACTS_LIST', () => {
+    const setArtifactsList = async (body: object): Promise<string> => {
+      const listPath = path.join(tempDir, 'artifacts_list')
+      await fs.writeFile(listPath, JSON.stringify(body))
+      process.env[ARTIFACTS_LIST_ENV] = listPath
+      return listPath
+    }
+
+    it('returns subjects from the runner-emitted list when no explicit input is provided', async () => {
+      const hex = 'a'.repeat(64)
+      await setArtifactsList({
+        version: 1,
+        subjects: [{ name: 'myapp', digest: `sha256:${hex}`, kind: 'file' }]
+      })
+
+      const subjects = await subjectFromInputs(blankInputs)
+      expect(subjects).toEqual([{ name: 'myapp', digest: { sha256: hex } }])
+    })
+
+    it('lowercases subject names when downcaseName is true', async () => {
+      const hex = 'b'.repeat(64)
+      await setArtifactsList({
+        version: 1,
+        subjects: [
+          { name: 'GHCR.io/FOO/Bar', digest: `sha256:${hex}`, kind: 'oci' }
+        ]
+      })
+
+      const subjects = await subjectFromInputs({
+        ...blankInputs,
+        downcaseName: true
+      })
+      expect(subjects[0].name).toBe('ghcr.io/foo/bar')
+    })
+
+    it('throws a helpful error when the list is empty', async () => {
+      await setArtifactsList({ version: 1, subjects: [] })
+
+      await expect(subjectFromInputs(blankInputs)).rejects.toThrow(
+        /no artifact subjects were declared via \$GITHUB_ARTIFACTS/i
+      )
+    })
+
+    it('explicit subject-path wins over the runner-emitted list', async () => {
+      const hex = 'a'.repeat(64)
+      await setArtifactsList({
+        version: 1,
+        subjects: [
+          { name: 'from-runner', digest: `sha256:${hex}`, kind: 'file' }
+        ]
+      })
+
+      // Use an explicit file subject; runner list should be ignored.
+      const fileBody = Buffer.from('hello world')
+      const explicitPath = path.join(tempDir, 'explicit-artifact')
+      await fs.writeFile(explicitPath, fileBody)
+      const expectedDigest = crypto
+        .createHash('sha256')
+        .update(fileBody)
+        .digest('hex')
+
+      const subjects = await subjectFromInputs({
+        ...blankInputs,
+        subjectPath: explicitPath
+      })
+
+      expect(subjects).toHaveLength(1)
+      expect(subjects[0].name).toBe('explicit-artifact')
+      expect(subjects[0].digest.sha256).toBe(expectedDigest)
     })
   })
 })
