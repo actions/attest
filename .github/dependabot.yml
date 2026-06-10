@@ -4,6 +4,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 3
     groups:
       actions-minor:
         update-types:
@@ -14,6 +16,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 3
     groups:
       npm-development:
         dependency-type: development
@@ -23,4 +27,5 @@ updates:
       npm-production:
         dependency-type: production
         update-types:
+          - minor
           - patch
