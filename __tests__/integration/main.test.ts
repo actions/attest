@@ -117,9 +117,7 @@ describe('run', () => {
     // Reset chainable summary mocks
     for (const key of Object.keys(summaryMock)) {
       if (key !== 'stringify' && key !== 'isEmptyBuffer') {
-        ;(
-          summaryMock[key as keyof typeof summaryMock] as jest.Mock
-        ).mockReturnThis()
+        summaryMock[key as keyof typeof summaryMock].mockReturnThis()
       }
     }
 
