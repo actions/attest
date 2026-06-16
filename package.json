@@ -91,8 +91,8 @@
     "@sigstore/mock": "^0.13.0",
     "@types/jest": "^30.0.0",
     "@types/make-fetch-happen": "^10.0.4",
-    "@types/node": "^25.9.2",
-    "@vercel/ncc": "^0.38.4",
+    "@types/node": "^25.9.3",
+    "@vercel/ncc": "^0.44.0",
     "eslint": "^9.39.2",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-jest": "^29.15.2",
@@ -100,10 +100,10 @@
     "js-yaml": "^4.2.0",
     "markdownlint-cli": "^0.48.0",
     "nock": "^13.5.6",
-    "prettier": "^3.8.3",
+    "prettier": "^3.8.4",
     "ts-jest": "^29.4.11",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.60.1",
+    "typescript-eslint": "^8.61.0",
     "undici": "^8.4.1"
   }
 }
