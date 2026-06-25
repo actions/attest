@@ -2,8 +2,8 @@ import { jest } from '@jest/globals'
 
 // Mock functions
 const mockRun = jest.fn()
-const mockGetInput = jest.fn()
-const mockGetBooleanInput = jest.fn()
+const mockGetInput = jest.fn<(name: string) => string>()
+const mockGetBooleanInput = jest.fn<(name: string) => boolean>()
 
 // Mock @actions/core
 jest.unstable_mockModule('@actions/core', () => ({
