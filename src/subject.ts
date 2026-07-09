@@ -4,7 +4,6 @@ import crypto from 'crypto'
 import { parse } from 'csv-parse/sync'
 import { createReadStream } from 'fs'
 import fs from 'fs/promises'
-import os from 'os'
 import path from 'path'
 
 import type { Subject } from '@actions/attest'
@@ -181,7 +180,10 @@ const getSubjectFromChecksumsFile = async (
 const getSubjectFromChecksumsString = (checksums: string): Subject[] => {
   const subjects: Subject[] = []
 
-  const records: string[] = checksums.split(os.EOL).filter(Boolean)
+  // Split on any line ending (LF or CRLF) so that checksums files produced on
+  // one platform still parse correctly on another (e.g. an LF-only file on
+  // Windows, where os.EOL would be "\r\n" and never match).
+  const records: string[] = checksums.split(/\r?\n/).filter(Boolean)
 
   for (const record of records) {
     // Find the space delimiter following the digest
@@ -199,6 +201,14 @@ const getSubjectFromChecksumsString = (checksums: string): Subject[] => {
       flag_and_name.startsWith('*') || flag_and_name.startsWith(' ')
         ? flag_and_name.slice(1)
         : flag_and_name
+
+    // Defense-in-depth: a subject name should never span multiple lines. If it
+    // does, the checksums input was not split correctly (e.g. an unrecognized
+    // line ending), which would silently collapse many artifacts into one.
+    // Fail loudly rather than produce a partial attestation.
+    if (/[\r\n]/.test(name)) {
+      throw new Error(`Invalid subject name (contains a newline): ${name}`)
+    }
 
     const digest = record.slice(0, delimIndex)
 

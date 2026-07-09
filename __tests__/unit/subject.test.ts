@@ -404,6 +404,69 @@ badline
 
         await expect(subjectFromInputs(inputs)).rejects.toThrow(/unknown digest algorithm/i)
       })
+
+      it('should split LF-only multi-line checksums into separate subjects', async () => {
+        // Regression test for https://github.com/actions/attest/issues/440.
+        // An LF-only checksums file must parse every record, even on platforms
+        // where os.EOL is "\r\n" (Windows).
+        const checksums = [
+          '187dcd1506a170337415589ff00c8743f19d41cc31fca246c2739dfd450d0b9d  artifact-linux',
+          '9ecbf449e286a8a8748c161c52aa28b6b2fc64ab86f94161c5d1b3abc18156c5  artifact-darwin',
+          '5d8b4751ef31f9440d843fcfa4e53ca2e25b1cb1f13fd355fdc7c24b41fe645293291ea9297ba3989078abb77ebbaac66be073618a9e4974dbd0361881d4c718  artifact-windows'
+        ].join('\n')
+
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectChecksums: checksums
+        }
+
+        const subjects = await subjectFromInputs(inputs)
+
+        expect(subjects).toHaveLength(3)
+        expect(subjects.map(s => s.name).sort()).toEqual([
+          'artifact-darwin',
+          'artifact-linux',
+          'artifact-windows'
+        ])
+      })
+
+      it('should split CRLF checksums into separate subjects', async () => {
+        const checksums = [
+          '187dcd1506a170337415589ff00c8743f19d41cc31fca246c2739dfd450d0b9d  artifact-linux',
+          '9ecbf449e286a8a8748c161c52aa28b6b2fc64ab86f94161c5d1b3abc18156c5  artifact-darwin'
+        ].join('\r\n')
+
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectChecksums: checksums
+        }
+
+        const subjects = await subjectFromInputs(inputs)
+
+        expect(subjects).toHaveLength(2)
+        expect(subjects.map(s => s.name).sort()).toEqual([
+          'artifact-darwin',
+          'artifact-linux'
+        ])
+      })
+
+      it('should throw when a subject name contains a newline', async () => {
+        // A bare carriage return (not part of a CRLF pair) is not treated as a
+        // line separator, so it survives inside the record's name. The
+        // defense-in-depth guard should reject it rather than emit a subject
+        // whose name spans multiple lines.
+        const checksums =
+          '187dcd1506a170337415589ff00c8743f19d41cc31fca246c2739dfd450d0b9d  artifact\rlinux'
+
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectChecksums: checksums
+        }
+
+        await expect(subjectFromInputs(inputs)).rejects.toThrow(
+          /invalid subject name \(contains a newline\)/i
+        )
+      })
     })
 
     describe('from file', () => {
