@@ -81,7 +81,7 @@
     "@actions/attest": "^3.2.0",
     "@actions/core": "^3.0.1",
     "@actions/github": "^9.1.1",
-    "@actions/glob": "^0.6.1",
+    "@actions/glob": "^0.7.0",
     "@sigstore/oci": "^0.7.1",
     "csv-parse": "^6.2.1"
   },
