@@ -83,7 +83,7 @@
     "@actions/github": "^9.1.1",
     "@actions/glob": "^0.7.0",
     "@sigstore/oci": "^0.7.1",
-    "csv-parse": "^6.2.1"
+    "csv-parse": "^7.0.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
