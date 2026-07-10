@@ -1,0 +1,78 @@
+# Rebuilds the transpiled `dist/` for Dependabot production-dependency bumps.
+# This half is deliberately UNPRIVILEGED: it runs in the pull_request context
+# with a read-only token and no secrets, so freshly-bumped (and therefore
+# untrusted) dependency code never coexists with a write credential. It only
+# produces artifacts; the privileged `commit-dist.yml` workflow consumes them.
+name: Rebuild dist
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: read # required by dependabot/fetch-metadata
+
+jobs:
+  rebuild:
+    name: Rebuild dist/
+    # Only Dependabot PRs are eligible; everything else is covered by check-dist.
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+
+      - name: Checkout
+        if: steps.meta.outputs.dependency-type == 'direct:production'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup Node.js
+        if: steps.meta.outputs.dependency-type == 'direct:production'
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      # --ignore-scripts prevents lifecycle scripts of the bumped dependency
+      # from running during install; the bundle step is the only build we run.
+      - name: Install Dependencies
+        if: steps.meta.outputs.dependency-type == 'direct:production'
+        run: npm ci --ignore-scripts
+
+      - name: Build dist/ Directory
+        if: steps.meta.outputs.dependency-type == 'direct:production'
+        run: npm run bundle
+
+      - name: Detect dist/ changes
+        id: diff
+        if: steps.meta.outputs.dependency-type == 'direct:production'
+        run: |
+          if [ "$(git diff --ignore-space-at-eol --text dist/ | wc -l)" -gt "0" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Persist the context the privileged workflow needs. workflow_run cannot
+      # trust head_ref from its own event payload alone, so we hand it over
+      # explicitly as artifact metadata.
+      - name: Record PR context
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          mkdir -p dist-meta
+          echo "${{ github.event.pull_request.number }}"   > dist-meta/pr-number
+          echo "${{ github.event.pull_request.head.ref }}" > dist-meta/head-ref
+          echo "${{ github.event.pull_request.head.sha }}" > dist-meta/head-sha
+
+      - name: Upload rebuilt dist/
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rebuilt-dist
+          path: |
+            dist/
+            dist-meta/
+          retention-days: 1
