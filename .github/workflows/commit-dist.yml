@@ -40,16 +40,32 @@ jobs:
           path: incoming
 
       # No artifact => the builder found dist/ already up to date. Nothing to do.
+      # The head-ref/head-sha values come from an artifact produced in the
+      # (unprivileged) PR context, so validate them strictly before writing to
+      # $GITHUB_OUTPUT to avoid workflow-command injection.
       - name: Check for artifact
         id: check
         run: |
-          if [ -d incoming/dist ] && [ -f incoming/dist-meta/head-ref ]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-            echo "head-ref=$(cat incoming/dist-meta/head-ref)" >> "$GITHUB_OUTPUT"
-            echo "head-sha=$(cat incoming/dist-meta/head-sha)" >> "$GITHUB_OUTPUT"
-          else
+          if [ ! -d incoming/dist ] || [ ! -f incoming/dist-meta/head-ref ] || [ ! -f incoming/dist-meta/head-sha ]; then
             echo "present=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+
+          head_ref="$(head -n1 incoming/dist-meta/head-ref | tr -d '\r\n')"
+          head_sha="$(head -n1 incoming/dist-meta/head-sha | tr -d '\r\n')"
+
+          if ! printf '%s' "$head_sha" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "Invalid head-sha; refusing to proceed." >&2
+            exit 1
+          fi
+          if ! printf '%s' "$head_ref" | grep -Eq '^[A-Za-z0-9._/-]+$'; then
+            echo "Invalid head-ref; refusing to proceed." >&2
+            exit 1
+          fi
+
+          echo "present=true" >> "$GITHUB_OUTPUT"
+          echo "head-ref=$head_ref" >> "$GITHUB_OUTPUT"
+          echo "head-sha=$head_sha" >> "$GITHUB_OUTPUT"
 
       - name: Checkout PR branch
         if: steps.check.outputs.present == 'true'
