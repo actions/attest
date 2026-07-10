@@ -37,7 +37,10 @@ jobs:
           name: rebuilt-dist
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
-          path: incoming
+          # Download OUTSIDE the checkout workspace: the later actions/checkout
+          # step runs `git clean -ffdx`, which would delete an untracked
+          # `incoming/` dir inside the workspace before we can use it.
+          path: ${{ runner.temp }}/incoming
 
       # No artifact => the builder found dist/ already up to date. Nothing to do.
       # The head-ref/head-sha values come from an artifact produced in the
@@ -46,13 +49,14 @@ jobs:
       - name: Check for artifact
         id: check
         run: |
-          if [ ! -d incoming/dist ] || [ ! -f incoming/dist-meta/head-ref ] || [ ! -f incoming/dist-meta/head-sha ]; then
+          incoming="${{ runner.temp }}/incoming"
+          if [ ! -d "$incoming/dist" ] || [ ! -f "$incoming/dist-meta/head-ref" ] || [ ! -f "$incoming/dist-meta/head-sha" ]; then
             echo "present=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          head_ref="$(head -n1 incoming/dist-meta/head-ref | tr -d '\r\n')"
-          head_sha="$(head -n1 incoming/dist-meta/head-sha | tr -d '\r\n')"
+          head_ref="$(head -n1 "$incoming/dist-meta/head-ref" | tr -d '\r\n')"
+          head_sha="$(head -n1 "$incoming/dist-meta/head-sha" | tr -d '\r\n')"
 
           if ! printf '%s' "$head_sha" | grep -Eq '^[0-9a-f]{40}$'; then
             echo "Invalid head-sha; refusing to proceed." >&2
@@ -89,8 +93,8 @@ jobs:
         if: steps.check.outputs.present == 'true'
         run: |
           rm -rf dist
-          mv incoming/dist dist
-          rm -rf incoming
+          mv "${{ runner.temp }}/incoming/dist" dist
+          rm -rf "${{ runner.temp }}/incoming"
 
       - name: Commit and push
         if: steps.check.outputs.present == 'true'
