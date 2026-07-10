@@ -45,7 +45,10 @@ jobs:
         id: build
         run: npm run bundle
 
-      # This will fail the workflow if the PR wasn't created by Dependabot.
+      # Fail the workflow if the checked-in dist/ differs from a fresh build.
+      # Dependabot production-dependency bumps are rebuilt and committed
+      # automatically by the rebuild-dist.yml / commit-dist.yml workflows; any
+      # other stale dist/ must be rebuilt and pushed by hand.
       - name: Compare Directories
         id: diff
         run: |
@@ -55,8 +58,8 @@ jobs:
             exit 1
           fi
 
-      # If `dist/` was different than expected, and this was not a Dependabot
-      # PR, upload the expected version as a workflow artifact.
+      # If dist/ was different than expected, upload the freshly-built version
+      # as a workflow artifact so it can be downloaded and committed manually.
       - if: ${{ failure() && steps.diff.outcome == 'failure' }}
         name: Upload Artifact
         id: upload

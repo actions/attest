@@ -1,0 +1,90 @@
+# Consumes the artifact from `rebuild-dist.yml` and commits the rebuilt `dist/`
+# back to the Dependabot PR branch. This half is PRIVILEGED (contents: write)
+# but it never runs any code from the PR — it only moves already-built bytes and
+# git-pushes them. Because it triggers on workflow_run, the workflow definition
+# executed here is the trusted copy from the default branch.
+#
+# NOTE: pushes made with the default GITHUB_TOKEN do NOT re-trigger `on:
+# pull_request` workflows, so `check-dist.yml` will not automatically re-verify
+# the committed dist/. The verify-head guard below is our integrity check.
+name: Commit dist
+
+on:
+  workflow_run:
+    workflows: ["Rebuild dist"]
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+jobs:
+  commit:
+    name: Commit dist/
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    # Only proceed for successful builder runs that were triggered by a PR.
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request'
+    steps:
+      - name: Download rebuilt dist/
+        id: download
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        continue-on-error: true
+        with:
+          name: rebuilt-dist
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: incoming
+
+      # No artifact => the builder found dist/ already up to date. Nothing to do.
+      - name: Check for artifact
+        id: check
+        run: |
+          if [ -d incoming/dist ] && [ -f incoming/dist-meta/head-ref ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "head-ref=$(cat incoming/dist-meta/head-ref)" >> "$GITHUB_OUTPUT"
+            echo "head-sha=$(cat incoming/dist-meta/head-sha)" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout PR branch
+        if: steps.check.outputs.present == 'true'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ steps.check.outputs.head-ref }}
+          token: ${{ github.token }}
+
+      # Guard against a race: if the PR branch advanced after the builder ran,
+      # bail rather than committing a dist/ built from a stale tree.
+      - name: Verify head is unchanged
+        if: steps.check.outputs.present == 'true'
+        run: |
+          current="$(git rev-parse HEAD)"
+          if [ "$current" != "${{ steps.check.outputs.head-sha }}" ]; then
+            echo "PR branch moved ($current != ${{ steps.check.outputs.head-sha }}); skipping."
+            exit 1
+          fi
+
+      - name: Apply rebuilt dist/
+        if: steps.check.outputs.present == 'true'
+        run: |
+          rm -rf dist
+          mv incoming/dist dist
+          rm -rf incoming
+
+      - name: Commit and push
+        if: steps.check.outputs.present == 'true'
+        run: |
+          if git diff --quiet -- dist/; then
+            echo "dist/ already current; nothing to commit."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/
+          git commit -m "build: rebuild dist/ for dependency bump"
+          git push origin HEAD:${{ steps.check.outputs.head-ref }}
