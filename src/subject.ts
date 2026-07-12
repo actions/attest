@@ -6,6 +6,8 @@ import { createReadStream } from 'fs'
 import fs from 'fs/promises'
 import path from 'path'
 
+import { readArtifactsList } from './artifacts'
+
 import type { Subject } from '@actions/attest'
 
 const MAX_SUBJECT_COUNT = 1024
@@ -39,6 +41,15 @@ export const subjectFromInputs = async (
     Boolean
   )
   if (enabledInputs.length === 0) {
+    // No explicit subject input — try the runner-generated artifacts list
+    const discovered = await readArtifactsList({
+      downcaseOCI: downcaseName,
+      requireSingleOCI: downcaseName
+    })
+    if (discovered && discovered.length > 0) {
+      return discovered
+    }
+
     throw new Error(
       'One of subject-path, subject-digest, or subject-checksums must be provided'
     )

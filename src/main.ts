@@ -88,6 +88,18 @@ export async function run(inputs: RunInputs): Promise<void> {
       downcaseName: inputs.pushToRegistry
     })
 
+    // When pushing to an OCI registry, every subject must use sha256 digests
+    if (inputs.pushToRegistry) {
+      for (const subject of subjects) {
+        const algorithms = Object.keys(subject.digest)
+        if (algorithms.length !== 1 || algorithms[0] !== 'sha256') {
+          throw new Error(
+            'push-to-registry requires all subjects to have sha256 digests'
+          )
+        }
+      }
+    }
+
     // Generate predicate based on attestation type
     const predicate = await getPredicateForType(attestationType, inputs)
 

@@ -9,9 +9,11 @@ inputs:
   subject-path:
     description: >
       Path to the artifact serving as the subject of the attestation. Must
-      specify exactly one of "subject-path",  "subject-digest", or
+      specify exactly one of "subject-path", "subject-digest", or
       "subject-checksums". May contain a glob pattern or list of paths (total
-      subject count cannot exceed 1024).
+      subject count cannot exceed 1024). When none of these inputs are
+      provided, the action falls back to subjects discovered via the
+      runner-provided $GITHUB_ARTIFACTS_LIST environment variable.
     required: false
   subject-digest:
     description: >
@@ -27,8 +29,10 @@ inputs:
   subject-checksums:
     description: >
       Path to checksums file containing digest and name of subjects for
-      attestation. Must specify exactly one of "subject-path", "subject-digest",
-      or "subject-checksums".
+      attestation. Digest algorithm is inferred from hex length (sha256 for 64
+      characters, sha512 for 128 characters). When "push-to-registry" is true,
+      all checksums must be sha256. Must specify exactly one of "subject-path",
+      "subject-digest", or "subject-checksums".
     required: false
   subject-version:
     description: >
@@ -61,9 +65,10 @@ inputs:
     required: false
   push-to-registry:
     description: >
-      Whether to push the attestation to the image registry. Requires that the
-      "subject-name" parameter specify the fully-qualified image name and that
-      the "subject-digest" parameter be specified. Defaults to false.
+      Whether to push the attestation to the image registry. Requires a single
+      fully-qualified OCI subject with a SHA-256 digest, supplied either
+      explicitly via "subject-name"/"subject-digest" or discovered from the
+      runner-provided artifacts list. Defaults to false.
     default: false
     required: false
   create-storage-record:
