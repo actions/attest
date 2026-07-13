@@ -8,7 +8,7 @@ const SUPPORTED_VERSION = 1
 // Valid kinds and their allowed digest algorithms with expected hex lengths
 const DIGEST_RULES: Record<string, Record<string, number>> = {
   file: { sha256: 64 },
-  oci: { sha256: 64, sha384: 96, sha512: 128 }
+  oci: { sha256: 64 }
 }
 
 const HEX_RE = /^[0-9a-fA-F]+$/

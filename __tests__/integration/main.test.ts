@@ -450,7 +450,7 @@ describe('run', () => {
       )
     })
 
-    it('should fail when discovered OCI artifact uses sha512 with push-to-registry', async () => {
+    it('should fail when discovered OCI artifact uses sha512 (not allowed)', async () => {
       const listPath = path.join(tempDir, 'artifacts.json')
       await fs.writeFile(
         listPath,
@@ -469,51 +469,15 @@ describe('run', () => {
 
       await run({
         ...defaultInputs,
-        pushToRegistry: true,
         predicateType: 'https://example.com/predicate',
         predicate: '{}'
       })
 
       expect(setFailedMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: expect.stringMatching(/push-to-registry.*sha256/)
-        })
-      )
-      expect(mockAttest).not.toHaveBeenCalled()
-    })
-
-    it('should fail when subject-checksums contain sha512 with push-to-registry', async () => {
-      const sha512 = 'a'.repeat(128)
-      await run({
-        ...defaultInputs,
-        subjectChecksums: `${sha512}  artifact-amd64`,
-        pushToRegistry: true,
-        predicateType: 'https://example.com/predicate',
-        predicate: '{}'
-      })
-
-      expect(setFailedMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: expect.stringMatching(/push-to-registry.*sha256/)
-        })
-      )
-      expect(mockAttest).not.toHaveBeenCalled()
-    })
-
-    it('should fail when mixed checksums contain any sha512 with push-to-registry', async () => {
-      const sha256 = 'a'.repeat(64)
-      const sha512 = 'b'.repeat(128)
-      await run({
-        ...defaultInputs,
-        subjectChecksums: `${sha256}  artifact-one\n${sha512}  artifact-two`,
-        pushToRegistry: true,
-        predicateType: 'https://example.com/predicate',
-        predicate: '{}'
-      })
-
-      expect(setFailedMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: expect.stringMatching(/push-to-registry.*sha256/)
+          message: expect.stringMatching(
+            /algorithm "sha512" is not allowed for kind "oci"/
+          )
         })
       )
       expect(mockAttest).not.toHaveBeenCalled()
@@ -607,43 +571,6 @@ describe('run', () => {
         })
       )
       expect(mockAttest).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('discovered non-sha256 digest without registry', () => {
-    it('should succeed with discovered sha512 OCI subject when not pushing to registry', async () => {
-      const listPath = path.join(tempDir, 'artifacts.json')
-      await fs.writeFile(
-        listPath,
-        JSON.stringify({
-          version: 1,
-          subjects: [
-            {
-              name: 'ghcr.io/test-owner/test-repo',
-              kind: 'oci',
-              digest: `sha512:${'a'.repeat(128)}`
-            }
-          ]
-        })
-      )
-      process.env.GITHUB_ARTIFACTS_LIST = listPath
-
-      await run({
-        ...defaultInputs,
-        predicateType: 'https://example.com/predicate',
-        predicate: '{}'
-      })
-
-      expect(setFailedMock).not.toHaveBeenCalled()
-      expect(mockAttest).toHaveBeenCalledWith(
-        expect.objectContaining({
-          subjects: [
-            expect.objectContaining({
-              digest: { sha512: 'a'.repeat(128) }
-            })
-          ]
-        })
-      )
     })
   })
 })

@@ -369,32 +369,32 @@ describe('parseArtifactsList', () => {
         expect(result[0].digest).toEqual({ sha256: 'b'.repeat(64) })
       })
 
-      it('should accept sha384 (96 hex chars)', () => {
-        const result = parseArtifactsList(
-          wrap([
-            {
-              name: 'ghcr.io/owner/image',
-              kind: 'oci',
-              digest: `sha384:${'c'.repeat(96)}`
-            }
-          ])
-        )
-        expect(result).toHaveLength(1)
-        expect(result[0].digest).toEqual({ sha384: 'c'.repeat(96) })
+      it('should reject sha384 for oci kind', () => {
+        expect(() =>
+          parseArtifactsList(
+            wrap([
+              {
+                name: 'ghcr.io/owner/image',
+                kind: 'oci',
+                digest: `sha384:${'c'.repeat(96)}`
+              }
+            ])
+          )
+        ).toThrow(/algorithm "sha384" is not allowed for kind "oci"/)
       })
 
-      it('should accept sha512 (128 hex chars)', () => {
-        const result = parseArtifactsList(
-          wrap([
-            {
-              name: 'ghcr.io/owner/image',
-              kind: 'oci',
-              digest: `sha512:${'d'.repeat(128)}`
-            }
-          ])
-        )
-        expect(result).toHaveLength(1)
-        expect(result[0].digest).toEqual({ sha512: 'd'.repeat(128) })
+      it('should reject sha512 for oci kind', () => {
+        expect(() =>
+          parseArtifactsList(
+            wrap([
+              {
+                name: 'ghcr.io/owner/image',
+                kind: 'oci',
+                digest: `sha512:${'d'.repeat(128)}`
+              }
+            ])
+          )
+        ).toThrow(/algorithm "sha512" is not allowed for kind "oci"/)
       })
     })
   })
@@ -457,7 +457,7 @@ describe('parseArtifactsList', () => {
           {
             name: 'ghcr.io/owner/app',
             kind: 'oci',
-            digest: `sha512:${'c'.repeat(128)}`
+            digest: `sha256:${'c'.repeat(64)}`
           }
         ])
       )

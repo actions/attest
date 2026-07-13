@@ -29,10 +29,8 @@ inputs:
   subject-checksums:
     description: >
       Path to checksums file containing digest and name of subjects for
-      attestation. Digest algorithm is inferred from hex length (sha256 for 64
-      characters, sha512 for 128 characters). When "push-to-registry" is true,
-      all checksums must be sha256. Must specify exactly one of "subject-path",
-      "subject-digest", or "subject-checksums".
+      attestation. Must specify exactly one of "subject-path", "subject-digest",
+      or "subject-checksums".
     required: false
   subject-version:
     description: >

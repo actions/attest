@@ -112,10 +112,8 @@ See [action.yml](action.yml)
     subject-name:
 
     # Path to checksums file containing digest and name of subjects for
-    # attestation. Digest algorithm is inferred from hex length (sha256 for
-    # 64 characters, sha512 for 128 characters). When "push-to-registry" is
-    # true, all checksums must be sha256. Must specify exactly one of
-    # "subject-path", "subject-digest", or "subject-checksums".
+    # attestation. Must specify exactly one of "subject-path", "subject-digest",
+    # or "subject-checksums".
     subject-checksums:
 
     # Path to the JSON-formatted SBOM file (SPDX or CycloneDX) to attest.
@@ -222,11 +220,10 @@ The artifacts list file must be a JSON object with the following shape:
 ```
 
 Each entry must include a `name`, a `digest` in `algorithm:hex` format, and a
-`kind` of either `file` or `oci`. File-kind entries must use `sha256` digests;
-OCI-kind entries may use `sha256`, `sha384`, or `sha512`.
+`kind` of either `file` or `oci`. Both kinds currently require `sha256` digests.
 
 When `push-to-registry` is enabled, the discovered artifacts list must contain
-exactly one subject and it must be an OCI-kind entry with a SHA-256 digest.
+exactly one subject and it must be an OCI-kind entry.
 
 ## Examples
 
