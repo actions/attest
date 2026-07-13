@@ -88,6 +88,11 @@ export async function run(inputs: RunInputs): Promise<void> {
       downcaseName: inputs.pushToRegistry
     })
 
+    // Validate subjects are compatible with registry push requirements
+    if (inputs.pushToRegistry) {
+      validateRegistrySubjects(subjects)
+    }
+
     // Generate predicate based on attestation type
     const predicate = await getPredicateForType(attestationType, inputs)
 
@@ -264,5 +269,25 @@ const getPredicateForType = async (
     }
     case 'custom':
       return predicateFromInputs(inputs)
+  }
+}
+
+// Validate that resolved subjects meet registry push requirements:
+// exactly one subject with a SHA-256 digest.
+export const validateRegistrySubjects = (subjects: Subject[]): void => {
+  if (subjects.length !== 1) {
+    throw new Error(
+      `push-to-registry requires exactly one subject but ${subjects.length} subjects were resolved`
+    )
+  }
+
+  const subject = subjects[0]
+  const algorithms = Object.keys(subject.digest)
+  const hasNonSHA256 = algorithms.some(alg => alg !== 'sha256')
+
+  if (hasNonSHA256 || !algorithms.includes('sha256')) {
+    throw new Error(
+      `push-to-registry requires a subject with a SHA-256 digest but the subject has: ${algorithms.join(', ')}`
+    )
   }
 }

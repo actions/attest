@@ -572,5 +572,95 @@ describe('run', () => {
       )
       expect(mockAttest).not.toHaveBeenCalled()
     })
+
+    it('should allow SHA-512 subject-checksums when pushToRegistry is false', async () => {
+      const sha512Digest = 'a'.repeat(128)
+
+      await run({
+        ...defaultInputs,
+        subjectChecksums: `${sha512Digest} my-artifact`,
+        predicateType: 'https://example.com/predicate',
+        predicate: '{}',
+        pushToRegistry: false
+      })
+
+      expect(setFailedMock).not.toHaveBeenCalled()
+      expect(mockAttest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subjects: [
+            expect.objectContaining({
+              name: 'my-artifact',
+              digest: { sha512: sha512Digest }
+            })
+          ]
+        })
+      )
+    })
+
+    it('should fail with SHA-512 subject-checksums when pushToRegistry is true', async () => {
+      const sha512Digest = 'a'.repeat(128)
+
+      await run({
+        ...defaultInputs,
+        subjectChecksums: `${sha512Digest} ghcr.io/owner/repo`,
+        predicateType: 'https://example.com/predicate',
+        predicate: '{}',
+        pushToRegistry: true
+      })
+
+      expect(setFailedMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringMatching(
+            /push-to-registry requires a subject with a SHA-256 digest/
+          )
+        })
+      )
+      expect(mockAttest).not.toHaveBeenCalled()
+    })
+
+    it('should fail when multiple explicit subject-checksums are used with pushToRegistry', async () => {
+      const checksums = [
+        `${'a'.repeat(64)} ghcr.io/owner/app1`,
+        `${'b'.repeat(64)} ghcr.io/owner/app2`
+      ].join('\n')
+
+      await run({
+        ...defaultInputs,
+        subjectChecksums: checksums,
+        predicateType: 'https://example.com/predicate',
+        predicate: '{}',
+        pushToRegistry: true
+      })
+
+      expect(setFailedMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringMatching(
+            /push-to-registry requires exactly one subject but 2 subjects were resolved/
+          )
+        })
+      )
+      expect(mockAttest).not.toHaveBeenCalled()
+    })
+
+    it('should succeed with single SHA-256 explicit subject and pushToRegistry', async () => {
+      await run({
+        ...registryInputs
+      })
+
+      expect(setFailedMock).not.toHaveBeenCalled()
+      expect(mockAttest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subjects: [
+            expect.objectContaining({
+              name: 'ghcr.io/test-owner/test-repo',
+              digest: {
+                sha256:
+                  '7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32'
+              }
+            })
+          ]
+        })
+      )
+    })
   })
 })
