@@ -1,6 +1,25 @@
-import { validateRegistrySubjects } from '../../src/main'
+import { jest } from '@jest/globals'
 
 import type { Subject } from '@actions/attest'
+
+// src/main pulls in ESM-only dependencies (e.g. @actions/attest, @sigstore/oci)
+// which, when statically imported, load asynchronously under Jest's
+// experimental VM modules. On Node < 24.9 that async import resolves after the
+// test environment is torn down and crashes the suite. Mock those modules and
+// import main dynamically so the heavy graph never loads.
+jest.unstable_mockModule('@actions/core', () => ({}))
+jest.unstable_mockModule('@actions/github', () => ({ context: {} }))
+jest.unstable_mockModule('@actions/attest', () => ({
+  attest: jest.fn(),
+  buildSLSAProvenancePredicate: jest.fn(),
+  createStorageRecord: jest.fn()
+}))
+jest.unstable_mockModule('@sigstore/oci', () => ({
+  getRegistryCredentials: jest.fn(),
+  attachArtifactToImage: jest.fn()
+}))
+
+const { validateRegistrySubjects } = await import('../../src/main')
 
 describe('validateRegistrySubjects', () => {
   it('should pass for a single subject with SHA-256 digest', () => {
