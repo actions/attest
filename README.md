@@ -94,17 +94,18 @@ See [action.yml](action.yml)
 ```yaml
 - uses: actions/attest@v4
   with:
-    # Path to the artifact serving as the subject of the attestation. Must
-    # specify exactly one of "subject-path", "subject-digest", or
-    # "subject-checksums". May contain a glob pattern or list of paths
-    # (total subject count cannot exceed 1024).
-    # When none of these inputs are provided, subjects are automatically
-    # discovered from the runner-provided $GITHUB_ARTIFACTS_LIST file.
+    # Path to the artifact serving as the subject of the attestation. At most
+    # one of "subject-path", "subject-digest", or "subject-checksums" may be
+    # provided. May contain a glob pattern or list of paths (total subject
+    # count cannot exceed 1024).
+    # If none of these inputs are provided, subjects are discovered from the
+    # runner-provided $GITHUB_ARTIFACTS_LIST environment variable.
     subject-path:
 
     # SHA256 digest of the subject for the attestation. Must be in the form
-    # "sha256:hex_digest" (e.g. "sha256:abc123..."). Must specify exactly one
-    # of "subject-path", "subject-digest", or "subject-checksums".
+    # "sha256:hex_digest" (e.g. "sha256:abc123..."). At most one of
+    # "subject-path", "subject-digest", or "subject-checksums" may be provided.
+    # If none are provided, subjects are discovered from $GITHUB_ARTIFACTS_LIST.
     subject-digest:
 
     # Subject name as it should appear in the attestation. Required when
@@ -112,8 +113,9 @@ See [action.yml](action.yml)
     subject-name:
 
     # Path to checksums file containing digest and name of subjects for
-    # attestation. Must specify exactly one of "subject-path", "subject-digest",
-    # or "subject-checksums".
+    # attestation. At most one of "subject-path", "subject-digest", or
+    # "subject-checksums" may be provided. If none are provided, subjects are
+    # discovered from $GITHUB_ARTIFACTS_LIST.
     subject-checksums:
 
     # Path to the JSON-formatted SBOM file (SPDX or CycloneDX) to attest.
@@ -136,10 +138,10 @@ See [action.yml](action.yml)
     # or "predicate" when creating custom attestations.
     predicate-path:
 
-    # Whether to push the attestation to the image registry. Requires a single
-    # fully-qualified OCI subject with a SHA-256 digest, supplied either
-    # explicitly via "subject-name"/"subject-digest" or discovered from the
-    # runner-provided $GITHUB_ARTIFACTS_LIST file. Defaults to false.
+    # Whether to push the attestation to the image registry. Requires that the
+    # resolved subject is a single fully-qualified OCI image reference with a
+    # SHA-256 digest, whether specified explicitly (via any subject input) or
+    # discovered from the runner-provided artifacts list. Defaults to false.
     push-to-registry:
 
     # Whether to create a storage record for the artifact.
