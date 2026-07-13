@@ -1,7 +1,11 @@
 import fs from 'fs/promises'
 import os from 'os'
 import path from 'path'
-import { readArtifactsList, parseArtifactsList } from '../../src/artifacts'
+import {
+  errorMessage,
+  readArtifactsList,
+  parseArtifactsList
+} from '../../src/artifacts'
 
 const ENV_KEY = 'GITHUB_ARTIFACTS_LIST'
 
@@ -826,5 +830,17 @@ describe('parseArtifactsList', () => {
 
       expect(result).toHaveLength(2)
     })
+  })
+})
+
+describe('errorMessage', () => {
+  it('should extract message from Error instances', () => {
+    expect(errorMessage(new Error('boom'))).toBe('boom')
+  })
+
+  it('should stringify non-Error values', () => {
+    expect(errorMessage('raw string')).toBe('raw string')
+    expect(errorMessage(42)).toBe('42')
+    expect(errorMessage(null)).toBe('null')
   })
 })

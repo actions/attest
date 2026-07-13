@@ -145,7 +145,7 @@ const getSubjectFromDigest = (
   subjectDigest: string,
   subjectName: string
 ): Subject => {
-  if (!subjectDigest.match(/^sha256:[A-Za-z0-9]{64}$/)) {
+  if (!subjectDigest.match(/^sha256:[0-9a-fA-F]{64}$/)) {
     throw new Error(
       'subject-digest must be in the format "sha256:<hex-digest>"'
     )

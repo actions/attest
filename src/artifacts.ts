@@ -30,6 +30,12 @@ export type ArtifactsListOptions = {
 }
 
 /**
+ * Extracts a displayable message from an unknown caught value.
+ */
+export const errorMessage = (err: unknown): string =>
+  err instanceof Error ? err.message : String(err)
+
+/**
  * Reads and parses the runner-generated artifacts list file identified by
  * the $GITHUB_ARTIFACTS_LIST environment variable. Returns undefined when
  * the env var is unset or blank (caller should treat this as "no discovered
@@ -50,7 +56,7 @@ export const readArtifactsList = async (
   try {
     raw = await fs.readFile(filePath, 'utf-8')
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err)
+    const msg = errorMessage(err)
     throw new Error(`Failed to read artifacts list at "${filePath}": ${msg}`)
   }
 

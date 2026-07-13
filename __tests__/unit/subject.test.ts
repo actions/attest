@@ -366,6 +366,31 @@ describe('subjectFromInputs', () => {
         /subject-digest must be in the format/
       )
     })
+
+    it('should throw for non-hex characters in digest', async () => {
+      const inputs: SubjectInputs = {
+        ...blankInputs,
+        subjectName: 'artifact',
+        subjectDigest: `sha256:${'g'.repeat(64)}`
+      }
+
+      await expect(subjectFromInputs(inputs)).rejects.toThrow(
+        /subject-digest must be in the format/
+      )
+    })
+
+    it('should accept valid uppercase hex digest', async () => {
+      const inputs: SubjectInputs = {
+        ...blankInputs,
+        subjectName: 'artifact',
+        subjectDigest: `sha256:${'A'.repeat(64)}`
+      }
+
+      const subjects = await subjectFromInputs(inputs)
+
+      expect(subjects).toHaveLength(1)
+      expect(subjects[0].digest).toEqual({ sha256: 'A'.repeat(64) })
+    })
   })
 
   describe('with subject-path', () => {
