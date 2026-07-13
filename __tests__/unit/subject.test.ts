@@ -90,6 +90,21 @@ describe('subjectFromInputs', () => {
       expect(subjects[0].name).toBe('discovered-binary')
     })
 
+    it('should throw when discovered subjects exceed the maximum count', async () => {
+      const filePath = path.join(tempDir, 'artifacts.json')
+      const subjects = Array.from({ length: 1025 }, (_, i) => ({
+        name: `discovered-binary-${i}`,
+        kind: 'file',
+        digest: `sha256:${'a'.repeat(64)}`
+      }))
+      await fs.writeFile(filePath, JSON.stringify({ version: 1, subjects }))
+      process.env[ENV_KEY] = filePath
+
+      await expect(subjectFromInputs(blankInputs)).rejects.toThrow(
+        /too many subjects/i
+      )
+    })
+
     it('should lowercase discovered OCI names when downcaseName is true', async () => {
       const filePath = path.join(tempDir, 'artifacts.json')
       await fs.writeFile(

@@ -47,6 +47,11 @@ export const subjectFromInputs = async (
       requireSingleOCI: downcaseName
     })
     if (discovered && discovered.length > 0) {
+      if (discovered.length > MAX_SUBJECT_COUNT) {
+        throw new Error(
+          `Too many subjects specified (>${MAX_SUBJECT_COUNT}). The maximum number of subjects is ${MAX_SUBJECT_COUNT}.`
+        )
+      }
       return discovered
     }
 
