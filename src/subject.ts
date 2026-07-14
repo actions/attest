@@ -6,6 +6,8 @@ import { createReadStream } from 'fs'
 import fs from 'fs/promises'
 import path from 'path'
 
+import { readArtifactsList } from './artifacts'
+
 import type { Subject } from '@actions/attest'
 
 const MAX_SUBJECT_COUNT = 1024
@@ -39,6 +41,20 @@ export const subjectFromInputs = async (
     Boolean
   )
   if (enabledInputs.length === 0) {
+    // No explicit subject input — try the runner-generated artifacts list
+    const discovered = await readArtifactsList({
+      downcaseOCI: downcaseName,
+      requireSingleOCI: downcaseName
+    })
+    if (discovered && discovered.length > 0) {
+      if (discovered.length > MAX_SUBJECT_COUNT) {
+        throw new Error(
+          `Too many subjects specified (>${MAX_SUBJECT_COUNT}). The maximum number of subjects is ${MAX_SUBJECT_COUNT}.`
+        )
+      }
+      return discovered
+    }
+
     throw new Error(
       'One of subject-path, subject-digest, or subject-checksums must be provided'
     )
@@ -134,7 +150,7 @@ const getSubjectFromDigest = (
   subjectDigest: string,
   subjectName: string
 ): Subject => {
-  if (!subjectDigest.match(/^sha256:[A-Za-z0-9]{64}$/)) {
+  if (!subjectDigest.match(/^sha256:[0-9a-fA-F]{64}$/)) {
     throw new Error(
       'subject-digest must be in the format "sha256:<hex-digest>"'
     )

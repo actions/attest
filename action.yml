@@ -8,16 +8,20 @@ branding:
 inputs:
   subject-path:
     description: >
-      Path to the artifact serving as the subject of the attestation. Must
-      specify exactly one of "subject-path",  "subject-digest", or
-      "subject-checksums". May contain a glob pattern or list of paths (total
-      subject count cannot exceed 1024).
+      Path to the artifact serving as the subject of the attestation. At most
+      one of "subject-path", "subject-digest", or "subject-checksums" may be
+      provided. May contain a glob pattern or list of paths (total subject
+      count cannot exceed 1024). If none of these inputs are provided, subjects
+      are discovered from the runner-provided $GITHUB_ARTIFACTS_LIST
+      environment variable.
     required: false
   subject-digest:
     description: >
       Digest of the subject for the attestation. Must be in the form
-      "algorithm:hex_digest" (e.g. "sha256:abc123..."). Must specify exactly one
-      of "subject-path", "subject-digest", or "subject-checksums".
+      "algorithm:hex_digest" (e.g. "sha256:abc123..."). At most one of
+      "subject-path", "subject-digest", or "subject-checksums" may be provided.
+      If none are provided, subjects are discovered from
+      $GITHUB_ARTIFACTS_LIST.
     required: false
   subject-name:
     description: >
@@ -27,8 +31,9 @@ inputs:
   subject-checksums:
     description: >
       Path to checksums file containing digest and name of subjects for
-      attestation. Must specify exactly one of "subject-path", "subject-digest",
-      or "subject-checksums".
+      attestation. At most one of "subject-path", "subject-digest", or
+      "subject-checksums" may be provided. If none are provided, subjects are
+      discovered from $GITHUB_ARTIFACTS_LIST.
     required: false
   subject-version:
     description: >
@@ -62,8 +67,9 @@ inputs:
   push-to-registry:
     description: >
       Whether to push the attestation to the image registry. Requires that the
-      "subject-name" parameter specify the fully-qualified image name and that
-      the "subject-digest" parameter be specified. Defaults to false.
+      resolved subject is a single fully-qualified OCI image reference with a
+      SHA-256 digest, whether specified explicitly (via any subject input) or
+      discovered from the runner-provided artifacts list. Defaults to false.
     default: false
     required: false
   create-storage-record:

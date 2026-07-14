@@ -55,6 +55,265 @@ describe('subjectFromInputs', () => {
     })
   })
 
+  describe('artifacts list fallback', () => {
+    const ENV_KEY = 'GITHUB_ARTIFACTS_LIST'
+    const originalEnv = process.env
+
+    beforeEach(() => {
+      process.env = { ...originalEnv }
+    })
+
+    afterEach(() => {
+      process.env = originalEnv
+    })
+
+    it('should use artifacts list when no explicit inputs are provided', async () => {
+      const filePath = path.join(tempDir, 'artifacts.json')
+      await fs.writeFile(
+        filePath,
+        JSON.stringify({
+          version: 1,
+          subjects: [
+            {
+              name: 'discovered-binary',
+              kind: 'file',
+              digest: `sha256:${'a'.repeat(64)}`
+            }
+          ]
+        })
+      )
+      process.env[ENV_KEY] = filePath
+
+      const subjects = await subjectFromInputs(blankInputs)
+
+      expect(subjects).toHaveLength(1)
+      expect(subjects[0].name).toBe('discovered-binary')
+    })
+
+    it('should throw when discovered subjects exceed the maximum count', async () => {
+      const filePath = path.join(tempDir, 'artifacts.json')
+      const subjects = Array.from({ length: 1025 }, (_, i) => ({
+        name: `discovered-binary-${i}`,
+        kind: 'file',
+        digest: `sha256:${'a'.repeat(64)}`
+      }))
+      await fs.writeFile(filePath, JSON.stringify({ version: 1, subjects }))
+      process.env[ENV_KEY] = filePath
+
+      await expect(subjectFromInputs(blankInputs)).rejects.toThrow(
+        /too many subjects/i
+      )
+    })
+
+    it('should lowercase discovered OCI names when downcaseName is true', async () => {
+      const filePath = path.join(tempDir, 'artifacts.json')
+      await fs.writeFile(
+        filePath,
+        JSON.stringify({
+          version: 1,
+          subjects: [
+            {
+              name: 'ghcr.io/Owner/My-Image',
+              kind: 'oci',
+              digest: `sha256:${'a'.repeat(64)}`
+            }
+          ]
+        })
+      )
+      process.env[ENV_KEY] = filePath
+
+      const subjects = await subjectFromInputs({
+        ...blankInputs,
+        downcaseName: true
+      })
+
+      expect(subjects).toHaveLength(1)
+      expect(subjects[0].name).toBe('ghcr.io/owner/my-image')
+    })
+
+    it('should reject discovered file-kind subjects when downcaseName is true (registry push)', async () => {
+      const filePath = path.join(tempDir, 'artifacts.json')
+      await fs.writeFile(
+        filePath,
+        JSON.stringify({
+          version: 1,
+          subjects: [
+            {
+              name: 'My-Binary-Linux',
+              kind: 'file',
+              digest: `sha256:${'a'.repeat(64)}`
+            }
+          ]
+        })
+      )
+      process.env[ENV_KEY] = filePath
+
+      await expect(
+        subjectFromInputs({
+          ...blankInputs,
+          downcaseName: true
+        })
+      ).rejects.toThrow(
+        /push-to-registry requires an OCI subject/
+      )
+    })
+
+    it('should preserve file names for discovered file-kind subjects without registry push', async () => {
+      const filePath = path.join(tempDir, 'artifacts.json')
+      await fs.writeFile(
+        filePath,
+        JSON.stringify({
+          version: 1,
+          subjects: [
+            {
+              name: 'My-Binary-Linux',
+              kind: 'file',
+              digest: `sha256:${'a'.repeat(64)}`
+            }
+          ]
+        })
+      )
+      process.env[ENV_KEY] = filePath
+
+      const subjects = await subjectFromInputs({
+        ...blankInputs,
+        downcaseName: false
+      })
+
+      expect(subjects).toHaveLength(1)
+      expect(subjects[0].name).toBe('My-Binary-Linux')
+    })
+
+    it('should throw standard error when env is unset and no explicit inputs', async () => {
+      delete process.env[ENV_KEY]
+
+      await expect(subjectFromInputs(blankInputs)).rejects.toThrow(
+        /one of subject-path, subject-digest, or subject-checksums must be provided/i
+      )
+    })
+
+    it('should throw standard error when artifacts list file is zero-byte', async () => {
+      const filePath = path.join(tempDir, 'zero-byte.json')
+      await fs.writeFile(filePath, '')
+      process.env[ENV_KEY] = filePath
+
+      await expect(subjectFromInputs(blankInputs)).rejects.toThrow(
+        /one of subject-path, subject-digest, or subject-checksums must be provided/i
+      )
+    })
+
+    it('should throw standard error when artifacts list is empty', async () => {
+      const filePath = path.join(tempDir, 'empty.json')
+      await fs.writeFile(
+        filePath,
+        JSON.stringify({ version: 1, subjects: [] })
+      )
+      process.env[ENV_KEY] = filePath
+
+      await expect(subjectFromInputs(blankInputs)).rejects.toThrow(
+        /one of subject-path, subject-digest, or subject-checksums must be provided/i
+      )
+    })
+
+    it('should ignore artifacts list when subject-digest is provided', async () => {
+      const filePath = path.join(tempDir, 'artifacts.json')
+      await fs.writeFile(
+        filePath,
+        JSON.stringify({
+          version: 1,
+          subjects: [
+            {
+              name: 'should-not-appear',
+              kind: 'file',
+              digest: `sha256:${'f'.repeat(64)}`
+            }
+          ]
+        })
+      )
+      process.env[ENV_KEY] = filePath
+
+      const inputs: SubjectInputs = {
+        ...blankInputs,
+        subjectName: 'explicit-artifact',
+        subjectDigest: `sha256:${'a'.repeat(64)}`
+      }
+
+      const subjects = await subjectFromInputs(inputs)
+
+      expect(subjects).toHaveLength(1)
+      expect(subjects[0].name).toBe('explicit-artifact')
+    })
+
+    it('should ignore artifacts list when subject-path is provided', async () => {
+      const artifactFile = path.join(tempDir, 'real-artifact.bin')
+      await fs.writeFile(artifactFile, 'content')
+
+      const listPath = path.join(tempDir, 'artifacts.json')
+      await fs.writeFile(
+        listPath,
+        JSON.stringify({
+          version: 1,
+          subjects: [
+            {
+              name: 'should-not-appear',
+              kind: 'file',
+              digest: `sha256:${'f'.repeat(64)}`
+            }
+          ]
+        })
+      )
+      process.env[ENV_KEY] = listPath
+
+      const inputs: SubjectInputs = {
+        ...blankInputs,
+        subjectPath: artifactFile
+      }
+
+      const subjects = await subjectFromInputs(inputs)
+
+      expect(subjects).toHaveLength(1)
+      expect(subjects[0].name).toBe('real-artifact.bin')
+    })
+
+    it('should ignore artifacts list when subject-checksums is provided', async () => {
+      const listPath = path.join(tempDir, 'artifacts.json')
+      await fs.writeFile(
+        listPath,
+        JSON.stringify({
+          version: 1,
+          subjects: [
+            {
+              name: 'should-not-appear',
+              kind: 'file',
+              digest: `sha256:${'f'.repeat(64)}`
+            }
+          ]
+        })
+      )
+      process.env[ENV_KEY] = listPath
+
+      const inputs: SubjectInputs = {
+        ...blankInputs,
+        subjectChecksums: `${'a'.repeat(64)}  explicit-checksums-artifact`
+      }
+
+      const subjects = await subjectFromInputs(inputs)
+
+      expect(subjects).toHaveLength(1)
+      expect(subjects[0].name).toBe('explicit-checksums-artifact')
+    })
+
+    it('should propagate parse errors from malformed artifacts list', async () => {
+      const filePath = path.join(tempDir, 'bad.json')
+      await fs.writeFile(filePath, '{bad json}')
+      process.env[ENV_KEY] = filePath
+
+      await expect(subjectFromInputs(blankInputs)).rejects.toThrow(
+        /invalid JSON/
+      )
+    })
+  })
+
   describe('with subject-digest', () => {
     const validDigest = 'sha256:7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32'
 
@@ -121,6 +380,31 @@ describe('subjectFromInputs', () => {
       await expect(subjectFromInputs(inputs)).rejects.toThrow(
         /subject-digest must be in the format/
       )
+    })
+
+    it('should throw for non-hex characters in digest', async () => {
+      const inputs: SubjectInputs = {
+        ...blankInputs,
+        subjectName: 'artifact',
+        subjectDigest: `sha256:${'g'.repeat(64)}`
+      }
+
+      await expect(subjectFromInputs(inputs)).rejects.toThrow(
+        /subject-digest must be in the format/
+      )
+    })
+
+    it('should accept valid uppercase hex digest', async () => {
+      const inputs: SubjectInputs = {
+        ...blankInputs,
+        subjectName: 'artifact',
+        subjectDigest: `sha256:${'A'.repeat(64)}`
+      }
+
+      const subjects = await subjectFromInputs(inputs)
+
+      expect(subjects).toHaveLength(1)
+      expect(subjects[0].digest).toEqual({ sha256: 'A'.repeat(64) })
     })
   })
 

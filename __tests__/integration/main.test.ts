@@ -449,5 +449,218 @@ describe('run', () => {
         })
       )
     })
+
+    it('should fail when discovered OCI artifact uses sha512 (not allowed)', async () => {
+      const listPath = path.join(tempDir, 'artifacts.json')
+      await fs.writeFile(
+        listPath,
+        JSON.stringify({
+          version: 1,
+          subjects: [
+            {
+              name: 'ghcr.io/test-owner/test-repo',
+              kind: 'oci',
+              digest: `sha512:${'a'.repeat(128)}`
+            }
+          ]
+        })
+      )
+      process.env.GITHUB_ARTIFACTS_LIST = listPath
+
+      await run({
+        ...defaultInputs,
+        predicateType: 'https://example.com/predicate',
+        predicate: '{}'
+      })
+
+      expect(setFailedMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringMatching(
+            /algorithm "sha512" is not allowed for kind "oci"/
+          )
+        })
+      )
+      expect(mockAttest).not.toHaveBeenCalled()
+    })
+
+    it('should accept sha256 subject-path with push-to-registry', async () => {
+      const filePath = path.join(tempDir, 'image-artifact.bin')
+      await fs.writeFile(filePath, 'test content')
+
+      await run({
+        ...defaultInputs,
+        subjectPath: filePath,
+        subjectName: 'ghcr.io/test-owner/test-repo',
+        pushToRegistry: true,
+        predicateType: 'https://example.com/predicate',
+        predicate: '{}'
+      })
+
+      expect(setFailedMock).not.toHaveBeenCalled()
+      expect(mockAttest).toHaveBeenCalled()
+    })
+
+    it('should fail when discovered file-kind subject is used with push-to-registry', async () => {
+      const listPath = path.join(tempDir, 'artifacts.json')
+      await fs.writeFile(
+        listPath,
+        JSON.stringify({
+          version: 1,
+          subjects: [
+            {
+              name: 'my-binary',
+              kind: 'file',
+              digest: `sha256:${'a'.repeat(64)}`
+            }
+          ]
+        })
+      )
+      process.env.GITHUB_ARTIFACTS_LIST = listPath
+
+      await run({
+        ...defaultInputs,
+        pushToRegistry: true,
+        predicateType: 'https://example.com/predicate',
+        predicate: '{}'
+      })
+
+      expect(setFailedMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringMatching(
+            /push-to-registry requires an OCI subject/
+          )
+        })
+      )
+      expect(mockAttest).not.toHaveBeenCalled()
+    })
+
+    it('should fail when multiple discovered OCI subjects are used with push-to-registry', async () => {
+      const listPath = path.join(tempDir, 'artifacts.json')
+      await fs.writeFile(
+        listPath,
+        JSON.stringify({
+          version: 1,
+          subjects: [
+            {
+              name: 'ghcr.io/owner/app1',
+              kind: 'oci',
+              digest: `sha256:${'a'.repeat(64)}`
+            },
+            {
+              name: 'ghcr.io/owner/app2',
+              kind: 'oci',
+              digest: `sha256:${'b'.repeat(64)}`
+            }
+          ]
+        })
+      )
+      process.env.GITHUB_ARTIFACTS_LIST = listPath
+
+      await run({
+        ...defaultInputs,
+        pushToRegistry: true,
+        predicateType: 'https://example.com/predicate',
+        predicate: '{}'
+      })
+
+      expect(setFailedMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringMatching(
+            /push-to-registry requires exactly one subject/
+          )
+        })
+      )
+      expect(mockAttest).not.toHaveBeenCalled()
+    })
+
+    it('should allow SHA-512 subject-checksums when pushToRegistry is false', async () => {
+      const sha512Digest = 'a'.repeat(128)
+
+      await run({
+        ...defaultInputs,
+        subjectChecksums: `${sha512Digest} my-artifact`,
+        predicateType: 'https://example.com/predicate',
+        predicate: '{}',
+        pushToRegistry: false
+      })
+
+      expect(setFailedMock).not.toHaveBeenCalled()
+      expect(mockAttest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subjects: [
+            expect.objectContaining({
+              name: 'my-artifact',
+              digest: { sha512: sha512Digest }
+            })
+          ]
+        })
+      )
+    })
+
+    it('should fail with SHA-512 subject-checksums when pushToRegistry is true', async () => {
+      const sha512Digest = 'a'.repeat(128)
+
+      await run({
+        ...defaultInputs,
+        subjectChecksums: `${sha512Digest} ghcr.io/owner/repo`,
+        predicateType: 'https://example.com/predicate',
+        predicate: '{}',
+        pushToRegistry: true
+      })
+
+      expect(setFailedMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringMatching(
+            /push-to-registry requires a subject with a SHA-256 digest/
+          )
+        })
+      )
+      expect(mockAttest).not.toHaveBeenCalled()
+    })
+
+    it('should fail when multiple explicit subject-checksums are used with pushToRegistry', async () => {
+      const checksums = [
+        `${'a'.repeat(64)} ghcr.io/owner/app1`,
+        `${'b'.repeat(64)} ghcr.io/owner/app2`
+      ].join('\n')
+
+      await run({
+        ...defaultInputs,
+        subjectChecksums: checksums,
+        predicateType: 'https://example.com/predicate',
+        predicate: '{}',
+        pushToRegistry: true
+      })
+
+      expect(setFailedMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringMatching(
+            /push-to-registry requires exactly one subject but 2 subjects were resolved/
+          )
+        })
+      )
+      expect(mockAttest).not.toHaveBeenCalled()
+    })
+
+    it('should succeed with single SHA-256 explicit subject and pushToRegistry', async () => {
+      await run({
+        ...registryInputs
+      })
+
+      expect(setFailedMock).not.toHaveBeenCalled()
+      expect(mockAttest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subjects: [
+            expect.objectContaining({
+              name: 'ghcr.io/test-owner/test-repo',
+              digest: {
+                sha256:
+                  '7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32'
+              }
+            })
+          ]
+        })
+      )
+    })
   })
 })

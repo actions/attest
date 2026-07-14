@@ -94,15 +94,18 @@ See [action.yml](action.yml)
 ```yaml
 - uses: actions/attest@v4
   with:
-    # Path to the artifact serving as the subject of the attestation. Must
-    # specify exactly one of "subject-path", "subject-digest", or
-    # "subject-checksums". May contain a glob pattern or list of paths
-    # (total subject count cannot exceed 1024).
+    # Path to the artifact serving as the subject of the attestation. At most
+    # one of "subject-path", "subject-digest", or "subject-checksums" may be
+    # provided. May contain a glob pattern or list of paths (total subject
+    # count cannot exceed 1024).
+    # If none of these inputs are provided, subjects are discovered from the
+    # runner-provided $GITHUB_ARTIFACTS_LIST environment variable.
     subject-path:
 
     # SHA256 digest of the subject for the attestation. Must be in the form
-    # "sha256:hex_digest" (e.g. "sha256:abc123..."). Must specify exactly one
-    # of "subject-path", "subject-digest", or "subject-checksums".
+    # "sha256:hex_digest" (e.g. "sha256:abc123..."). At most one of
+    # "subject-path", "subject-digest", or "subject-checksums" may be provided.
+    # If none are provided, subjects are discovered from $GITHUB_ARTIFACTS_LIST.
     subject-digest:
 
     # Subject name as it should appear in the attestation. Required when
@@ -110,8 +113,9 @@ See [action.yml](action.yml)
     subject-name:
 
     # Path to checksums file containing digest and name of subjects for
-    # attestation. Must specify exactly one of "subject-path", "subject-digest",
-    # or "subject-checksums".
+    # attestation. At most one of "subject-path", "subject-digest", or
+    # "subject-checksums" may be provided. If none are provided, subjects are
+    # discovered from $GITHUB_ARTIFACTS_LIST.
     subject-checksums:
 
     # Path to the JSON-formatted SBOM file (SPDX or CycloneDX) to attest.
@@ -135,8 +139,9 @@ See [action.yml](action.yml)
     predicate-path:
 
     # Whether to push the attestation to the image registry. Requires that the
-    # "subject-name" parameter specify the fully-qualified image name and that
-    # the "subject-digest" parameter be specified. Defaults to false.
+    # resolved subject is a single fully-qualified OCI image reference with a
+    # SHA-256 digest, whether specified explicitly (via any subject input) or
+    # discovered from the runner-provided artifacts list. Defaults to false.
     push-to-registry:
 
     # Whether to create a storage record for the artifact.
@@ -182,6 +187,45 @@ No more than 1024 subjects can be attested at the same time.
 
 Whether supplied via the `predicate` or `predicatePath` input, the predicate
 string cannot exceed 16MB.
+
+## Automatic Subject Discovery
+
+When none of the explicit subject inputs (`subject-path`, `subject-digest`,
+`subject-checksums`) are provided, the action automatically discovers subjects
+from the runner-provided `$GITHUB_ARTIFACTS_LIST` environment variable. This
+variable is set by the GitHub Actions runner (see
+[actions/runner#4527](https://github.com/actions/runner/pull/4527)) and points
+to a JSON file describing artifacts produced during the workflow.
+
+> [!NOTE]
+> `$GITHUB_ARTIFACTS` is the producer-facing file-command path to which steps
+> append subject declarations; `$GITHUB_ARTIFACTS_LIST` is the runner-generated
+> read-only JSON list consumed by later steps.
+
+Explicit subject inputs always take precedence — when any of `subject-path`,
+`subject-digest`, or `subject-checksums` is provided, the `$GITHUB_ARTIFACTS_LIST`
+file is never read.
+
+The artifacts list file must be a JSON object with the following shape:
+
+```json
+{
+  "version": 1,
+  "subjects": [
+    {
+      "name": "my-binary-linux-amd64",
+      "digest": "sha256:abc123...",
+      "kind": "file"
+    }
+  ]
+}
+```
+
+Each entry must include a `name`, a `digest` in `algorithm:hex` format, and a
+`kind` of either `file` or `oci`. Both kinds currently require `sha256` digests.
+
+When `push-to-registry` is enabled, the discovered artifacts list must contain
+exactly one subject and it must be an OCI-kind entry.
 
 ## Examples
 
