@@ -91,7 +91,7 @@
     "@sigstore/mock": "^0.13.0",
     "@types/jest": "^30.0.0",
     "@types/make-fetch-happen": "^10.0.4",
-    "@types/node": "^25.9.2",
+    "@types/node": "^26.1.1",
     "@vercel/ncc": "^0.44.1",
     "eslint": "^9.39.2",
     "eslint-plugin-import": "^2.32.0",
