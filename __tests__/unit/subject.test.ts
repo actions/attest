@@ -346,6 +346,48 @@ describe('subjectFromInputs', () => {
       expect(subjects[0].name).toBe('ghcr.io/foo/bar')
     })
 
+    // Table-driven acceptance tests for all six canonical SHA-2 algorithms
+    const algorithmTests: { algorithm: string; hexLength: number }[] = [
+      { algorithm: 'sha224', hexLength: 56 },
+      { algorithm: 'sha256', hexLength: 64 },
+      { algorithm: 'sha384', hexLength: 96 },
+      { algorithm: 'sha512', hexLength: 128 },
+      { algorithm: 'sha512_224', hexLength: 56 },
+      { algorithm: 'sha512_256', hexLength: 64 }
+    ]
+
+    it.each(algorithmTests)(
+      'should accept canonical $algorithm digest ($hexLength hex chars)',
+      async ({ algorithm, hexLength }) => {
+        const hex = 'a'.repeat(hexLength)
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectName: 'artifact',
+          subjectDigest: `${algorithm}:${hex}`
+        }
+
+        const subjects = await subjectFromInputs(inputs)
+
+        expect(subjects).toHaveLength(1)
+        expect(subjects[0].digest).toEqual({ [algorithm]: hex })
+      }
+    )
+
+    it('should accept uppercase hex digits in digest', async () => {
+      const inputs: SubjectInputs = {
+        ...blankInputs,
+        subjectName: 'artifact',
+        subjectDigest: 'sha256:7D070F6B64D9BCC530FE99CC21EAAA4B3C364E0B2D367D7735671FA202A03B32'
+      }
+
+      const subjects = await subjectFromInputs(inputs)
+
+      expect(subjects).toHaveLength(1)
+      expect(subjects[0].digest).toEqual({
+        sha256: '7D070F6B64D9BCC530FE99CC21EAAA4B3C364E0B2D367D7735671FA202A03B32'
+      })
+    })
+
     it('should throw for malformed digest format', async () => {
       const inputs: SubjectInputs = {
         ...blankInputs,
@@ -366,7 +408,7 @@ describe('subjectFromInputs', () => {
       }
 
       await expect(subjectFromInputs(inputs)).rejects.toThrow(
-        /subject-digest must be in the format/
+        /subject-digest has unsupported algorithm "md5"/
       )
     })
 
@@ -378,15 +420,39 @@ describe('subjectFromInputs', () => {
       }
 
       await expect(subjectFromInputs(inputs)).rejects.toThrow(
-        /subject-digest must be in the format/
+        /subject-digest has invalid length for algorithm "sha256"/
       )
     })
 
-    it('should throw for non-hex characters in digest', async () => {
+    it('should reject uppercase algorithm names', async () => {
       const inputs: SubjectInputs = {
         ...blankInputs,
         subjectName: 'artifact',
-        subjectDigest: `sha256:${'g'.repeat(64)}`
+        subjectDigest: `SHA256:${'a'.repeat(64)}`
+      }
+
+      await expect(subjectFromInputs(inputs)).rejects.toThrow(
+        /subject-digest has unsupported algorithm "SHA256"/
+      )
+    })
+
+    it('should reject non-canonical algorithm aliases', async () => {
+      const inputs: SubjectInputs = {
+        ...blankInputs,
+        subjectName: 'artifact',
+        subjectDigest: `sha-256:${'a'.repeat(64)}`
+      }
+
+      await expect(subjectFromInputs(inputs)).rejects.toThrow(
+        /subject-digest has unsupported algorithm "sha-256"/
+      )
+    })
+
+    it('should reject extra colons in digest', async () => {
+      const inputs: SubjectInputs = {
+        ...blankInputs,
+        subjectName: 'artifact',
+        subjectDigest: `sha256:${'a'.repeat(32)}:${'b'.repeat(32)}`
       }
 
       await expect(subjectFromInputs(inputs)).rejects.toThrow(
@@ -394,17 +460,65 @@ describe('subjectFromInputs', () => {
       )
     })
 
-    it('should accept valid uppercase hex digest', async () => {
+    it('should reject empty algorithm component', async () => {
       const inputs: SubjectInputs = {
         ...blankInputs,
         subjectName: 'artifact',
-        subjectDigest: `sha256:${'A'.repeat(64)}`
+        subjectDigest: `:${'a'.repeat(64)}`
       }
 
-      const subjects = await subjectFromInputs(inputs)
+      await expect(subjectFromInputs(inputs)).rejects.toThrow(
+        /subject-digest must be in the format/
+      )
+    })
 
-      expect(subjects).toHaveLength(1)
-      expect(subjects[0].digest).toEqual({ sha256: 'A'.repeat(64) })
+    it('should reject empty digest component', async () => {
+      const inputs: SubjectInputs = {
+        ...blankInputs,
+        subjectName: 'artifact',
+        subjectDigest: 'sha256:'
+      }
+
+      await expect(subjectFromInputs(inputs)).rejects.toThrow(
+        /subject-digest must be in the format/
+      )
+    })
+
+    it('should reject non-hex characters in digest', async () => {
+      const inputs: SubjectInputs = {
+        ...blankInputs,
+        subjectName: 'artifact',
+        subjectDigest: `sha256:${'g'.repeat(64)}`
+      }
+
+      await expect(subjectFromInputs(inputs)).rejects.toThrow(
+        /subject-digest has invalid hex digits/
+      )
+    })
+
+    it('should reject npm SRI format', async () => {
+      // npm SRI: "sha512-<base64>" is not the canonical "algorithm:hex" form
+      const inputs: SubjectInputs = {
+        ...blankInputs,
+        subjectName: 'artifact',
+        subjectDigest: 'sha512-n4bQgYhMfWtsxiT7nrnlA0leSv4+C2CDkMXOUOEJoiQ='
+      }
+
+      await expect(subjectFromInputs(inputs)).rejects.toThrow(
+        /subject-digest must be in the format/
+      )
+    })
+
+    it('should reject digest with no colon separator', async () => {
+      const inputs: SubjectInputs = {
+        ...blankInputs,
+        subjectName: 'artifact',
+        subjectDigest: `sha256${'a'.repeat(64)}`
+      }
+
+      await expect(subjectFromInputs(inputs)).rejects.toThrow(
+        /subject-digest must be in the format/
+      )
     })
   })
 
