@@ -662,5 +662,44 @@ describe('run', () => {
         })
       )
     })
+
+    it('should fail when subject-digest uses sha512 with push-to-registry', async () => {
+      await run({
+        ...registryInputs,
+        subjectDigest: `sha512:${'a'.repeat(128)}`
+      })
+
+      expect(setFailedMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringMatching(
+            /push-to-registry requires a subject with a SHA-256 digest/
+          )
+        })
+      )
+      expect(mockAttest).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('non-sha256 digest without registry', () => {
+    it('should succeed with sha512 subject-digest when not pushing to registry', async () => {
+      await run({
+        ...defaultInputs,
+        subjectName: 'artifact',
+        subjectDigest: `sha512:${'a'.repeat(128)}`,
+        predicateType: 'https://example.com/predicate',
+        predicate: '{}'
+      })
+
+      expect(setFailedMock).not.toHaveBeenCalled()
+      expect(mockAttest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subjects: [
+            expect.objectContaining({
+              digest: { sha512: 'a'.repeat(128) }
+            })
+          ]
+        })
+      )
+    })
   })
 })

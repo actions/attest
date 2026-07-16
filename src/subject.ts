@@ -15,6 +15,16 @@ const MAX_SUBJECT_CHECKSUM_SIZE_BYTES = 512 * MAX_SUBJECT_COUNT
 const DIGEST_ALGORITHM = 'sha256'
 const HEX_STRING_RE = /^[0-9a-fA-F]+$/
 
+// Canonical SHA-2 algorithms and their expected hex digest lengths
+const SUPPORTED_DIGEST_ALGORITHMS: Record<string, number> = {
+  sha224: 56,
+  sha256: 64,
+  sha384: 96,
+  sha512: 128,
+  sha512_224: 56,
+  sha512_256: 64
+}
+
 export type SubjectInputs = {
   subjectPath: string
   subjectName: string
@@ -144,22 +154,50 @@ const getSubjectFromPath = async (
   return digestedSubjects
 }
 
+// Parses a subject digest string of the form "algorithm:hex_digest" and
+// validates the algorithm name and hex digest length against the supported
+// canonical in-toto SHA-2 algorithm set.
+export const parseSubjectDigest = (
+  input: string
+): { algorithm: string; digest: string } => {
+  const match = input.match(/^([^:]+):([^:]+)$/)
+  if (!match) {
+    throw new Error(
+      'subject-digest must be in the format "algorithm:hex_digest"'
+    )
+  }
+
+  const [, algorithm, digest] = match
+
+  const expectedLength = SUPPORTED_DIGEST_ALGORITHMS[algorithm]
+  if (expectedLength === undefined) {
+    throw new Error(`subject-digest has unsupported algorithm "${algorithm}"`)
+  }
+
+  if (!HEX_STRING_RE.test(digest)) {
+    throw new Error('subject-digest has invalid hex digits')
+  }
+
+  if (digest.length !== expectedLength) {
+    throw new Error(
+      `subject-digest has invalid length for algorithm "${algorithm}" (expected ${expectedLength}, got ${digest.length})`
+    )
+  }
+
+  return { algorithm, digest }
+}
+
 // Returns the subject specified by the digest of a file. The digest is returned
 // along with the subject's name.
 const getSubjectFromDigest = (
   subjectDigest: string,
   subjectName: string
 ): Subject => {
-  if (!subjectDigest.match(/^sha256:[0-9a-fA-F]{64}$/)) {
-    throw new Error(
-      'subject-digest must be in the format "sha256:<hex-digest>"'
-    )
-  }
-  const [alg, digest] = subjectDigest.split(':')
+  const { algorithm, digest } = parseSubjectDigest(subjectDigest)
 
   return {
     name: subjectName,
-    digest: { [alg]: digest }
+    digest: { [algorithm]: digest }
   }
 }
 
