@@ -161,6 +161,9 @@ export function parseNotesBody(body) {
 
 /** Ask GitHub to generate release notes for a tag range and parse them. */
 export async function generateNotes(cwd, { tag, previousTag, targetCommitish }) {
+    if (!parseVersion(tag)) {
+        throw new Error(`Tag must be a v-prefixed semver like v4.2.1 (got: ${tag ?? "<missing>"})`);
+    }
     const repo = await resolveRepo(cwd);
     const args = ["api", `repos/${repo}/releases/generate-notes`, "-f", `tag_name=${tag}`];
     if (previousTag) args.push("-f", `previous_tag_name=${previousTag}`);
@@ -168,11 +171,14 @@ export async function generateNotes(cwd, { tag, previousTag, targetCommitish }) 
     const out = await gh(args);
     const parsed = JSON.parse(out);
     const { items, footer } = parseNotesBody(parsed.body);
+    const fallbackFooter = previousTag
+        ? `**Full Changelog**: https://github.com/${repo}/compare/${previousTag}...${tag}`
+        : `**Full Changelog**: https://github.com/${repo}/commits/${tag}`;
     return {
         repo,
         name: parsed.name || tag,
         items,
-        footer: footer || `**Full Changelog**: https://github.com/${repo}/compare/${previousTag || ""}...${tag}`,
+        footer: footer || fallbackFooter,
     };
 }
 

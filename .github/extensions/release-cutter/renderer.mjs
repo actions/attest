@@ -166,7 +166,6 @@ export function renderHtml() {
       </div>
       <ul id="items" class="items"></ul>
       <textarea id="raw" class="hidden"></textarea>
-      <div class="hint" id="raw-hint hidden"></div>
     </div>
   </div>
 
@@ -181,10 +180,32 @@ export function renderHtml() {
 const $ = (id) => document.getElementById(id);
 let state = { repo: "", suggested: {}, latestTag: "", footer: "", items: [], rawMode: false, rawText: "" };
 
-function showBanner(kind, html) {
+// Per-instance token handed to us in the iframe URL; required on every API call.
+const TOKEN = new URLSearchParams(location.search).get("t") || "";
+function api(path) {
+  return path + (path.includes("?") ? "&" : "?") + "t=" + encodeURIComponent(TOKEN);
+}
+
+// Banner content is built from DOM nodes (strings become text nodes) so that
+// CLI/gh output interpolated into messages can never inject HTML.
+function showBanner(kind, ...parts) {
   const b = $("banner");
-  if (!kind) { b.innerHTML = ""; return; }
-  b.innerHTML = '<div class="banner ' + kind + '">' + html + '</div>';
+  b.textContent = "";
+  if (!kind) return;
+  const div = document.createElement("div");
+  div.className = "banner " + kind;
+  for (const p of parts) {
+    if (p == null) continue;
+    div.appendChild(typeof p === "string" ? document.createTextNode(p) : p);
+  }
+  b.appendChild(div);
+}
+
+function mono(text) {
+  const s = document.createElement("span");
+  s.className = "mono";
+  s.textContent = text;
+  return s;
 }
 
 function isValidTag(t) { return /^v\\d+\\.\\d+\\.\\d+$/.test(t); }
@@ -257,13 +278,15 @@ function renderItems() {
 
 async function loadStatus() {
   try {
-    const r = await fetch("/api/status");
+    const r = await fetch(api("/api/status"));
     const s = await r.json();
     if (s.error) throw new Error(s.error);
     state.repo = s.repo;
     state.suggested = s.suggested;
     state.latestTag = s.latestRelease ? s.latestRelease.tagName : "";
-    $("subtitle").innerHTML = "Repository <span class='mono'>" + s.repo + "</span> · default branch <span class='mono'>" + s.defaultBranch + "</span>";
+    const sub = $("subtitle");
+    sub.textContent = "";
+    sub.append("Repository ", mono(s.repo), " · default branch ", mono(s.defaultBranch));
     $("latest").textContent = s.latestRelease ? s.latestRelease.tagName : "(none)";
     $("major").textContent = s.majorTag || "—";
     $("tag").value = s.defaultTag || "";
@@ -280,7 +303,7 @@ async function generate() {
   showBanner(null);
   $("regen").disabled = true; $("regen").textContent = "Generating…";
   try {
-    const r = await fetch("/api/notes", {
+    const r = await fetch(api("/api/notes"), {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tag, previousTag: state.latestTag }),
     });
@@ -313,15 +336,21 @@ async function publish() {
   showBanner(null);
   $("publish").disabled = true; $("publish").textContent = "Publishing…";
   try {
-    const r = await fetch("/api/publish", {
+    const r = await fetch(api("/api/publish"), {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tag, name: title, body }),
     });
     const data = await r.json();
     if (data.error) throw new Error(data.error);
-    let msg = "Published <a href='" + data.releaseUrl + "' target='_blank'>" + data.tag + "</a>.";
-    if (data.movedMajor) msg += " Moved <span class='mono'>" + data.movedMajor.tag + "</span> → <span class='mono'>" + data.movedMajor.sha.slice(0,7) + "</span>.";
-    showBanner("ok", msg);
+    const parts = ["Published "];
+    const link = document.createElement("a");
+    link.href = data.releaseUrl; link.target = "_blank"; link.rel = "noopener noreferrer";
+    link.textContent = data.tag;
+    parts.push(link, ".");
+    if (data.movedMajor) {
+      parts.push(" Moved ", mono(data.movedMajor.tag), " → ", mono(data.movedMajor.sha.slice(0, 7)), ".");
+    }
+    showBanner("ok", ...parts);
     $("publish").textContent = "Published";
   } catch (e) {
     showBanner("err", "Publish failed: " + e.message);

@@ -12,11 +12,13 @@
 // UI is in renderer.mjs.
 
 import { createServer } from "node:http";
+import { randomUUID } from "node:crypto";
 import { joinSession, createCanvas, CanvasError } from "@github/copilot-sdk/extension";
 import { renderHtml } from "./renderer.mjs";
 import { getStatus, generateNotes, publishRelease } from "./backend.mjs";
 
-// One loopback server per open canvas instance.
+// One loopback server per open canvas instance. Each carries a random token so
+// only the iframe we handed the URL to can reach the (publish-capable) API.
 const servers = new Map();
 
 let workspacePath = process.cwd();
@@ -24,18 +26,28 @@ let workspacePath = process.cwd();
 function readJsonBody(req) {
     return new Promise((resolve, reject) => {
         let data = "";
+        let settled = false;
+        const finish = (fn, value) => {
+            if (settled) return;
+            settled = true;
+            fn(value);
+        };
         req.on("data", (chunk) => {
+            if (settled) return;
             data += chunk;
-            if (data.length > 4 * 1024 * 1024) reject(new Error("Request body too large"));
+            if (data.length > 4 * 1024 * 1024) {
+                req.destroy();
+                finish(reject, new Error("Request body too large"));
+            }
         });
         req.on("end", () => {
             try {
-                resolve(data ? JSON.parse(data) : {});
+                finish(resolve, data ? JSON.parse(data) : {});
             } catch (e) {
-                reject(e);
+                finish(reject, e);
             }
         });
-        req.on("error", reject);
+        req.on("error", (e) => finish(reject, e));
     });
 }
 
@@ -45,13 +57,21 @@ function sendJson(res, status, payload) {
     res.end(body);
 }
 
-async function handleRequest(req, res) {
+async function handleRequest(req, res, token) {
     try {
         const url = new URL(req.url, "http://127.0.0.1");
         if (req.method === "GET" && url.pathname === "/") {
             res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
             res.end(renderHtml());
             return;
+        }
+        // Everything below is a state-changing / data API: require the token.
+        if (url.pathname.startsWith("/api/")) {
+            const provided = url.searchParams.get("t") || req.headers["x-canvas-token"];
+            if (provided !== token) {
+                sendJson(res, 403, { error: "Forbidden" });
+                return;
+            }
         }
         if (req.method === "GET" && url.pathname === "/api/status") {
             const status = await getStatus(workspacePath);
@@ -73,16 +93,17 @@ async function handleRequest(req, res) {
         res.writeHead(404, { "Content-Type": "text/plain" });
         res.end("Not found");
     } catch (err) {
-        sendJson(res, 200, { error: err?.message || String(err) });
+        sendJson(res, 500, { error: err?.message || String(err) });
     }
 }
 
 async function startServer() {
-    const server = createServer(handleRequest);
+    const token = randomUUID();
+    const server = createServer((req, res) => handleRequest(req, res, token));
     await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     const port = typeof address === "object" && address ? address.port : 0;
-    return { server, url: `http://127.0.0.1:${port}/` };
+    return { server, url: `http://127.0.0.1:${port}/?t=${token}` };
 }
 
 const session = await joinSession({
