@@ -36,6 +36,19 @@ export const errorMessage = (err: unknown): string =>
   err instanceof Error ? err.message : String(err)
 
 /**
+ * Removes a trailing ":tag" from an OCI image reference. The artifact's digest
+ * already pins the exact image, so a tag in the reference is redundant — and
+ * the registry-push path rejects any name that isn't a bare "registry/repo"
+ * reference. Only a colon appearing after the final path separator is treated
+ * as a tag, so a registry port (e.g. "localhost:5000/repo") is preserved.
+ */
+export const stripOCITag = (name: string): string => {
+  const lastSlash = name.lastIndexOf('/')
+  const lastColon = name.lastIndexOf(':')
+  return lastColon > lastSlash ? name.slice(0, lastColon) : name
+}
+
+/**
  * Reads and parses the runner-generated artifacts list file identified by
  * the $GITHUB_ARTIFACTS_LIST environment variable. Returns undefined when
  * the env var is unset or blank (caller should treat this as "no discovered
@@ -125,11 +138,18 @@ export const parseArtifactsList = (
     const e = entry as Record<string, unknown>
     const { name: rawName, kind, digest } = validateEntry(e, i)
 
-    // Normalize OCI names to lowercase when requested (e.g. for registry push).
-    // This must happen before dedup so that case-only duplicates collapse and
-    // case-colliding names with different digests are detected as conflicts.
-    const name =
-      options?.downcaseOCI && kind === 'oci' ? rawName.toLowerCase() : rawName
+    // Normalize OCI names before dedup so tag-only / case-only duplicates
+    // collapse and true conflicts are detected. Strip any ":tag" (the digest
+    // pins the exact image, and the registry-push path only accepts a bare
+    // "registry/repo" reference) and lowercase when requested (e.g. for
+    // registry push).
+    let name = rawName
+    if (kind === 'oci') {
+      name = stripOCITag(name)
+      if (options?.downcaseOCI) {
+        name = name.toLowerCase()
+      }
+    }
 
     // Check for conflicts or duplicates by normalized name
     const prev = seen.get(name)

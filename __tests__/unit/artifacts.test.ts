@@ -707,6 +707,122 @@ describe('parseArtifactsList', () => {
     })
   })
 
+  describe('OCI tag stripping', () => {
+    const wrap = (subjects: unknown[]): string =>
+      JSON.stringify({ version: 1, subjects })
+
+    it('should strip a trailing :tag from OCI names', () => {
+      const result = parseArtifactsList(
+        wrap([
+          {
+            name: 'ghcr.io/owner/app:12345',
+            kind: 'oci',
+            digest: `sha256:${'a'.repeat(64)}`
+          }
+        ])
+      )
+
+      expect(result).toHaveLength(1)
+      expect(result[0].name).toBe('ghcr.io/owner/app')
+    })
+
+    it('should preserve a registry port when no tag is present', () => {
+      const result = parseArtifactsList(
+        wrap([
+          {
+            name: 'localhost:5000/owner/app',
+            kind: 'oci',
+            digest: `sha256:${'a'.repeat(64)}`
+          }
+        ])
+      )
+
+      expect(result).toHaveLength(1)
+      expect(result[0].name).toBe('localhost:5000/owner/app')
+    })
+
+    it('should strip the tag but keep a registry port', () => {
+      const result = parseArtifactsList(
+        wrap([
+          {
+            name: 'localhost:5000/owner/app:12345',
+            kind: 'oci',
+            digest: `sha256:${'a'.repeat(64)}`
+          }
+        ])
+      )
+
+      expect(result).toHaveLength(1)
+      expect(result[0].name).toBe('localhost:5000/owner/app')
+    })
+
+    it('should leave OCI names without a tag unchanged', () => {
+      const result = parseArtifactsList(
+        wrap([
+          {
+            name: 'ghcr.io/owner/app',
+            kind: 'oci',
+            digest: `sha256:${'a'.repeat(64)}`
+          }
+        ])
+      )
+
+      expect(result).toHaveLength(1)
+      expect(result[0].name).toBe('ghcr.io/owner/app')
+    })
+
+    it('should NOT strip a colon from file-kind names', () => {
+      const result = parseArtifactsList(
+        wrap([
+          {
+            name: 'weird:name',
+            kind: 'file',
+            digest: `sha256:${'a'.repeat(64)}`
+          }
+        ])
+      )
+
+      expect(result).toHaveLength(1)
+      expect(result[0].name).toBe('weird:name')
+    })
+
+    it('should strip the tag then lowercase when downcaseOCI is true', () => {
+      const result = parseArtifactsList(
+        wrap([
+          {
+            name: 'ghcr.io/Owner/App:LatestBuild',
+            kind: 'oci',
+            digest: `sha256:${'a'.repeat(64)}`
+          }
+        ]),
+        { downcaseOCI: true }
+      )
+
+      expect(result).toHaveLength(1)
+      expect(result[0].name).toBe('ghcr.io/owner/app')
+    })
+
+    it('should collapse tag-only duplicate OCI names after stripping', () => {
+      const result = parseArtifactsList(
+        wrap([
+          {
+            name: 'ghcr.io/owner/app:v1',
+            kind: 'oci',
+            digest: `sha256:${'a'.repeat(64)}`
+          },
+          {
+            name: 'ghcr.io/owner/app:v2',
+            kind: 'oci',
+            digest: `sha256:${'a'.repeat(64)}`
+          }
+        ])
+      )
+
+      expect(result).toHaveLength(1)
+      expect(result[0].name).toBe('ghcr.io/owner/app')
+    })
+  })
+
   describe('requireSingleOCI option', () => {
     const wrap = (subjects: unknown[]): string =>
       JSON.stringify({ version: 1, subjects })
