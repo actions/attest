@@ -4,7 +4,8 @@ import path from 'path'
 import {
   errorMessage,
   readArtifactsList,
-  parseArtifactsList
+  parseArtifactsList,
+  stripOCITag
 } from '../../src/artifacts'
 
 const ENV_KEY = 'GITHUB_ARTIFACTS_LIST'
@@ -707,11 +708,11 @@ describe('parseArtifactsList', () => {
     })
   })
 
-  describe('OCI tag stripping', () => {
+  describe('OCI tag preservation', () => {
     const wrap = (subjects: unknown[]): string =>
       JSON.stringify({ version: 1, subjects })
 
-    it('should strip a trailing :tag from OCI names', () => {
+    it('should preserve a trailing :tag in the OCI subject name', () => {
       const result = parseArtifactsList(
         wrap([
           {
@@ -723,74 +724,14 @@ describe('parseArtifactsList', () => {
       )
 
       expect(result).toHaveLength(1)
-      expect(result[0].name).toBe('ghcr.io/owner/app')
+      expect(result[0].name).toBe('ghcr.io/owner/app:12345')
     })
 
-    it('should preserve a registry port when no tag is present', () => {
+    it('should preserve the tag while lowercasing when downcaseOCI is true', () => {
       const result = parseArtifactsList(
         wrap([
           {
-            name: 'localhost:5000/owner/app',
-            kind: 'oci',
-            digest: `sha256:${'a'.repeat(64)}`
-          }
-        ])
-      )
-
-      expect(result).toHaveLength(1)
-      expect(result[0].name).toBe('localhost:5000/owner/app')
-    })
-
-    it('should strip the tag but keep a registry port', () => {
-      const result = parseArtifactsList(
-        wrap([
-          {
-            name: 'localhost:5000/owner/app:12345',
-            kind: 'oci',
-            digest: `sha256:${'a'.repeat(64)}`
-          }
-        ])
-      )
-
-      expect(result).toHaveLength(1)
-      expect(result[0].name).toBe('localhost:5000/owner/app')
-    })
-
-    it('should leave OCI names without a tag unchanged', () => {
-      const result = parseArtifactsList(
-        wrap([
-          {
-            name: 'ghcr.io/owner/app',
-            kind: 'oci',
-            digest: `sha256:${'a'.repeat(64)}`
-          }
-        ])
-      )
-
-      expect(result).toHaveLength(1)
-      expect(result[0].name).toBe('ghcr.io/owner/app')
-    })
-
-    it('should NOT strip a colon from file-kind names', () => {
-      const result = parseArtifactsList(
-        wrap([
-          {
-            name: 'weird:name',
-            kind: 'file',
-            digest: `sha256:${'a'.repeat(64)}`
-          }
-        ])
-      )
-
-      expect(result).toHaveLength(1)
-      expect(result[0].name).toBe('weird:name')
-    })
-
-    it('should strip the tag then lowercase when downcaseOCI is true', () => {
-      const result = parseArtifactsList(
-        wrap([
-          {
-            name: 'ghcr.io/Owner/App:LatestBuild',
+            name: 'ghcr.io/Owner/App:v1',
             kind: 'oci',
             digest: `sha256:${'a'.repeat(64)}`
           }
@@ -799,10 +740,10 @@ describe('parseArtifactsList', () => {
       )
 
       expect(result).toHaveLength(1)
-      expect(result[0].name).toBe('ghcr.io/owner/app')
+      expect(result[0].name).toBe('ghcr.io/owner/app:v1')
     })
 
-    it('should collapse tag-only duplicate OCI names after stripping', () => {
+    it('should treat differently-tagged OCI names as distinct subjects', () => {
       const result = parseArtifactsList(
         wrap([
           {
@@ -818,8 +759,39 @@ describe('parseArtifactsList', () => {
         ])
       )
 
-      expect(result).toHaveLength(1)
-      expect(result[0].name).toBe('ghcr.io/owner/app')
+      expect(result).toHaveLength(2)
+      expect(result[0].name).toBe('ghcr.io/owner/app:v1')
+      expect(result[1].name).toBe('ghcr.io/owner/app:v2')
+    })
+  })
+
+  describe('stripOCITag', () => {
+    it('should strip a trailing :tag', () => {
+      expect(stripOCITag('ghcr.io/owner/app:12345')).toBe('ghcr.io/owner/app')
+    })
+
+    it('should leave a reference without a tag unchanged', () => {
+      expect(stripOCITag('ghcr.io/owner/app')).toBe('ghcr.io/owner/app')
+    })
+
+    it('should preserve a registry port when no tag is present', () => {
+      expect(stripOCITag('localhost:5000/owner/app')).toBe(
+        'localhost:5000/owner/app'
+      )
+    })
+
+    it('should strip the tag but keep a registry port', () => {
+      expect(stripOCITag('localhost:5000/owner/app:12345')).toBe(
+        'localhost:5000/owner/app'
+      )
+    })
+
+    it('should strip a bare "name:tag" reference with no registry path', () => {
+      expect(stripOCITag('app:v1')).toBe('app')
+    })
+
+    it('should leave a reference with no colon unchanged', () => {
+      expect(stripOCITag('ghcr.io/owner/app')).toBe('ghcr.io/owner/app')
     })
   })
 

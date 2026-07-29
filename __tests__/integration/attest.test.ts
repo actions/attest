@@ -4,7 +4,8 @@ import {
   createGitHubContextMock,
   createOctokitMock,
   TEST_PREDICATE,
-  TEST_SUBJECT_WITH_REGISTRY
+  TEST_SUBJECT_WITH_REGISTRY,
+  TEST_SUBJECT_WITH_REGISTRY_TAG
 } from '../fixtures/mocks'
 
 import type { Attestation } from '@actions/attest'
@@ -139,6 +140,24 @@ describe('createAttestation', () => {
 
       expect(mockAttachArtifactToImage).not.toHaveBeenCalled()
     })
+
+    it('should strip the image tag before pushing but keep it in the attestation subject', async () => {
+      const subjects = [TEST_SUBJECT_WITH_REGISTRY_TAG]
+
+      await createAttestation(subjects, TEST_PREDICATE, pushOpts)
+
+      // The attestation subject retains the tagged reference...
+      expect(mockAttest).toHaveBeenCalledWith(
+        expect.objectContaining({ subjects })
+      )
+      // ...but the registry-push path receives the bare reference.
+      expect(mockGetRegistryCredentials).toHaveBeenCalledWith(
+        'ghcr.io/test-owner/test-repo'
+      )
+      expect(mockAttachArtifactToImage).toHaveBeenCalledWith(
+        expect.objectContaining({ imageName: 'ghcr.io/test-owner/test-repo' })
+      )
+    })
   })
 
   describe('storage record creation', () => {
@@ -164,6 +183,20 @@ describe('createAttestation', () => {
         expect.anything()
       )
       expect(result.storageRecordIds).toEqual([12345])
+    })
+
+    it('should use the tag-stripped name in the storage record', async () => {
+      const subjects = [TEST_SUBJECT_WITH_REGISTRY_TAG]
+
+      await createAttestation(subjects, TEST_PREDICATE, storageOpts)
+
+      expect(mockCreateStorageRecord).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'ghcr.io/test-owner/test-repo' }),
+        expect.objectContaining({
+          registryUrl: 'https://ghcr.io'
+        }),
+        expect.anything()
+      )
     })
 
     it('should omit version from storage record when subjectVersion is empty', async () => {

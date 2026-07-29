@@ -227,10 +227,12 @@ Each entry must include a `name`, a `digest` in `algorithm:hex` format, and a
 When `push-to-registry` is enabled, the discovered artifacts list must contain
 exactly one subject and it must be an OCI-kind entry.
 
-For OCI-kind entries, any `:tag` in the `name` is ignored — the entry's
-`digest` identifies the exact image, so the subject name is normalized to a
-bare `registry/repository` reference (for example, `ghcr.io/owner/app:v1`
-becomes `ghcr.io/owner/app`).
+For OCI-kind entries, any `:tag` in the `name` is preserved in the attestation
+subject but is stripped when the attestation is pushed to the registry — the
+entry's `digest` identifies the exact image, and the registry push requires a
+bare `registry/repository` reference. For example, a subject named
+`ghcr.io/owner/app:v1` is recorded in the attestation as-is, but the
+attestation is attached to `ghcr.io/owner/app` by digest.
 
 ## Examples
 

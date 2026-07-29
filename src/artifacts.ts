@@ -36,11 +36,13 @@ export const errorMessage = (err: unknown): string =>
   err instanceof Error ? err.message : String(err)
 
 /**
- * Removes a trailing ":tag" from an OCI image reference. The artifact's digest
- * already pins the exact image, so a tag in the reference is redundant — and
- * the registry-push path rejects any name that isn't a bare "registry/repo"
- * reference. Only a colon appearing after the final path separator is treated
- * as a tag, so a registry port (e.g. "localhost:5000/repo") is preserved.
+ * Removes a trailing ":tag" from an OCI image reference, returning a bare
+ * "registry/repository" reference. The tag is preserved in the attestation
+ * subject but must be stripped before pushing the attestation to the registry:
+ * the artifact's digest already pins the exact image, and the registry-push
+ * path (@sigstore/oci) only accepts a bare reference. Only a colon appearing
+ * after the final path separator is treated as a tag, so a registry port
+ * (e.g. "localhost:5000/repo") is preserved.
  */
 export const stripOCITag = (name: string): string => {
   const lastSlash = name.lastIndexOf('/')
@@ -138,18 +140,14 @@ export const parseArtifactsList = (
     const e = entry as Record<string, unknown>
     const { name: rawName, kind, digest } = validateEntry(e, i)
 
-    // Normalize OCI names before dedup so tag-only / case-only duplicates
-    // collapse and true conflicts are detected. Strip any ":tag" (the digest
-    // pins the exact image, and the registry-push path only accepts a bare
-    // "registry/repo" reference) and lowercase when requested (e.g. for
-    // registry push).
-    let name = rawName
-    if (kind === 'oci') {
-      name = stripOCITag(name)
-      if (options?.downcaseOCI) {
-        name = name.toLowerCase()
-      }
-    }
+    // Normalize OCI names to lowercase when requested (e.g. for registry push).
+    // This must happen before dedup so that case-only duplicates collapse and
+    // case-colliding names with different digests are detected as conflicts.
+    // The image tag (if any) is intentionally preserved so it appears in the
+    // attestation subject; it is stripped later, only when the attestation is
+    // pushed to the registry (see stripOCITag usage in attest.ts).
+    const name =
+      options?.downcaseOCI && kind === 'oci' ? rawName.toLowerCase() : rawName
 
     // Check for conflicts or duplicates by normalized name
     const prev = seen.get(name)
