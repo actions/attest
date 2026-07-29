@@ -793,6 +793,18 @@ describe('parseArtifactsList', () => {
     it('should leave a reference with no colon unchanged', () => {
       expect(stripOCITag('ghcr.io/owner/app')).toBe('ghcr.io/owner/app')
     })
+
+    it('should leave a digest reference untouched', () => {
+      expect(stripOCITag(`ghcr.io/owner/app@sha256:${'a'.repeat(64)}`)).toBe(
+        `ghcr.io/owner/app@sha256:${'a'.repeat(64)}`
+      )
+    })
+
+    it('should leave a tag+digest reference untouched', () => {
+      expect(
+        stripOCITag(`ghcr.io/owner/app:v1@sha256:${'a'.repeat(64)}`)
+      ).toBe(`ghcr.io/owner/app:v1@sha256:${'a'.repeat(64)}`)
+    })
   })
 
   describe('requireSingleOCI option', () => {

@@ -122344,9 +122344,14 @@ const errorMessage = (err) => err instanceof Error ? err.message : String(err);
  * the artifact's digest already pins the exact image, and the registry-push
  * path (@sigstore/oci) only accepts a bare reference. Only a colon appearing
  * after the final path separator is treated as a tag, so a registry port
- * (e.g. "localhost:5000/repo") is preserved.
+ * (e.g. "localhost:5000/repo") is preserved. A digest reference
+ * (e.g. "…/app@sha256:…") is left untouched — the ':' inside the digest is
+ * not a tag separator.
  */
 const stripOCITag = (name) => {
+    // Never treat a colon inside a digest ("@sha256:…") as a tag separator.
+    if (name.includes('@'))
+        return name;
     const lastSlash = name.lastIndexOf('/');
     const lastColon = name.lastIndexOf(':');
     return lastColon > lastSlash ? name.slice(0, lastColon) : name;
