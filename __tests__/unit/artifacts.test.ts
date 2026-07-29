@@ -4,7 +4,8 @@ import path from 'path'
 import {
   errorMessage,
   readArtifactsList,
-  parseArtifactsList
+  parseArtifactsList,
+  bareImageName
 } from '../../src/artifacts'
 
 const ENV_KEY = 'GITHUB_ARTIFACTS_LIST'
@@ -704,6 +705,109 @@ describe('parseArtifactsList', () => {
       ).toThrow(
         /entry 1: duplicate name "ghcr.io\/owner\/app" with conflicting kind or digest/
       )
+    })
+  })
+
+  describe('OCI tag preservation', () => {
+    const wrap = (subjects: unknown[]): string =>
+      JSON.stringify({ version: 1, subjects })
+
+    it('should preserve a trailing :tag in the OCI subject name', () => {
+      const result = parseArtifactsList(
+        wrap([
+          {
+            name: 'ghcr.io/owner/app:12345',
+            kind: 'oci',
+            digest: `sha256:${'a'.repeat(64)}`
+          }
+        ])
+      )
+
+      expect(result).toHaveLength(1)
+      expect(result[0].name).toBe('ghcr.io/owner/app:12345')
+    })
+
+    it('should preserve the tag while lowercasing when downcaseOCI is true', () => {
+      const result = parseArtifactsList(
+        wrap([
+          {
+            name: 'ghcr.io/Owner/App:v1',
+            kind: 'oci',
+            digest: `sha256:${'a'.repeat(64)}`
+          }
+        ]),
+        { downcaseOCI: true }
+      )
+
+      expect(result).toHaveLength(1)
+      expect(result[0].name).toBe('ghcr.io/owner/app:v1')
+    })
+
+    it('should treat differently-tagged OCI names as distinct subjects', () => {
+      const result = parseArtifactsList(
+        wrap([
+          {
+            name: 'ghcr.io/owner/app:v1',
+            kind: 'oci',
+            digest: `sha256:${'a'.repeat(64)}`
+          },
+          {
+            name: 'ghcr.io/owner/app:v2',
+            kind: 'oci',
+            digest: `sha256:${'a'.repeat(64)}`
+          }
+        ])
+      )
+
+      expect(result).toHaveLength(2)
+      expect(result[0].name).toBe('ghcr.io/owner/app:v1')
+      expect(result[1].name).toBe('ghcr.io/owner/app:v2')
+    })
+  })
+
+  describe('bareImageName', () => {
+    const DIGEST = `sha256:${'a'.repeat(64)}`
+
+    it('should leave a bare reference unchanged', () => {
+      expect(bareImageName('ghcr.io/owner/app')).toBe('ghcr.io/owner/app')
+    })
+
+    it('should strip a trailing :tag', () => {
+      expect(bareImageName('ghcr.io/owner/app:12345')).toBe('ghcr.io/owner/app')
+    })
+
+    it('should strip a digest suffix', () => {
+      expect(bareImageName(`ghcr.io/owner/app@${DIGEST}`)).toBe(
+        'ghcr.io/owner/app'
+      )
+    })
+
+    it('should strip both a tag and a digest suffix', () => {
+      expect(bareImageName(`ghcr.io/owner/app:v1@${DIGEST}`)).toBe(
+        'ghcr.io/owner/app'
+      )
+    })
+
+    it('should preserve a registry port when no tag is present', () => {
+      expect(bareImageName('localhost:5000/owner/app')).toBe(
+        'localhost:5000/owner/app'
+      )
+    })
+
+    it('should strip the tag but keep a registry port', () => {
+      expect(bareImageName('localhost:5000/owner/app:12345')).toBe(
+        'localhost:5000/owner/app'
+      )
+    })
+
+    it('should strip a digest but keep a registry port', () => {
+      expect(bareImageName(`localhost:5000/owner/app@${DIGEST}`)).toBe(
+        'localhost:5000/owner/app'
+      )
+    })
+
+    it('should strip a bare "name:tag" reference with no registry path', () => {
+      expect(bareImageName('app:v1')).toBe('app')
     })
   })
 

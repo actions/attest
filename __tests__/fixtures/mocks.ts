@@ -203,6 +203,13 @@ export const TEST_SUBJECT_WITH_REGISTRY: Subject = {
   }
 }
 
+export const TEST_SUBJECT_WITH_REGISTRY_TAG: Subject = {
+  name: 'ghcr.io/test-owner/test-repo:v1.2.3',
+  digest: {
+    sha256: '7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32'
+  }
+}
+
 export const TEST_PREDICATE: Predicate = {
   type: 'https://example.com/predicate/v1',
   params: { foo: 'bar' }

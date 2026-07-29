@@ -36,6 +36,33 @@ export const errorMessage = (err: unknown): string =>
   err instanceof Error ? err.message : String(err)
 
 /**
+ * Reduces an OCI image reference to a bare "registry/repository" reference by
+ * removing any tag and/or digest suffix. A tag or digest is preserved in the
+ * attestation subject but must be stripped before pushing the attestation to
+ * the registry: the subject's digest already pins the exact image, and the
+ * registry-push path (@sigstore/oci) only accepts a bare reference.
+ *
+ * Handles every reference form:
+ *   - foo/bar              -> foo/bar
+ *   - foo/bar:tag          -> foo/bar
+ *   - foo/bar@sha256:…      -> foo/bar
+ *   - foo/bar:tag@sha256:…  -> foo/bar
+ *
+ * A registry port (e.g. "localhost:5000/repo") is preserved, since only a
+ * colon appearing after the final path separator is treated as a tag.
+ */
+export const bareImageName = (name: string): string => {
+  // Drop a digest suffix ("@sha256:…") first, if present.
+  const atIndex = name.indexOf('@')
+  const ref = atIndex === -1 ? name : name.slice(0, atIndex)
+  // Then drop a tag suffix (":tag"), but not a registry port (a colon that
+  // appears before the final path separator).
+  const lastSlash = ref.lastIndexOf('/')
+  const lastColon = ref.lastIndexOf(':')
+  return lastColon > lastSlash ? ref.slice(0, lastColon) : ref
+}
+
+/**
  * Reads and parses the runner-generated artifacts list file identified by
  * the $GITHUB_ARTIFACTS_LIST environment variable. Returns undefined when
  * the env var is unset or blank (caller should treat this as "no discovered
@@ -128,6 +155,9 @@ export const parseArtifactsList = (
     // Normalize OCI names to lowercase when requested (e.g. for registry push).
     // This must happen before dedup so that case-only duplicates collapse and
     // case-colliding names with different digests are detected as conflicts.
+    // The image tag (if any) is intentionally preserved so it appears in the
+    // attestation subject; it is stripped later, only when the attestation is
+    // pushed to the registry (see bareImageName usage in attest.ts).
     const name =
       options?.downcaseOCI && kind === 'oci' ? rawName.toLowerCase() : rawName
 
