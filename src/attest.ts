@@ -8,7 +8,7 @@ import {
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 import { attachArtifactToImage, getRegistryCredentials } from '@sigstore/oci'
-import { stripOCITag } from './artifacts'
+import { bareImageName } from './artifacts'
 import { formatSubjectDigest } from './subject'
 
 const OCI_TIMEOUT = 30000
@@ -44,10 +44,11 @@ export const createAttestation = async (
 
   if (subjects.length === 1 && opts.pushToRegistry) {
     const subject = subjects[0]
-    // The attestation subject may carry an image tag (e.g. "…/app:v1"), but
-    // the registry-push APIs require a bare "registry/repository" reference.
-    // Strip the tag here; the subject digest still pins the exact image.
-    const imageName = stripOCITag(subject.name)
+    // The attestation subject may carry a tag and/or digest
+    // (e.g. "…/app:v1" or "…/app:v1@sha256:…"), but the registry-push APIs
+    // require a bare "registry/repository" reference. Reduce it here; the
+    // subject digest still pins the exact image.
+    const imageName = bareImageName(subject.name)
     const credentials = getRegistryCredentials(imageName)
     const subjectDigest = formatSubjectDigest(subject)
     const artifact = await attachArtifactToImage({

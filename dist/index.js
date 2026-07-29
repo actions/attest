@@ -122338,23 +122338,30 @@ const HEX_RE = /^[0-9a-fA-F]+$/;
  */
 const errorMessage = (err) => err instanceof Error ? err.message : String(err);
 /**
- * Removes a trailing ":tag" from an OCI image reference, returning a bare
- * "registry/repository" reference. The tag is preserved in the attestation
- * subject but must be stripped before pushing the attestation to the registry:
- * the artifact's digest already pins the exact image, and the registry-push
- * path (@sigstore/oci) only accepts a bare reference. Only a colon appearing
- * after the final path separator is treated as a tag, so a registry port
- * (e.g. "localhost:5000/repo") is preserved. A digest reference
- * (e.g. "…/app@sha256:…") is left untouched — the ':' inside the digest is
- * not a tag separator.
+ * Reduces an OCI image reference to a bare "registry/repository" reference by
+ * removing any tag and/or digest suffix. A tag or digest is preserved in the
+ * attestation subject but must be stripped before pushing the attestation to
+ * the registry: the subject's digest already pins the exact image, and the
+ * registry-push path (@sigstore/oci) only accepts a bare reference.
+ *
+ * Handles every reference form:
+ *   - foo/bar              -> foo/bar
+ *   - foo/bar:tag          -> foo/bar
+ *   - foo/bar@sha256:…      -> foo/bar
+ *   - foo/bar:tag@sha256:…  -> foo/bar
+ *
+ * A registry port (e.g. "localhost:5000/repo") is preserved, since only a
+ * colon appearing after the final path separator is treated as a tag.
  */
-const stripOCITag = (name) => {
-    // Never treat a colon inside a digest ("@sha256:…") as a tag separator.
-    if (name.includes('@'))
-        return name;
-    const lastSlash = name.lastIndexOf('/');
-    const lastColon = name.lastIndexOf(':');
-    return lastColon > lastSlash ? name.slice(0, lastColon) : name;
+const bareImageName = (name) => {
+    // Drop a digest suffix ("@sha256:…") first, if present.
+    const atIndex = name.indexOf('@');
+    const ref = atIndex === -1 ? name : name.slice(0, atIndex);
+    // Then drop a tag suffix (":tag"), but not a registry port (a colon that
+    // appears before the final path separator).
+    const lastSlash = ref.lastIndexOf('/');
+    const lastColon = ref.lastIndexOf(':');
+    return lastColon > lastSlash ? ref.slice(0, lastColon) : ref;
 };
 /**
  * Reads and parses the runner-generated artifacts list file identified by
@@ -122430,7 +122437,7 @@ const parseArtifactsList = (content, options) => {
         // case-colliding names with different digests are detected as conflicts.
         // The image tag (if any) is intentionally preserved so it appears in the
         // attestation subject; it is stripped later, only when the attestation is
-        // pushed to the registry (see stripOCITag usage in attest.ts).
+        // pushed to the registry (see bareImageName usage in attest.ts).
         const name = options?.downcaseOCI && kind === 'oci' ? rawName.toLowerCase() : rawName;
         // Check for conflicts or duplicates by normalized name
         const prev = seen.get(name);
@@ -128239,10 +128246,11 @@ const createAttestation = async (subjects, predicate, opts) => {
     const result = attestation;
     if (subjects.length === 1 && opts.pushToRegistry) {
         const subject = subjects[0];
-        // The attestation subject may carry an image tag (e.g. "…/app:v1"), but
-        // the registry-push APIs require a bare "registry/repository" reference.
-        // Strip the tag here; the subject digest still pins the exact image.
-        const imageName = stripOCITag(subject.name);
+        // The attestation subject may carry a tag and/or digest
+        // (e.g. "…/app:v1" or "…/app:v1@sha256:…"), but the registry-push APIs
+        // require a bare "registry/repository" reference. Reduce it here; the
+        // subject digest still pins the exact image.
+        const imageName = bareImageName(subject.name);
         const credentials = (0,oci_dist/* getRegistryCredentials */.U2)(imageName);
         const subjectDigest = formatSubjectDigest(subject);
         const artifact = await (0,oci_dist/* attachArtifactToImage */.Kg)({

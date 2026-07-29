@@ -5,7 +5,7 @@ import {
   errorMessage,
   readArtifactsList,
   parseArtifactsList,
-  stripOCITag
+  bareImageName
 } from '../../src/artifacts'
 
 const ENV_KEY = 'GITHUB_ARTIFACTS_LIST'
@@ -765,45 +765,49 @@ describe('parseArtifactsList', () => {
     })
   })
 
-  describe('stripOCITag', () => {
-    it('should strip a trailing :tag', () => {
-      expect(stripOCITag('ghcr.io/owner/app:12345')).toBe('ghcr.io/owner/app')
+  describe('bareImageName', () => {
+    const DIGEST = `sha256:${'a'.repeat(64)}`
+
+    it('should leave a bare reference unchanged', () => {
+      expect(bareImageName('ghcr.io/owner/app')).toBe('ghcr.io/owner/app')
     })
 
-    it('should leave a reference without a tag unchanged', () => {
-      expect(stripOCITag('ghcr.io/owner/app')).toBe('ghcr.io/owner/app')
+    it('should strip a trailing :tag', () => {
+      expect(bareImageName('ghcr.io/owner/app:12345')).toBe('ghcr.io/owner/app')
+    })
+
+    it('should strip a digest suffix', () => {
+      expect(bareImageName(`ghcr.io/owner/app@${DIGEST}`)).toBe(
+        'ghcr.io/owner/app'
+      )
+    })
+
+    it('should strip both a tag and a digest suffix', () => {
+      expect(bareImageName(`ghcr.io/owner/app:v1@${DIGEST}`)).toBe(
+        'ghcr.io/owner/app'
+      )
     })
 
     it('should preserve a registry port when no tag is present', () => {
-      expect(stripOCITag('localhost:5000/owner/app')).toBe(
+      expect(bareImageName('localhost:5000/owner/app')).toBe(
         'localhost:5000/owner/app'
       )
     })
 
     it('should strip the tag but keep a registry port', () => {
-      expect(stripOCITag('localhost:5000/owner/app:12345')).toBe(
+      expect(bareImageName('localhost:5000/owner/app:12345')).toBe(
+        'localhost:5000/owner/app'
+      )
+    })
+
+    it('should strip a digest but keep a registry port', () => {
+      expect(bareImageName(`localhost:5000/owner/app@${DIGEST}`)).toBe(
         'localhost:5000/owner/app'
       )
     })
 
     it('should strip a bare "name:tag" reference with no registry path', () => {
-      expect(stripOCITag('app:v1')).toBe('app')
-    })
-
-    it('should leave a reference with no colon unchanged', () => {
-      expect(stripOCITag('ghcr.io/owner/app')).toBe('ghcr.io/owner/app')
-    })
-
-    it('should leave a digest reference untouched', () => {
-      expect(stripOCITag(`ghcr.io/owner/app@sha256:${'a'.repeat(64)}`)).toBe(
-        `ghcr.io/owner/app@sha256:${'a'.repeat(64)}`
-      )
-    })
-
-    it('should leave a tag+digest reference untouched', () => {
-      expect(
-        stripOCITag(`ghcr.io/owner/app:v1@sha256:${'a'.repeat(64)}`)
-      ).toBe(`ghcr.io/owner/app:v1@sha256:${'a'.repeat(64)}`)
+      expect(bareImageName('app:v1')).toBe('app')
     })
   })
 
