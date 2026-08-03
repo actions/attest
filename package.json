@@ -82,7 +82,7 @@
     "@actions/core": "^3.0.1",
     "@actions/github": "^9.1.1",
     "@actions/glob": "^0.7.0",
-    "@sigstore/oci": "^0.7.1",
+    "@sigstore/oci": "^0.7.2",
     "csv-parse": "^7.0.1"
   },
   "devDependencies": {
