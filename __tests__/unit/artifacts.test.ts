@@ -811,7 +811,7 @@ describe('parseArtifactsList', () => {
     })
   })
 
-  describe('requireSingleOCI option', () => {
+  describe('requireOCI option', () => {
     const wrap = (subjects: unknown[]): string =>
       JSON.stringify({ version: 1, subjects })
 
@@ -824,7 +824,7 @@ describe('parseArtifactsList', () => {
             digest: `sha256:${'a'.repeat(64)}`
           }
         ]),
-        { requireSingleOCI: true }
+        { requireOCI: true }
       )
 
       expect(result).toHaveLength(1)
@@ -841,7 +841,7 @@ describe('parseArtifactsList', () => {
               digest: `sha256:${'a'.repeat(64)}`
             }
           ]),
-          { requireSingleOCI: true }
+          { requireOCI: true }
         )
       ).toThrow(
         /push-to-registry requires an OCI subject but the discovered artifacts list contains file-kind subjects/
@@ -863,45 +863,43 @@ describe('parseArtifactsList', () => {
               digest: `sha256:${'b'.repeat(64)}`
             }
           ]),
-          { requireSingleOCI: true }
+          { requireOCI: true }
         )
       ).toThrow(
         /push-to-registry requires an OCI subject but the discovered artifacts list contains file-kind subjects/
       )
     })
 
-    it('should reject multiple OCI subjects', () => {
-      expect(() =>
-        parseArtifactsList(
-          wrap([
-            {
-              name: 'ghcr.io/owner/app1',
-              kind: 'oci',
-              digest: `sha256:${'a'.repeat(64)}`
-            },
-            {
-              name: 'ghcr.io/owner/app2',
-              kind: 'oci',
-              digest: `sha256:${'b'.repeat(64)}`
-            }
-          ]),
-          { requireSingleOCI: true }
-        )
-      ).toThrow(
-        /push-to-registry requires exactly one subject but the discovered artifacts list contains multiple subjects/
+    it('should allow multiple OCI subjects when requireOCI is set', () => {
+      const result = parseArtifactsList(
+        wrap([
+          {
+            name: 'ghcr.io/owner/app1',
+            kind: 'oci',
+            digest: `sha256:${'a'.repeat(64)}`
+          },
+          {
+            name: 'ghcr.io/owner/app2',
+            kind: 'oci',
+            digest: `sha256:${'b'.repeat(64)}`
+          }
+        ]),
+        { requireOCI: true }
       )
+
+      expect(result).toHaveLength(2)
     })
 
     it('should allow empty subjects (no-op for empty list)', () => {
       const result = parseArtifactsList(
         wrap([]),
-        { requireSingleOCI: true }
+        { requireOCI: true }
       )
 
       expect(result).toEqual([])
     })
 
-    it('should not enforce requireSingleOCI when option is false', () => {
+    it('should not enforce requireOCI when option is false', () => {
       const result = parseArtifactsList(
         wrap([
           {
@@ -910,13 +908,13 @@ describe('parseArtifactsList', () => {
             digest: `sha256:${'a'.repeat(64)}`
           }
         ]),
-        { requireSingleOCI: false }
+        { requireOCI: false }
       )
 
       expect(result).toHaveLength(1)
     })
 
-    it('should not enforce requireSingleOCI when options are omitted', () => {
+    it('should not enforce requireOCI when options are omitted', () => {
       const result = parseArtifactsList(
         wrap([
           {
