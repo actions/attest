@@ -1,4 +1,5 @@
-# Rebuilds the transpiled `dist/` for Dependabot production-dependency bumps.
+# Rebuilds the transpiled `dist/` for Dependabot dependency bumps that may
+# affect the generated bundle.
 # This half is deliberately UNPRIVILEGED: it runs in the pull_request context
 # with a read-only token and no secrets, so freshly-bumped (and therefore
 # untrusted) dependency code never coexists with a write credential. It only
@@ -18,6 +19,7 @@ jobs:
   rebuild:
     name: Rebuild dist/
     # Only Dependabot PRs are eligible; everything else is covered by check-dist.
+    # Both production and development dependency bumps may affect dist/.
     if: github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
@@ -26,11 +28,15 @@ jobs:
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
 
       - name: Checkout
-        if: steps.meta.outputs.dependency-type == 'direct:production'
+        if: >
+          steps.meta.outputs.dependency-type == 'direct:production' ||
+          steps.meta.outputs.dependency-type == 'direct:development'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        if: steps.meta.outputs.dependency-type == 'direct:production'
+        if: >
+          steps.meta.outputs.dependency-type == 'direct:production' ||
+          steps.meta.outputs.dependency-type == 'direct:development'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
@@ -39,16 +45,22 @@ jobs:
       # --ignore-scripts prevents lifecycle scripts of the bumped dependency
       # from running during install; the bundle step is the only build we run.
       - name: Install Dependencies
-        if: steps.meta.outputs.dependency-type == 'direct:production'
+        if: >
+          steps.meta.outputs.dependency-type == 'direct:production' ||
+          steps.meta.outputs.dependency-type == 'direct:development'
         run: npm ci --ignore-scripts
 
       - name: Build dist/ Directory
-        if: steps.meta.outputs.dependency-type == 'direct:production'
+        if: >
+          steps.meta.outputs.dependency-type == 'direct:production' ||
+          steps.meta.outputs.dependency-type == 'direct:development'
         run: npm run bundle
 
       - name: Detect dist/ changes
         id: diff
-        if: steps.meta.outputs.dependency-type == 'direct:production'
+        if: >
+          steps.meta.outputs.dependency-type == 'direct:production' ||
+          steps.meta.outputs.dependency-type == 'direct:development'
         run: |
           if [ "$(git diff --ignore-space-at-eol --text dist/ | wc -l)" -gt "0" ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
