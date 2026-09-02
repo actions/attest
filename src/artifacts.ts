@@ -26,7 +26,7 @@ export type ArtifactsList = {
 
 export type ArtifactsListOptions = {
   downcaseOCI?: boolean
-  requireSingleOCI?: boolean
+  requireOCI?: boolean
 }
 
 /**
@@ -185,10 +185,11 @@ export const parseArtifactsList = (
     })
   }
 
-  // When requireSingleOCI is set (registry push flow), enforce that exactly
-  // one subject was discovered and that it is OCI-kind. This prevents file
-  // subjects from leaking into the registry push path.
-  if (options?.requireSingleOCI && subjects.length > 0) {
+  // When requireOCI is set (registry push flow), enforce that all discovered
+  // subjects are OCI-kind. This prevents file subjects from leaking into the
+  // registry push path. Cardinality enforcement is handled by the caller
+  // based on the selected attestation mode.
+  if (options?.requireOCI && subjects.length > 0) {
     // Re-check kinds from the validated entries — we tracked them in `seen`
     const kinds = [...seen.values()].map(v => v.kind)
     const hasNonOCI = kinds.some(k => k !== 'oci')
@@ -196,11 +197,6 @@ export const parseArtifactsList = (
     if (hasNonOCI) {
       throw new Error(
         'push-to-registry requires an OCI subject but the discovered artifacts list contains file-kind subjects'
-      )
-    }
-    if (subjects.length > 1) {
-      throw new Error(
-        'push-to-registry requires exactly one subject but the discovered artifacts list contains multiple subjects'
       )
     }
   }
