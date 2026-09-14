@@ -68,23 +68,13 @@ jobs:
             echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # Persist the context the privileged workflow needs. workflow_run cannot
-      # trust head_ref from its own event payload alone, so we hand it over
-      # explicitly as artifact metadata.
-      - name: Record PR context
-        if: steps.diff.outputs.changed == 'true'
-        run: |
-          mkdir -p dist-meta
-          echo "${{ github.event.pull_request.number }}"   > dist-meta/pr-number
-          echo "${{ github.event.pull_request.head.ref }}" > dist-meta/head-ref
-          echo "${{ github.event.pull_request.head.sha }}" > dist-meta/head-sha
-
+      # Only the built bytes cross the privilege boundary. The consumer derives
+      # the PR branch and head SHA from its own `workflow_run` payload, so no
+      # control-flow metadata is carried in the artifact.
       - name: Upload rebuilt dist/
         if: steps.diff.outputs.changed == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: rebuilt-dist
-          path: |
-            dist/
-            dist-meta/
+          path: dist/
           retention-days: 1

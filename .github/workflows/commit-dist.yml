@@ -4,6 +4,11 @@
 # git-pushes them. Because it triggers on workflow_run, the workflow definition
 # executed here is the trusted copy from the default branch.
 #
+# Everything that decides *where* this workflow writes — the eligibility checks
+# and the target branch — is read from the `workflow_run` payload, which GitHub
+# populates and the builder job cannot influence. The downloaded artifact is
+# treated purely as opaque bytes to be committed; it never steers control flow.
+#
 # NOTE: pushes made with the default GITHUB_TOKEN do NOT re-trigger `on:
 # pull_request` workflows, so `check-dist.yml` will not automatically re-verify
 # the committed dist/. The verify-head guard below is our integrity check.
@@ -24,10 +29,16 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    # Only proceed for successful builder runs that were triggered by a PR.
+    # Only proceed for successful builder runs triggered by a Dependabot pull
+    # request whose head branch lives in this repository. Fork-originated runs
+    # are rejected outright: a `pull_request` run executes the PR's own copy of
+    # `rebuild-dist.yml`, so nothing such a run produces is trustworthy.
     if: >
       github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'pull_request'
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.actor.login == 'dependabot[bot]' &&
+      startsWith(github.event.workflow_run.head_branch, 'dependabot/')
     steps:
       - name: Download rebuilt dist/
         id: download
@@ -40,52 +51,41 @@ jobs:
           # Download OUTSIDE the checkout workspace: the later actions/checkout
           # step runs `git clean -ffdx`, which would delete an untracked
           # `incoming/` dir inside the workspace before we can use it.
-          path: ${{ runner.temp }}/incoming
+          #
+          # upload-artifact roots an artifact at the least common ancestor of
+          # its input paths, so `rebuilt-dist` holds the *contents* of dist/.
+          # Extract into `incoming/dist` to restore the expected layout.
+          path: ${{ runner.temp }}/incoming/dist
 
       # No artifact => the builder found dist/ already up to date. Nothing to do.
-      # The head-ref/head-sha values come from an artifact produced in the
-      # (unprivileged) PR context, so validate them strictly before writing to
-      # $GITHUB_OUTPUT to avoid workflow-command injection.
+      # Key off the bundle entrypoint rather than the directory: an unexpected
+      # artifact layout then no-ops instead of committing a malformed dist/.
       - name: Check for artifact
         id: check
         run: |
-          incoming="${{ runner.temp }}/incoming"
-          if [ ! -d "$incoming/dist" ] || [ ! -f "$incoming/dist-meta/head-ref" ] || [ ! -f "$incoming/dist-meta/head-sha" ]; then
+          if [ -f "${{ runner.temp }}/incoming/dist/index.js" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
             echo "present=false" >> "$GITHUB_OUTPUT"
-            exit 0
           fi
-
-          head_ref="$(head -n1 "$incoming/dist-meta/head-ref" | tr -d '\r\n')"
-          head_sha="$(head -n1 "$incoming/dist-meta/head-sha" | tr -d '\r\n')"
-
-          if ! printf '%s' "$head_sha" | grep -Eq '^[0-9a-f]{40}$'; then
-            echo "Invalid head-sha; refusing to proceed." >&2
-            exit 1
-          fi
-          if ! printf '%s' "$head_ref" | grep -Eq '^[A-Za-z0-9._/-]+$'; then
-            echo "Invalid head-ref; refusing to proceed." >&2
-            exit 1
-          fi
-
-          echo "present=true" >> "$GITHUB_OUTPUT"
-          echo "head-ref=$head_ref" >> "$GITHUB_OUTPUT"
-          echo "head-sha=$head_sha" >> "$GITHUB_OUTPUT"
 
       - name: Checkout PR branch
         if: steps.check.outputs.present == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ steps.check.outputs.head-ref }}
+          ref: ${{ github.event.workflow_run.head_branch }}
           token: ${{ github.token }}
 
       # Guard against a race: if the PR branch advanced after the builder ran,
       # bail rather than committing a dist/ built from a stale tree.
       - name: Verify head is unchanged
         if: steps.check.outputs.present == 'true'
+        env:
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           current="$(git rev-parse HEAD)"
-          if [ "$current" != "${{ steps.check.outputs.head-sha }}" ]; then
-            echo "PR branch moved ($current != ${{ steps.check.outputs.head-sha }}); skipping."
+          if [ "$current" != "$EXPECTED_SHA" ]; then
+            echo "PR branch moved ($current != $EXPECTED_SHA); skipping."
             exit 1
           fi
 
@@ -98,6 +98,8 @@ jobs:
 
       - name: Commit and push
         if: steps.check.outputs.present == 'true'
+        env:
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
           if git diff --quiet -- dist/; then
             echo "dist/ already current; nothing to commit."
@@ -107,4 +109,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add dist/
           git commit -m "build: rebuild dist/ for dependency bump"
-          git push origin HEAD:${{ steps.check.outputs.head-ref }}
+          git push origin "HEAD:refs/heads/$HEAD_BRANCH"
