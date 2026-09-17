@@ -103,6 +103,7 @@ const defaultInputs: RunInputs = {
   createStorageRecord: false,
   subjectVersion: '',
   showSummary: false,
+  singleSubjectAttestations: false,
   githubToken: 'test-token',
   privateSigning: false
 }
@@ -405,7 +406,11 @@ describe('run', () => {
     it('should write summary when showSummary is true', async () => {
       await run(validInputs)
 
-      expect(summaryMock.addHeading).toHaveBeenCalled()
+      expect(summaryMock.addHeading).toHaveBeenCalledWith(
+        'Attestation Created',
+        3
+      )
+      expect(summaryMock.addTable).toHaveBeenCalled()
       expect(summaryMock.write).toHaveBeenCalled()
     })
 
@@ -413,6 +418,27 @@ describe('run', () => {
       await run({ ...validInputs, showSummary: false })
 
       expect(summaryMock.write).not.toHaveBeenCalled()
+    })
+
+    it('should use plural heading for multiple attestations', async () => {
+      const checksums = [
+        `${'a'.repeat(64)} artifact-a`,
+        `${'b'.repeat(64)} artifact-b`
+      ].join('\n')
+
+      await run({
+        ...defaultInputs,
+        subjectChecksums: checksums,
+        predicateType: 'https://example.com/predicate',
+        predicate: '{}',
+        singleSubjectAttestations: true,
+        showSummary: true
+      })
+
+      expect(summaryMock.addHeading).toHaveBeenCalledWith(
+        'Attestations Created',
+        3
+      )
     })
   })
 
@@ -534,7 +560,7 @@ describe('run', () => {
       expect(mockAttest).not.toHaveBeenCalled()
     })
 
-    it('should fail when multiple discovered OCI subjects are used with push-to-registry', async () => {
+    it('should fail when multiple discovered OCI subjects are used with push-to-registry in default mode', async () => {
       const listPath = path.join(tempDir, 'artifacts.json')
       await fs.writeFile(
         listPath,
@@ -566,11 +592,45 @@ describe('run', () => {
       expect(setFailedMock).toHaveBeenCalledWith(
         expect.objectContaining({
           message: expect.stringMatching(
-            /push-to-registry requires exactly one subject/
+            /push-to-registry requires exactly one subject but 2 subjects were resolved/
           )
         })
       )
       expect(mockAttest).not.toHaveBeenCalled()
+    })
+
+    it('should allow multiple discovered OCI subjects with push-to-registry in single-subject mode', async () => {
+      const listPath = path.join(tempDir, 'artifacts.json')
+      await fs.writeFile(
+        listPath,
+        JSON.stringify({
+          version: 1,
+          subjects: [
+            {
+              name: 'ghcr.io/owner/app1',
+              kind: 'oci',
+              digest: `sha256:${'a'.repeat(64)}`
+            },
+            {
+              name: 'ghcr.io/owner/app2',
+              kind: 'oci',
+              digest: `sha256:${'b'.repeat(64)}`
+            }
+          ]
+        })
+      )
+      process.env.GITHUB_ARTIFACTS_LIST = listPath
+
+      await run({
+        ...defaultInputs,
+        pushToRegistry: true,
+        singleSubjectAttestations: true,
+        predicateType: 'https://example.com/predicate',
+        predicate: '{}'
+      })
+
+      expect(setFailedMock).not.toHaveBeenCalled()
+      expect(mockAttest).toHaveBeenCalledTimes(2)
     })
 
     it('should allow SHA-512 subject-checksums when pushToRegistry is false', async () => {
@@ -611,7 +671,7 @@ describe('run', () => {
       expect(setFailedMock).toHaveBeenCalledWith(
         expect.objectContaining({
           message: expect.stringMatching(
-            /push-to-registry requires a subject with a SHA-256 digest/
+            /push-to-registry requires each subject to have only a SHA-256 digest/
           )
         })
       )
@@ -672,7 +732,7 @@ describe('run', () => {
       expect(setFailedMock).toHaveBeenCalledWith(
         expect.objectContaining({
           message: expect.stringMatching(
-            /push-to-registry requires a subject with a SHA-256 digest/
+            /push-to-registry requires each subject to have only a SHA-256 digest/
           )
         })
       )
@@ -700,6 +760,274 @@ describe('run', () => {
           ]
         })
       )
+    })
+  })
+
+  describe('results-path output', () => {
+    it('should always set results-path output', async () => {
+      await run({
+        ...defaultInputs,
+        subjectName: 'artifact',
+        subjectDigest:
+          'sha256:7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32',
+        predicateType: 'https://example.com/predicate',
+        predicate: '{}'
+      })
+
+      expect(setOutputMock).toHaveBeenCalledWith(
+        'results-path',
+        expect.stringContaining('attestation-results.json')
+      )
+    })
+
+    it('should write valid JSON results for default single attestation', async () => {
+      await run({
+        ...defaultInputs,
+        subjectName: 'artifact',
+        subjectDigest:
+          'sha256:7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32',
+        predicateType: 'https://example.com/predicate',
+        predicate: '{}'
+      })
+
+      const resultsPath = setOutputMock.mock.calls.find(
+        (call: unknown[]) => call[0] === 'results-path'
+      )?.[1] as string
+      const results = JSON.parse(await fs.readFile(resultsPath, 'utf-8'))
+
+      expect(results).toEqual([
+        expect.objectContaining({
+          status: 'success',
+          bundleLine: 1,
+          attestationId: 'att-123'
+        })
+      ])
+    })
+  })
+
+  describe('single-subject attestations', () => {
+    it('should create one attestation per subject when enabled', async () => {
+      const checksums = [
+        `${'a'.repeat(64)} artifact-a`,
+        `${'b'.repeat(64)} artifact-b`,
+        `${'c'.repeat(64)} artifact-c`
+      ].join('\n')
+
+      await run({
+        ...defaultInputs,
+        subjectChecksums: checksums,
+        predicateType: 'https://example.com/predicate',
+        predicate: '{}',
+        singleSubjectAttestations: true
+      })
+
+      expect(mockAttest).toHaveBeenCalledTimes(3)
+      expect(mockAttest.mock.calls.map((c: unknown[]) => (c as [{ subjects: unknown }])[0].subjects)).toEqual([
+        [{ name: 'artifact-a', digest: { sha256: 'a'.repeat(64) } }],
+        [{ name: 'artifact-b', digest: { sha256: 'b'.repeat(64) } }],
+        [{ name: 'artifact-c', digest: { sha256: 'c'.repeat(64) } }]
+      ])
+    })
+
+    it('should keep one multi-subject attestation by default', async () => {
+      const checksums = [
+        `${'a'.repeat(64)} artifact-a`,
+        `${'b'.repeat(64)} artifact-b`
+      ].join('\n')
+
+      await run({
+        ...defaultInputs,
+        subjectChecksums: checksums,
+        predicateType: 'https://example.com/predicate',
+        predicate: '{}'
+      })
+
+      expect(mockAttest).toHaveBeenCalledTimes(1)
+      expect(mockAttest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subjects: expect.arrayContaining([
+            expect.objectContaining({ name: 'artifact-a' }),
+            expect.objectContaining({ name: 'artifact-b' })
+          ])
+        })
+      )
+    })
+
+    it('should wait one second between single-subject operations', async () => {
+      const callTimestamps: number[] = []
+      mockAttest.mockImplementation(async () => {
+        callTimestamps.push(Date.now())
+        return await Promise.resolve(createAttestationResult())
+      })
+
+      await run({
+        ...defaultInputs,
+        subjectChecksums: [
+          `${'a'.repeat(64)} artifact-a`,
+          `${'b'.repeat(64)} artifact-b`
+        ].join('\n'),
+        predicateType: 'https://example.com/predicate',
+        predicate: '{}',
+        singleSubjectAttestations: true
+      })
+
+      expect(callTimestamps).toHaveLength(2)
+      const elapsed = callTimestamps[1] - callTimestamps[0]
+      expect(elapsed).toBeGreaterThanOrEqual(1000)
+    })
+
+    it('should reject more than 100 subjects in single-subject mode', async () => {
+      const checksums = Array.from(
+        { length: 101 },
+        (_, index) =>
+          `${index.toString(16).padStart(64, '0')} artifact-${index}`
+      ).join('\n')
+
+      await run({
+        ...defaultInputs,
+        subjectChecksums: checksums,
+        predicateType: 'https://example.com/predicate',
+        predicate: '{}',
+        singleSubjectAttestations: true
+      })
+
+      expect(setFailedMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringContaining(
+            'single-subject-attestations supports at most 100 subjects'
+          )
+        })
+      )
+      expect(mockAttest).not.toHaveBeenCalled()
+    })
+
+    it('should continue after a subject failure and fail after all attempts', async () => {
+      mockAttest
+        .mockResolvedValueOnce(
+          createAttestationResult({ attestationID: 'att-1' })
+        )
+        .mockRejectedValueOnce(new Error('service unavailable'))
+        .mockResolvedValueOnce(
+          createAttestationResult({ attestationID: 'att-3' })
+        )
+
+      const checksums = [
+        `${'a'.repeat(64)} artifact-a`,
+        `${'b'.repeat(64)} artifact-b`,
+        `${'c'.repeat(64)} artifact-c`
+      ].join('\n')
+
+      await run({
+        ...defaultInputs,
+        subjectChecksums: checksums,
+        predicateType: 'https://example.com/predicate',
+        predicate: '{}',
+        singleSubjectAttestations: true
+      })
+
+      expect(mockAttest).toHaveBeenCalledTimes(3)
+      expect(setFailedMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringContaining('1 of 3 attestations failed')
+        })
+      )
+
+      // Verify the JSON results file
+      const resultsPath = setOutputMock.mock.calls.find(
+        (call: unknown[]) => call[0] === 'results-path'
+      )?.[1] as string
+      const results = JSON.parse(await fs.readFile(resultsPath, 'utf-8'))
+
+      expect(results).toEqual([
+        expect.objectContaining({
+          subjects: [expect.objectContaining({ name: 'artifact-a' })],
+          status: 'success',
+          attestationId: 'att-1',
+          bundleLine: 1
+        }),
+        expect.objectContaining({
+          subjects: [expect.objectContaining({ name: 'artifact-b' })],
+          status: 'failure',
+          error: 'service unavailable'
+        }),
+        expect.objectContaining({
+          subjects: [expect.objectContaining({ name: 'artifact-c' })],
+          status: 'success',
+          attestationId: 'att-3',
+          bundleLine: 2
+        })
+      ])
+
+      // Verify the shared bundle file has one JSONL record per success
+      const bundlePath = setOutputMock.mock.calls.find(
+        (call: unknown[]) => call[0] === 'bundle-path'
+      )?.[1] as string
+      const bundleLines = (await fs.readFile(bundlePath, 'utf-8'))
+        .trim()
+        .split(/\r?\n/)
+      expect(bundleLines).toHaveLength(2)
+    })
+
+    it('should omit singular outputs for multi-attempt runs', async () => {
+      const checksums = [
+        `${'a'.repeat(64)} artifact-a`,
+        `${'b'.repeat(64)} artifact-b`
+      ].join('\n')
+
+      await run({
+        ...defaultInputs,
+        subjectChecksums: checksums,
+        predicateType: 'https://example.com/predicate',
+        predicate: '{}',
+        singleSubjectAttestations: true
+      })
+
+      expect(setOutputMock).not.toHaveBeenCalledWith(
+        'attestation-id',
+        expect.anything()
+      )
+      expect(setOutputMock).not.toHaveBeenCalledWith(
+        'attestation-url',
+        expect.anything()
+      )
+    })
+
+    it('should set singular outputs when single-subject mode has exactly one subject', async () => {
+      await run({
+        ...defaultInputs,
+        subjectChecksums: `${'a'.repeat(64)} artifact-a`,
+        predicateType: 'https://example.com/predicate',
+        predicate: '{}',
+        singleSubjectAttestations: true
+      })
+
+      expect(setOutputMock).toHaveBeenCalledWith('attestation-id', 'att-123')
+      expect(setOutputMock).toHaveBeenCalledWith(
+        'attestation-url',
+        expect.stringContaining('att-123')
+      )
+    })
+
+    it('should fail when multiple explicit subject-checksums are used with pushToRegistry in single-subject mode', async () => {
+      const sha512Digest = 'a'.repeat(128)
+
+      await run({
+        ...defaultInputs,
+        subjectChecksums: `${sha512Digest} ghcr.io/owner/repo`,
+        predicateType: 'https://example.com/predicate',
+        predicate: '{}',
+        pushToRegistry: true,
+        singleSubjectAttestations: true
+      })
+
+      expect(setFailedMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringMatching(
+            /push-to-registry requires each subject to have only a SHA-256 digest/
+          )
+        })
+      )
+      expect(mockAttest).not.toHaveBeenCalled()
     })
   })
 })

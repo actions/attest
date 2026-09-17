@@ -150,6 +150,11 @@ See [action.yml](action.yml)
     # image name. Defaults to true.
     create-storage-record:
 
+    # Whether to create one attestation for each resolved subject instead of
+    # one attestation containing all subjects. Limited to 100 subjects.
+    # Defaults to false.
+    single-subject-attestations:
+
     # Whether to attach a list of generated attestations to the workflow run
     # summary page. Defaults to true.
     show-summary:
@@ -163,12 +168,13 @@ See [action.yml](action.yml)
 
 <!-- markdownlint-disable MD013 -->
 
-| Name                 | Description                                                    | Example                                          |
-| -------------------- | -------------------------------------------------------------- | ------------------------------------------------ |
-| `attestation-id`     | GitHub ID for the attestation                                  | `123456`                                         |
-| `attestation-url`    | URL for the attestation summary                                | `https://github.com/foo/bar/attestations/123456` |
-| `bundle-path`        | Absolute path to the file containing the generated attestation | `/tmp/attestation.json`                          |
-| `storage-record-ids` | GitHub IDs for the storage records                             | `987654`                                         |
+| Name                 | Description                                                                           | Example                                          |
+| -------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `attestation-id`     | GitHub ID for the attestation (set only when one logical attestation is created)      | `123456`                                         |
+| `attestation-url`    | URL for the attestation summary (set only when one logical attestation is created)    | `https://github.com/foo/bar/attestations/123456` |
+| `bundle-path`        | Absolute path to the file containing the generated attestation(s) (JSONL)             | `/tmp/attestation.json`                          |
+| `storage-record-ids` | GitHub IDs for the storage records (set only when one logical attestation is created) | `987654`                                         |
+| `results-path`       | Path to the JSON file containing the result for each attempted attestation            | `/tmp/attestation-results.json`                  |
 
 <!-- markdownlint-enable MD013 -->
 
@@ -176,6 +182,31 @@ Attestations are saved in the JSON-serialized [Sigstore bundle][6] format.
 
 If multiple subjects are being attested at the same time, a single attestation
 will be created with references to each of the supplied subjects.
+
+### Single-Subject Attestations
+
+When `single-subject-attestations` is set to `true`, the action creates one
+independently signed attestation per resolved subject instead of a single
+attestation containing all subjects. This mode is limited to 100 subjects.
+
+- Subjects are processed serially with a one-second delay between operations.
+- If a subject fails, the action continues processing the remaining subjects
+  and fails the step after all subjects have been attempted.
+- The `results-path` output points to a JSON array that is updated after each
+  subject, so completed work is inspectable even after a later failure.
+- The `bundle-path` output contains one JSONL record per successful attestation.
+- `attestation-id`, `attestation-url`, and `storage-record-ids` are only set
+  when exactly one logical attestation was attempted.
+- Multiple OCI subjects are allowed with `push-to-registry` only in
+  single-subject mode; each subject uses the existing registry publication
+  behavior.
+
+```yaml
+- uses: actions/attest@v4
+  with:
+    subject-path: 'dist/*'
+    single-subject-attestations: true
+```
 
 ## Attestation Limits
 

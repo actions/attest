@@ -122910,18 +122910,16 @@ const parseArtifactsList = (content, options) => {
             digest: { [algorithm]: hex }
         });
     }
-    // When requireSingleOCI is set (registry push flow), enforce that exactly
-    // one subject was discovered and that it is OCI-kind. This prevents file
-    // subjects from leaking into the registry push path.
-    if (options?.requireSingleOCI && subjects.length > 0) {
+    // When requireOCI is set (registry push flow), enforce that all discovered
+    // subjects are OCI-kind. This prevents file subjects from leaking into the
+    // registry push path. Cardinality enforcement is handled by the caller
+    // based on the selected attestation mode.
+    if (options?.requireOCI && subjects.length > 0) {
         // Re-check kinds from the validated entries — we tracked them in `seen`
         const kinds = [...seen.values()].map(v => v.kind);
         const hasNonOCI = kinds.some(k => k !== 'oci');
         if (hasNonOCI) {
             throw new Error('push-to-registry requires an OCI subject but the discovered artifacts list contains file-kind subjects');
-        }
-        if (subjects.length > 1) {
-            throw new Error('push-to-registry requires exactly one subject but the discovered artifacts list contains multiple subjects');
         }
     }
     return subjects;
@@ -128562,7 +128560,7 @@ const subjectFromInputs = async (inputs) => {
         // No explicit subject input — try the runner-generated artifacts list
         const discovered = await readArtifactsList({
             downcaseOCI: downcaseName,
-            requireSingleOCI: downcaseName
+            requireOCI: downcaseName
         });
         if (discovered && discovered.length > 0) {
             if (discovered.length > MAX_SUBJECT_COUNT) {
@@ -129031,6 +129029,10 @@ const mute = (str) => `${COLOR_GRAY}${str}${COLOR_DEFAULT}`;
 
 const ATTESTATION_FILE_NAME = 'attestation.json';
 const ATTESTATION_PATHS_FILE_NAME = 'created_attestation_paths.txt';
+const ATTESTATION_RESULTS_FILE_NAME = 'attestation-results.json';
+const ATTESTATION_WRITE_DELAY_MS = 1000;
+const MAX_SINGLE_SUBJECT_ATTESTATIONS = 100;
+const sleep = async (milliseconds) => new Promise(resolve => setTimeout(resolve, milliseconds));
 /* istanbul ignore next */
 const logHandler = (level, ...args) => {
     // Send any HTTP-related log events to the GitHub Actions debug log
@@ -129069,33 +129071,96 @@ async function run(inputs) {
             ...inputs,
             downcaseName: inputs.pushToRegistry
         });
+        // Validate single-subject attestation count limit
+        if (inputs.singleSubjectAttestations &&
+            subjects.length > MAX_SINGLE_SUBJECT_ATTESTATIONS) {
+            throw new Error(`single-subject-attestations supports at most ${MAX_SINGLE_SUBJECT_ATTESTATIONS} subjects but ${subjects.length} subjects were resolved`);
+        }
         // Validate subjects are compatible with registry push requirements
         if (inputs.pushToRegistry) {
-            validateRegistrySubjects(subjects);
+            validateRegistrySubjects(subjects, inputs.singleSubjectAttestations);
         }
         // Generate predicate based on attestation type
         const predicate = await getPredicateForType(attestationType, inputs);
-        const outputPath = external_path_default().join(await tempDir(), ATTESTATION_FILE_NAME);
-        setOutput('bundle-path', outputPath);
-        const att = await createAttestation(subjects, predicate, {
+        const outputDir = await tempDir();
+        const bundlePath = external_path_default().join(outputDir, ATTESTATION_FILE_NAME);
+        const resultsPath = external_path_default().join(outputDir, ATTESTATION_RESULTS_FILE_NAME);
+        // Initialize both output files before network activity
+        await Promise.all([
+            promises_default().writeFile(bundlePath, '', 'utf-8'),
+            promises_default().writeFile(resultsPath, `[]${(external_os_default()).EOL}`, 'utf-8')
+        ]);
+        setOutput('bundle-path', bundlePath);
+        setOutput('results-path', resultsPath);
+        const opts = {
             sigstoreInstance,
             pushToRegistry: inputs.pushToRegistry,
             createStorageRecord: inputs.createStorageRecord,
             subjectVersion: inputs.subjectVersion,
             githubToken: inputs.githubToken
-        });
-        logAttestation(subjects, att, sigstoreInstance);
-        // Write attestation bundle to output file
-        await promises_default().writeFile(outputPath, JSON.stringify(att.bundle) + (external_os_default()).EOL, {
-            encoding: 'utf-8',
-            flag: 'a'
-        });
+        };
+        const subjectGroups = inputs.singleSubjectAttestations
+            ? subjects.map(subject => [subject])
+            : [subjects];
+        const results = [];
+        let bundleLineCount = 0;
+        for (const [index, attestationSubjects] of subjectGroups.entries()) {
+            if (index > 0) {
+                await sleep(ATTESTATION_WRITE_DELAY_MS);
+            }
+            try {
+                const att = await createAttestation(attestationSubjects, predicate, opts);
+                logAttestation(attestationSubjects, att, sigstoreInstance);
+                // Append bundle to JSONL file
+                await promises_default().writeFile(bundlePath, JSON.stringify(att.bundle) + (external_os_default()).EOL, {
+                    encoding: 'utf-8',
+                    flag: 'a'
+                });
+                bundleLineCount++;
+                const result = {
+                    subjects: attestationSubjects,
+                    status: 'success',
+                    bundleLine: bundleLineCount
+                };
+                /* istanbul ignore else */
+                if (att.attestationID) {
+                    result.attestationId = att.attestationID;
+                    result.attestationUrl = attestationURL(att.attestationID);
+                }
+                if (att.attestationDigest) {
+                    result.attestationDigest = att.attestationDigest;
+                }
+                /* istanbul ignore next */
+                if (att.storageRecordIds && att.storageRecordIds.length > 0) {
+                    result.storageRecordIds = att.storageRecordIds;
+                }
+                results.push(result);
+            }
+            catch (err) {
+                const message = err instanceof Error
+                    ? err.message
+                    : /* istanbul ignore next */ `${err}`;
+                results.push({
+                    subjects: attestationSubjects,
+                    status: 'failure',
+                    error: message
+                });
+                // Log the cause of per-subject errors
+                /* istanbul ignore if */
+                if (err instanceof Error && 'cause' in err) {
+                    const innerErr = err.cause;
+                    info(mute(innerErr instanceof Error ? innerErr.toString() : `${innerErr}`));
+                }
+            }
+            // Persist results after every attempt
+            await writeResults(resultsPath, results);
+        }
+        // Record the shared bundle path for cross-job discovery
         const baseDir = process.env.RUNNER_TEMP;
         /* istanbul ignore else */
         if (baseDir) {
             const outputSummaryPath = external_path_default().join(baseDir, ATTESTATION_PATHS_FILE_NAME);
-            // Append the output path to the attestations paths file
-            await promises_default().appendFile(outputSummaryPath, outputPath + (external_os_default()).EOL, {
+            await promises_default().appendFile(outputSummaryPath, bundlePath + (external_os_default()).EOL, {
                 encoding: 'utf-8',
                 flag: 'a'
             });
@@ -129103,18 +129168,29 @@ async function run(inputs) {
         else {
             warning('RUNNER_TEMP environment variable is not set. Cannot write attestation paths file.');
         }
-        /* istanbul ignore else */
-        if (att.attestationID) {
-            setOutput('attestation-id', att.attestationID);
-            setOutput('attestation-url', attestationURL(att.attestationID));
-        }
-        /* istanbul ignore if */
-        if (att.storageRecordIds) {
-            setOutput('storage-record-ids', att.storageRecordIds.join(','));
+        // Set singular outputs only when exactly one logical attestation was
+        // attempted and it succeeded
+        const successResults = results.filter((r) => r.status === 'success');
+        if (subjectGroups.length === 1 && successResults.length === 1) {
+            const result = successResults[0];
+            /* istanbul ignore else */
+            if (result.attestationId) {
+                setOutput('attestation-id', result.attestationId);
+                setOutput('attestation-url', result.attestationUrl);
+            }
+            /* istanbul ignore if */
+            if (result.storageRecordIds && result.storageRecordIds.length > 0) {
+                setOutput('storage-record-ids', result.storageRecordIds.join(','));
+            }
         }
         /* istanbul ignore else */
         if (inputs.showSummary) {
-            await logSummary(att);
+            await logSummary(results);
+        }
+        // Fail the step after all subjects have been processed
+        const failureCount = results.filter(r => r.status === 'failure').length;
+        if (failureCount > 0) {
+            throw new Error(`${failureCount} of ${results.length} attestations failed; see ${resultsPath} for details`);
         }
     }
     catch (err) {
@@ -129164,15 +129240,32 @@ const logAttestation = (subjects, attestation, sigstoreInstance) => {
     }
 };
 // Attach summary information to the GitHub Actions run
-const logSummary = async (attestation) => {
-    const { attestationID } = attestation;
-    /* istanbul ignore else */
-    if (attestationID) {
-        const url = attestationURL(attestationID);
-        summary.addHeading('Attestation Created', 3);
-        summary.addList([`<a href="${url}">${url}</a>`]);
-        await summary.write();
-    }
+const logSummary = async (results) => {
+    summary.addHeading(results.length === 1 ? 'Attestation Created' : 'Attestations Created', 3);
+    summary.addTable([
+        [
+            { data: 'Subject', header: true },
+            { data: 'Status', header: true },
+            { data: 'Attestation', header: true },
+            { data: 'Error', header: true }
+        ],
+        ...results.map(result => [
+            result.subjects
+                .map(subject => `${subject.name}@${formatSubjectDigest(subject)}`)
+                .join('<br>'),
+            result.status,
+            result.status === 'success' && result.attestationUrl
+                ? `<a href="${result.attestationUrl}">${result.attestationId}</a>`
+                : '',
+            result.status === 'failure' ? result.error : ''
+        ])
+    ]);
+    await summary.write();
+};
+const writeResults = async (resultsPath, results) => {
+    const temporaryPath = `${resultsPath}.tmp`;
+    await promises_default().writeFile(temporaryPath, `${JSON.stringify(results, null, 2)}${(external_os_default()).EOL}`, 'utf-8');
+    await promises_default().rename(temporaryPath, resultsPath);
 };
 const tempDir = async () => {
     const basePath = process.env['RUNNER_TEMP'];
@@ -129205,17 +129298,19 @@ const getPredicateForType = async (type, inputs) => {
             return predicateFromInputs(inputs);
     }
 };
-// Validate that resolved subjects meet registry push requirements:
-// exactly one subject with a SHA-256 digest.
-const validateRegistrySubjects = (subjects) => {
-    if (subjects.length !== 1) {
+// Validate that resolved subjects meet registry push requirements.
+// In default mode: exactly one subject with a SHA-256 digest.
+// In single-subject mode: each subject must have only a SHA-256 digest.
+const validateRegistrySubjects = (subjects, singleSubjectAttestations = false) => {
+    if (!singleSubjectAttestations && subjects.length !== 1) {
         throw new Error(`push-to-registry requires exactly one subject but ${subjects.length} subjects were resolved`);
     }
-    const subject = subjects[0];
-    const algorithms = Object.keys(subject.digest);
-    const hasNonSHA256 = algorithms.some(alg => alg !== 'sha256');
-    if (hasNonSHA256 || !algorithms.includes('sha256')) {
-        throw new Error(`push-to-registry requires a subject with a SHA-256 digest but the subject has: ${algorithms.join(', ')}`);
+    const invalid = subjects.find(subject => {
+        const algorithms = Object.keys(subject.digest);
+        return algorithms.length !== 1 || algorithms[0] !== 'sha256';
+    });
+    if (invalid) {
+        throw new Error(`push-to-registry requires each subject to have only a SHA-256 digest but "${invalid.name}" has: ${Object.keys(invalid.digest).join(', ')}`);
     }
 };
 
@@ -129238,6 +129333,7 @@ const inputs = {
     createStorageRecord: getBooleanInput('create-storage-record'),
     subjectVersion: getInput('subject-version'),
     showSummary: getBooleanInput('show-summary'),
+    singleSubjectAttestations: getBooleanInput('single-subject-attestations'),
     githubToken: getInput('github-token'),
     // undocumented -- not part of public interface
     privateSigning: ['true', 'True', 'TRUE', '1'].includes(getInput('private-signing'))
