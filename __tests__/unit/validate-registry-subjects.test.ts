@@ -39,7 +39,7 @@ describe('validateRegistrySubjects', () => {
     )
   })
 
-  it('should fail when multiple subjects are provided', () => {
+  it('should fail when multiple subjects are provided in default mode', () => {
     const subjects: Subject[] = [
       {
         name: 'ghcr.io/owner/app1',
@@ -65,7 +65,7 @@ describe('validateRegistrySubjects', () => {
     ]
 
     expect(() => validateRegistrySubjects(subjects)).toThrow(
-      /push-to-registry requires a subject with a SHA-256 digest/
+      /push-to-registry requires each subject to have only a SHA-256 digest/
     )
   })
 
@@ -78,7 +78,27 @@ describe('validateRegistrySubjects', () => {
     ]
 
     expect(() => validateRegistrySubjects(subjects)).toThrow(
-      /push-to-registry requires a subject with a SHA-256 digest/
+      /push-to-registry requires each subject to have only a SHA-256 digest/
+    )
+  })
+
+  it('should allow multiple SHA-256 subjects in single-subject mode', () => {
+    const subjects: Subject[] = [
+      { name: 'ghcr.io/owner/app1', digest: { sha256: 'a'.repeat(64) } },
+      { name: 'ghcr.io/owner/app2', digest: { sha256: 'b'.repeat(64) } }
+    ]
+
+    expect(() => validateRegistrySubjects(subjects, true)).not.toThrow()
+  })
+
+  it('should reject a non-SHA-256 member in single-subject mode', () => {
+    const subjects: Subject[] = [
+      { name: 'ghcr.io/owner/app1', digest: { sha256: 'a'.repeat(64) } },
+      { name: 'ghcr.io/owner/app2', digest: { sha512: 'b'.repeat(128) } }
+    ]
+
+    expect(() => validateRegistrySubjects(subjects, true)).toThrow(
+      /push-to-registry requires each subject to have only a SHA-256 digest/
     )
   })
 })
