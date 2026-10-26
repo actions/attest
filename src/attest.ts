@@ -126,13 +126,9 @@ export const repoOwnerIsOrg = async (githubToken: string): Promise<boolean> => {
 }
 
 function getRegistryURL(subjectName: string): string {
-  let url: URL
-
-  try {
-    url = new URL(subjectName)
-  } catch {
-    url = new URL(`https://${subjectName}`)
-  }
+  const url = new URL(
+    subjectName.includes('://') ? subjectName : `https://${subjectName}`
+  )
 
   /* istanbul ignore if */
   if (url.protocol !== 'https:') {
