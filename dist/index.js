@@ -128850,13 +128850,7 @@ const repoOwnerIsOrg = async (githubToken) => {
     return repo.owner?.type === 'Organization';
 };
 function getRegistryURL(subjectName) {
-    let url;
-    try {
-        url = new URL(subjectName);
-    }
-    catch {
-        url = new URL(`https://${subjectName}`);
-    }
+    const url = new URL(subjectName.includes('://') ? subjectName : `https://${subjectName}`);
     /* istanbul ignore if */
     if (url.protocol !== 'https:') {
         throw new Error(`Unsupported protocol ${url.protocol} in subject name ${subjectName}`);
