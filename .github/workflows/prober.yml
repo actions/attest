@@ -42,13 +42,13 @@ jobs:
           gh attestation verify ./artifact --owner "$GITHUB_REPOSITORY_OWNER"
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           path: "artifact"
 
       - name: Report attestation prober success
         if: ${{ success() }}
-        uses: masci/datadog@13467cfaddce69a18634ff4e2a283f65367be0d4 # v2.0.6
+        uses: masci/datadog@aadd4fb98a29438db71fae50c698cad8bc782ad3 # v2.0.7
         with:
           api-key: "${{ secrets.DATADOG_API_KEY }}"
           service-checks: |
@@ -66,7 +66,7 @@ jobs:
 
       - name: Report attestation prober failure
         if: ${{ failure() }}
-        uses: masci/datadog@13467cfaddce69a18634ff4e2a283f65367be0d4 # v2.0.6
+        uses: masci/datadog@aadd4fb98a29438db71fae50c698cad8bc782ad3 # v2.0.7
         with:
           api-key: "${{ secrets.DATADOG_API_KEY }}"
           service-checks: |
