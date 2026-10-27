@@ -54,7 +54,7 @@ export const subjectFromInputs = async (
     // No explicit subject input — try the runner-generated artifacts list
     const discovered = await readArtifactsList({
       downcaseOCI: downcaseName,
-      requireSingleOCI: downcaseName
+      requireOCI: downcaseName
     })
     if (discovered && discovered.length > 0) {
       if (discovered.length > MAX_SUBJECT_COUNT) {

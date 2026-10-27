@@ -45,6 +45,7 @@ describe('index', () => {
         'push-to-registry': false,
         'create-storage-record': true,
         'show-summary': true,
+        'single-subject-attestations': true,
         'private-signing': false
       }
       return inputs[name] || false
@@ -67,6 +68,7 @@ describe('index', () => {
       pushToRegistry: false,
       createStorageRecord: true,
       showSummary: true,
+      singleSubjectAttestations: true,
       privateSigning: false
     })
   })
