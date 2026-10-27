@@ -1,5 +1,5 @@
 import eslint from '@eslint/js'
-import importplugin from 'eslint-plugin-import'
+import { importX } from 'eslint-plugin-import-x'
 import jestplugin from 'eslint-plugin-jest'
 import path from 'node:path'
 import tseslint from 'typescript-eslint'
@@ -14,8 +14,8 @@ export default tseslint.config(
   eslint.configs.recommended,
   tseslint.configs.recommendedTypeChecked,
   jestplugin.configs['flat/recommended'],
-  importplugin.flatConfigs.recommended,
-  importplugin.flatConfigs.typescript,
+  importX.flatConfigs.recommended,
+  importX.flatConfigs.typescript,
   // Override some rules
   {
     name: 'project-settings',
@@ -67,18 +67,18 @@ export default tseslint.config(
       '@typescript-eslint/require-array-sort-compare': 'error',
       '@typescript-eslint/restrict-template-expressions': 'off',
 
-      // eslint-plugin-import rules
-      'import/extensions': 'error',
-      'import/first': 'error',
-      'import/no-absolute-path': 'error',
-      'import/no-commonjs': 'error',
-      'import/no-deprecated': 'warn',
-      'import/no-dynamic-require': 'error',
-      'import/no-extraneous-dependencies': 'error',
-      'import/no-mutable-exports': 'error',
-      'import/no-namespace': 'off',
-      'import/no-unresolved': ['error', { ignore: ['csv-parse/sync'] }],
-      'import/no-anonymous-default-export': [
+      // eslint-plugin-import-x rules
+      'import-x/extensions': 'error',
+      'import-x/first': 'error',
+      'import-x/no-absolute-path': 'error',
+      'import-x/no-commonjs': 'error',
+      'import-x/no-deprecated': 'warn',
+      'import-x/no-dynamic-require': 'error',
+      'import-x/no-extraneous-dependencies': 'error',
+      'import-x/no-mutable-exports': 'error',
+      'import-x/no-namespace': 'off',
+      'import-x/no-unresolved': ['error', { ignore: ['csv-parse/sync'] }],
+      'import-x/no-anonymous-default-export': [
         'error',
         {
           allowAnonymousClass: false,
