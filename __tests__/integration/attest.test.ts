@@ -199,6 +199,63 @@ describe('createAttestation', () => {
       )
     })
 
+    it.each([
+      [
+        'registry.example.com:9886/org/image',
+        'https://registry.example.com:9886'
+      ],
+      ['registry.example.com/org/image', 'https://registry.example.com'],
+      [
+        'https://registry.example.com:9886/org/image',
+        'https://registry.example.com:9886'
+      ],
+      [
+        'registry.example.com:9886/org/image:v1@sha256:abc123',
+        'https://registry.example.com:9886'
+      ],
+      ['localhost:5000/org/image', 'https://localhost:5000']
+    ])(
+      'should create a storage record with the registry origin for %s',
+      async (name, registryUrl) => {
+        const subjects = [{ ...TEST_SUBJECT_WITH_REGISTRY, name }]
+
+        const result = await createAttestation(
+          subjects,
+          TEST_PREDICATE,
+          storageOpts
+        )
+
+        expect(mockCreateStorageRecord).toHaveBeenCalledWith(
+          expect.anything(),
+          { registryUrl },
+          storageOpts.githubToken
+        )
+        expect(result.storageRecordIds).toEqual([12345])
+      }
+    )
+
+    it.each(['http', 'ftp'])(
+      'should not create a storage record for an explicit %s URL',
+      async protocol => {
+        const subjects = [
+          {
+            ...TEST_SUBJECT_WITH_REGISTRY,
+            name: `${protocol}://registry.example.com:9886/org/image`
+          }
+        ]
+
+        const result = await createAttestation(
+          subjects,
+          TEST_PREDICATE,
+          storageOpts
+        )
+
+        expect(mockCreateStorageRecord).not.toHaveBeenCalled()
+        expect(result.storageRecordIds).toBeUndefined()
+        expect(result.attestationDigest).toBe('sha256:attestation-digest')
+      }
+    )
+
     it('should omit version from storage record when subjectVersion is empty', async () => {
       const subjects = [TEST_SUBJECT_WITH_REGISTRY]
       const opts = { ...storageOpts, subjectVersion: '' }
