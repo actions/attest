@@ -97,7 +97,8 @@ See [action.yml](action.yml)
     # Path to the artifact serving as the subject of the attestation. At most
     # one of "subject-path", "subject-digest", or "subject-checksums" may be
     # provided. May contain a glob pattern or list of paths (total subject
-    # count cannot exceed 1024).
+    # count cannot exceed 1024). Each literal (non-glob) path must resolve to at
+    # least one file.
     # If none of these inputs are provided, subjects are discovered from the
     # runner-provided $GITHUB_ARTIFACTS_LIST environment variable.
     subject-path:

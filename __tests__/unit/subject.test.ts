@@ -568,6 +568,17 @@ describe('subjectFromInputs', () => {
       )
     })
 
+    it('should throw when glob pattern matches no files', async () => {
+      const inputs: SubjectInputs = {
+        ...blankInputs,
+        subjectPath: path.join(tempDir, 'nomatch-*.txt')
+      }
+
+      await expect(subjectFromInputs(inputs)).rejects.toThrow(
+        /could not find subject at path/i
+      )
+    })
+
     describe('glob patterns', () => {
       beforeEach(async () => {
         for (let i = 0; i < 3; i++) {
@@ -640,6 +651,86 @@ describe('subjectFromInputs', () => {
         expect(subjects).toHaveLength(1)
 
         await fs.rm(otherDir, { recursive: true, force: true })
+      })
+
+      it('should throw when any literal path does not exist', async () => {
+        const missing = path.join(tempDir, 'missing.txt')
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectPath: `${path.join(tempDir, 'file-0.txt')}\n${missing}`
+        }
+
+        await expect(subjectFromInputs(inputs)).rejects.toThrow(
+          `Could not find subject at path: ${missing}`
+        )
+      })
+
+      it('should report every missing literal path', async () => {
+        const missing1 = path.join(tempDir, 'missing-1.txt')
+        const missing2 = path.join(tempDir, 'missing-2.txt')
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectPath: `${missing1}\n${path.join(tempDir, 'file-*.txt')}\n${missing2}`
+        }
+
+        await expect(subjectFromInputs(inputs)).rejects.toThrow(
+          `Could not find subject at path: ${missing1}, ${missing2}`
+        )
+      })
+
+      it('should allow glob patterns that match no files', async () => {
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectPath: `${path.join(tempDir, 'file-0.txt')}\n${path.join(tempDir, 'nomatch-*.txt')}`
+        }
+
+        const subjects = await subjectFromInputs(inputs)
+
+        expect(subjects).toHaveLength(1)
+        expect(subjects[0].name).toBe('file-0.txt')
+      })
+
+      it('should not validate exclusion patterns', async () => {
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectPath: `${path.join(tempDir, 'file-*.txt')}\n!${path.join(tempDir, 'missing.txt')}`
+        }
+
+        const subjects = await subjectFromInputs(inputs)
+
+        expect(subjects).toHaveLength(3)
+      })
+
+      it('should accept a literal directory containing files', async () => {
+        const subdir = path.join(tempDir, 'subdir')
+        await fs.mkdir(subdir)
+        await fs.writeFile(path.join(subdir, 'nested.txt'), 'nested')
+
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectPath: `${path.join(tempDir, 'file-0.txt')}\n${subdir}`
+        }
+
+        const subjects = await subjectFromInputs(inputs)
+
+        expect(subjects.map(s => s.name).sort()).toEqual([
+          'file-0.txt',
+          'nested.txt'
+        ])
+      })
+
+      it('should throw when a literal directory contains no files', async () => {
+        const subdir = path.join(tempDir, 'empty')
+        await fs.mkdir(subdir)
+
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectPath: `${path.join(tempDir, 'file-0.txt')}\n${subdir}`
+        }
+
+        await expect(subjectFromInputs(inputs)).rejects.toThrow(
+          `Could not find subject at path: ${subdir}`
+        )
       })
     })
 
