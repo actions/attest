@@ -678,6 +678,17 @@ describe('subjectFromInputs', () => {
         )
       })
 
+      it('should ignore whitespace-only entries', async () => {
+        const inputs: SubjectInputs = {
+          ...blankInputs,
+          subjectPath: `${path.join(tempDir, 'file-0.txt')}, ,${path.join(tempDir, 'file-1.txt')}\n   \n${path.join(tempDir, 'file-2.txt')}`
+        }
+
+        const subjects = await subjectFromInputs(inputs)
+
+        expect(subjects).toHaveLength(3)
+      })
+
       it('should allow glob patterns that match no files', async () => {
         const inputs: SubjectInputs = {
           ...blankInputs,

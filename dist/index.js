@@ -129224,7 +129224,7 @@ const parseSubjectPathList = (input) => {
     for (const record of records) {
         res.push(...record);
     }
-    return res.filter(item => item).map(pat => pat.trim());
+    return res.map(pat => pat.trim()).filter(pat => pat);
 };
 // A literal path is an inclusion pattern without any glob metacharacters.
 // Exclusions ("!") and comments ("#") are not literal paths. Brace expansion
