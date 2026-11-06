@@ -48,6 +48,11 @@ jobs:
 
   test-attest:
     name: Test attest action
+    # Pull requests from forks never receive an OIDC token, so the attestation
+    # can't be signed. Skip the job for those runs.
+    if: >
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       contents: read
