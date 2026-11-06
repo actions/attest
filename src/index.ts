@@ -17,6 +17,9 @@ const inputs: RunInputs = {
   createStorageRecord: core.getBooleanInput('create-storage-record'),
   subjectVersion: core.getInput('subject-version'),
   showSummary: core.getBooleanInput('show-summary'),
+  singleSubjectAttestations: core.getBooleanInput(
+    'single-subject-attestations'
+  ),
   githubToken: core.getInput('github-token'),
   // undocumented -- not part of public interface
   privateSigning: ['true', 'True', 'TRUE', '1'].includes(

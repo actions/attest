@@ -78,6 +78,13 @@ inputs:
       Requires that push-to-registry is set to true. Defaults to true.
     default: true
     required: false
+  single-subject-attestations:
+    description: >
+      Whether to create one attestation for each resolved subject instead of one
+      attestation containing all subjects. Limited to 100 subjects. Defaults to
+      false.
+    default: false
+    required: false
   show-summary:
     description: >
       Whether to attach a list of generated attestations to the workflow run
@@ -98,6 +105,10 @@ outputs:
     description: 'The URL for the attestation summary.'
   storage-record-ids:
     description: 'The IDs of the storage records created for the artifact.'
+  results-path:
+    description: >
+      The path to the JSON file containing the result for each attempted
+      attestation.
 
 runs:
   using: node24

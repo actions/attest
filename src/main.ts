@@ -25,6 +25,9 @@ import type { Predicate, Subject } from '@actions/attest'
 
 const ATTESTATION_FILE_NAME = 'attestation.json'
 const ATTESTATION_PATHS_FILE_NAME = 'created_attestation_paths.txt'
+const ATTESTATION_RESULTS_FILE_NAME = 'attestation-results.json'
+const ATTESTATION_WRITE_DELAY_MS = 1000
+const MAX_SINGLE_SUBJECT_ATTESTATIONS = 100
 
 export type SBOMInputs = {
   sbomPath: string
@@ -38,8 +41,31 @@ export type RunInputs = SubjectInputs &
     subjectVersion: string
     githubToken: string
     showSummary: boolean
+    singleSubjectAttestations: boolean
     privateSigning: boolean
   }
+
+type SuccessfulAttestationResult = {
+  subjects: Subject[]
+  status: 'success'
+  bundleLine: number
+  attestationId?: string
+  attestationUrl?: string
+  attestationDigest?: string
+  storageRecordIds?: number[]
+}
+
+type FailedAttestationResult = {
+  subjects: Subject[]
+  status: 'failure'
+  error: string
+}
+
+type AttestationRunResult =
+  SuccessfulAttestationResult | FailedAttestationResult
+
+const sleep = async (milliseconds: number): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, milliseconds))
 
 /* istanbul ignore next */
 const logHandler = (level: string, ...args: unknown[]): void => {
@@ -88,39 +114,128 @@ export async function run(inputs: RunInputs): Promise<void> {
       downcaseName: inputs.pushToRegistry
     })
 
+    // Validate single-subject attestation count limit
+    if (
+      inputs.singleSubjectAttestations &&
+      subjects.length > MAX_SINGLE_SUBJECT_ATTESTATIONS
+    ) {
+      throw new Error(
+        `single-subject-attestations supports at most ${MAX_SINGLE_SUBJECT_ATTESTATIONS} subjects but ${subjects.length} subjects were resolved`
+      )
+    }
+
     // Validate subjects are compatible with registry push requirements
     if (inputs.pushToRegistry) {
-      validateRegistrySubjects(subjects)
+      validateRegistrySubjects(subjects, inputs.singleSubjectAttestations)
     }
 
     // Generate predicate based on attestation type
     const predicate = await getPredicateForType(attestationType, inputs)
 
-    const outputPath = path.join(await tempDir(), ATTESTATION_FILE_NAME)
-    core.setOutput('bundle-path', outputPath)
+    const outputDir = await tempDir()
+    const bundlePath = path.join(outputDir, ATTESTATION_FILE_NAME)
+    const resultsPath = path.join(outputDir, ATTESTATION_RESULTS_FILE_NAME)
 
-    const att = await createAttestation(subjects, predicate, {
+    // Initialize both output files before network activity
+    await Promise.all([
+      fs.writeFile(bundlePath, '', 'utf-8'),
+      fs.writeFile(resultsPath, `[]${os.EOL}`, 'utf-8')
+    ])
+
+    core.setOutput('bundle-path', bundlePath)
+    core.setOutput('results-path', resultsPath)
+
+    const opts = {
       sigstoreInstance,
       pushToRegistry: inputs.pushToRegistry,
       createStorageRecord: inputs.createStorageRecord,
       subjectVersion: inputs.subjectVersion,
       githubToken: inputs.githubToken
-    })
+    }
 
-    logAttestation(subjects, att, sigstoreInstance)
+    const subjectGroups = inputs.singleSubjectAttestations
+      ? subjects.map(subject => [subject])
+      : [subjects]
 
-    // Write attestation bundle to output file
-    await fs.writeFile(outputPath, JSON.stringify(att.bundle) + os.EOL, {
-      encoding: 'utf-8',
-      flag: 'a'
-    })
+    const results: AttestationRunResult[] = []
+    let bundleLineCount = 0
 
+    for (const [index, attestationSubjects] of subjectGroups.entries()) {
+      if (index > 0) {
+        await sleep(ATTESTATION_WRITE_DELAY_MS)
+      }
+
+      try {
+        const att = await createAttestation(
+          attestationSubjects,
+          predicate,
+          opts
+        )
+
+        logAttestation(attestationSubjects, att, sigstoreInstance)
+
+        // Append bundle to JSONL file
+        await fs.writeFile(bundlePath, JSON.stringify(att.bundle) + os.EOL, {
+          encoding: 'utf-8',
+          flag: 'a'
+        })
+        bundleLineCount++
+
+        const result: SuccessfulAttestationResult = {
+          subjects: attestationSubjects,
+          status: 'success',
+          bundleLine: bundleLineCount
+        }
+
+        /* istanbul ignore else */
+        if (att.attestationID) {
+          result.attestationId = att.attestationID
+          result.attestationUrl = attestationURL(att.attestationID)
+        }
+
+        if (att.attestationDigest) {
+          result.attestationDigest = att.attestationDigest
+        }
+
+        /* istanbul ignore next */
+        if (att.storageRecordIds && att.storageRecordIds.length > 0) {
+          result.storageRecordIds = att.storageRecordIds
+        }
+
+        results.push(result)
+      } catch (err) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : /* istanbul ignore next */ `${err}`
+        results.push({
+          subjects: attestationSubjects,
+          status: 'failure',
+          error: message
+        })
+
+        // Log the cause of per-subject errors
+        /* istanbul ignore if */
+        if (err instanceof Error && 'cause' in err) {
+          const innerErr = err.cause
+          core.info(
+            style.mute(
+              innerErr instanceof Error ? innerErr.toString() : `${innerErr}`
+            )
+          )
+        }
+      }
+
+      // Persist results after every attempt
+      await writeResults(resultsPath, results)
+    }
+
+    // Record the shared bundle path for cross-job discovery
     const baseDir = process.env.RUNNER_TEMP
     /* istanbul ignore else */
     if (baseDir) {
       const outputSummaryPath = path.join(baseDir, ATTESTATION_PATHS_FILE_NAME)
-      // Append the output path to the attestations paths file
-      await fs.appendFile(outputSummaryPath, outputPath + os.EOL, {
+      await fs.appendFile(outputSummaryPath, bundlePath + os.EOL, {
         encoding: 'utf-8',
         flag: 'a'
       })
@@ -130,20 +245,37 @@ export async function run(inputs: RunInputs): Promise<void> {
       )
     }
 
-    /* istanbul ignore else */
-    if (att.attestationID) {
-      core.setOutput('attestation-id', att.attestationID)
-      core.setOutput('attestation-url', attestationURL(att.attestationID))
-    }
+    // Set singular outputs only when exactly one logical attestation was
+    // attempted and it succeeded
+    const successResults = results.filter(
+      (r): r is SuccessfulAttestationResult => r.status === 'success'
+    )
+    if (subjectGroups.length === 1 && successResults.length === 1) {
+      const result = successResults[0]
 
-    /* istanbul ignore if */
-    if (att.storageRecordIds) {
-      core.setOutput('storage-record-ids', att.storageRecordIds.join(','))
+      /* istanbul ignore else */
+      if (result.attestationId) {
+        core.setOutput('attestation-id', result.attestationId)
+        core.setOutput('attestation-url', result.attestationUrl)
+      }
+
+      /* istanbul ignore if */
+      if (result.storageRecordIds && result.storageRecordIds.length > 0) {
+        core.setOutput('storage-record-ids', result.storageRecordIds.join(','))
+      }
     }
 
     /* istanbul ignore else */
     if (inputs.showSummary) {
-      await logSummary(att)
+      await logSummary(results)
+    }
+
+    // Fail the step after all subjects have been processed
+    const failureCount = results.filter(r => r.status === 'failure').length
+    if (failureCount > 0) {
+      throw new Error(
+        `${failureCount} of ${results.length} attestations failed; see ${resultsPath} for details`
+      )
     }
   } catch (err) {
     // Fail the workflow run if an error occurs
@@ -219,16 +351,43 @@ const logAttestation = (
 }
 
 // Attach summary information to the GitHub Actions run
-const logSummary = async (attestation: AttestResult): Promise<void> => {
-  const { attestationID } = attestation
+const logSummary = async (results: AttestationRunResult[]): Promise<void> => {
+  core.summary.addHeading(
+    results.length === 1 ? 'Attestation Created' : 'Attestations Created',
+    3
+  )
+  core.summary.addTable([
+    [
+      { data: 'Subject', header: true },
+      { data: 'Status', header: true },
+      { data: 'Attestation', header: true },
+      { data: 'Error', header: true }
+    ],
+    ...results.map(result => [
+      result.subjects
+        .map(subject => `${subject.name}@${formatSubjectDigest(subject)}`)
+        .join('<br>'),
+      result.status,
+      result.status === 'success' && result.attestationUrl
+        ? `<a href="${result.attestationUrl}">${result.attestationId}</a>`
+        : '',
+      result.status === 'failure' ? result.error : ''
+    ])
+  ])
+  await core.summary.write()
+}
 
-  /* istanbul ignore else */
-  if (attestationID) {
-    const url = attestationURL(attestationID)
-    core.summary.addHeading('Attestation Created', 3)
-    core.summary.addList([`<a href="${url}">${url}</a>`])
-    await core.summary.write()
-  }
+const writeResults = async (
+  resultsPath: string,
+  results: AttestationRunResult[]
+): Promise<void> => {
+  const temporaryPath = `${resultsPath}.tmp`
+  await fs.writeFile(
+    temporaryPath,
+    `${JSON.stringify(results, null, 2)}${os.EOL}`,
+    'utf-8'
+  )
+  await fs.rename(temporaryPath, resultsPath)
 }
 
 const tempDir = async (): Promise<string> => {
@@ -272,22 +431,27 @@ const getPredicateForType = async (
   }
 }
 
-// Validate that resolved subjects meet registry push requirements:
-// exactly one subject with a SHA-256 digest.
-export const validateRegistrySubjects = (subjects: Subject[]): void => {
-  if (subjects.length !== 1) {
+// Validate that resolved subjects meet registry push requirements.
+// In default mode: exactly one subject with a SHA-256 digest.
+// In single-subject mode: each subject must have only a SHA-256 digest.
+export const validateRegistrySubjects = (
+  subjects: Subject[],
+  singleSubjectAttestations = false
+): void => {
+  if (!singleSubjectAttestations && subjects.length !== 1) {
     throw new Error(
       `push-to-registry requires exactly one subject but ${subjects.length} subjects were resolved`
     )
   }
 
-  const subject = subjects[0]
-  const algorithms = Object.keys(subject.digest)
-  const hasNonSHA256 = algorithms.some(alg => alg !== 'sha256')
+  const invalid = subjects.find(subject => {
+    const algorithms = Object.keys(subject.digest)
+    return algorithms.length !== 1 || algorithms[0] !== 'sha256'
+  })
 
-  if (hasNonSHA256 || !algorithms.includes('sha256')) {
+  if (invalid) {
     throw new Error(
-      `push-to-registry requires a subject with a SHA-256 digest but the subject has: ${algorithms.join(', ')}`
+      `push-to-registry requires each subject to have only a SHA-256 digest but "${invalid.name}" has: ${Object.keys(invalid.digest).join(', ')}`
     )
   }
 }
