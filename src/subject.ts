@@ -114,10 +114,23 @@ const getSubjectFromPath = async (
   const digestedSubjects: Subject[] = []
 
   // Parse the list of subject paths
-  const subjectPaths = parseSubjectPathList(subjectPath).join('\n')
+  const patterns = parseSubjectPathList(subjectPath)
+
+  // Literal (non-glob) paths must each resolve to at least one file. Glob
+  // patterns are still permitted to match nothing.
+  const missing: string[] = []
+  for (const pattern of patterns.filter(isLiteralPath)) {
+    if (!(await hasMatchingFile(pattern))) {
+      missing.push(pattern)
+    }
+  }
+
+  if (missing.length > 0) {
+    throw new Error(`Could not find subject at path: ${missing.join(', ')}`)
+  }
 
   // Expand the globbed paths to a list of actual paths
-  const paths = await glob.create(subjectPaths).then(async g => g.glob())
+  const paths = await glob.create(patterns.join('\n')).then(async g => g.glob())
 
   // Filter path list to just the files (not directories), enforcing the maximum
   const files: string[] = []
@@ -314,7 +327,27 @@ const parseSubjectPathList = (input: string): string[] => {
     res.push(...record)
   }
 
-  return res.filter(item => item).map(pat => pat.trim())
+  return res.map(pat => pat.trim()).filter(pat => pat)
+}
+
+// A literal path is an inclusion pattern without any glob metacharacters.
+// Exclusions ("!") and comments ("#") are not literal paths. Brace expansion
+// and extglobs are disabled in @actions/glob, so only "*", "?", and "[" are
+// significant.
+const isLiteralPath = (pattern: string): boolean =>
+  !pattern.startsWith('!') && !pattern.startsWith('#') && !/[*?[]/.test(pattern)
+
+// Returns true if the pattern resolves to at least one file. Globbing the
+// pattern (rather than calling stat directly) preserves @actions/glob path
+// semantics, such as "~" expansion and implicit directory descendants.
+const hasMatchingFile = async (pattern: string): Promise<boolean> => {
+  const globber = await glob.create(pattern)
+  for await (const p of globber.globGenerator()) {
+    if ((await fs.stat(p)).isFile()) {
+      return true
+    }
+  }
+  return false
 }
 
 const digestAlgorithm = (digest: string): string => {
