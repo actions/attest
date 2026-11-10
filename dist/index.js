@@ -62760,7 +62760,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.fromBasicAuth = exports.toBasicAuth = exports.getRegistryCredentials = void 0;
+exports.fromBasicAuth = exports.toBasicAuth = exports.getRegistryCredentials = exports.DOCKER_HUB_ALIASES = void 0;
 /*
 Copyright 2023 The Sigstore Authors.
 
@@ -62783,7 +62783,7 @@ const name_1 = __nccwpck_require__(96666);
 // Well-known aliases for the Docker Hub registry. Docker stores Hub
 // credentials under a handful of different keys depending on how the user
 // authenticated, so they all need to canonicalize to the same host.
-const DOCKER_HUB_ALIASES = new Set([
+exports.DOCKER_HUB_ALIASES = new Set([
     'docker.io',
     'index.docker.io',
     'registry-1.docker.io',
@@ -62796,7 +62796,7 @@ const canonicalizeRegistry = (value) => {
     let host = value.replace(/^https?:\/\//, '');
     // Strip any path/query (everything after the first '/').
     host = host.split('/')[0];
-    return DOCKER_HUB_ALIASES.has(host) ? 'docker.io' : host;
+    return exports.DOCKER_HUB_ALIASES.has(host) ? 'docker.io' : host;
 };
 // Returns the credentials for a given registry by reading the Docker config
 // file.
@@ -62913,8 +62913,17 @@ const http2_1 = __nccwpck_require__(85675);
 const make_fetch_happen_1 = __importDefault(__nccwpck_require__(39310));
 const proc_log_1 = __nccwpck_require__(57015);
 const promise_retry_1 = __nccwpck_require__(49498);
+const network_1 = __nccwpck_require__(23391);
 const { HTTP_STATUS_INTERNAL_SERVER_ERROR, HTTP_STATUS_TOO_MANY_REQUESTS, HTTP_STATUS_REQUEST_TIMEOUT, } = http2_1.constants;
 const fetchWithRetry = async (url, options = {}) => {
+    const destination = (0, network_1.validateDestination)(url, options);
+    const proxy = (0, network_1.resolveProxy)(destination, options);
+    // The proxy resolves the destination itself, so connection-time DNS checks
+    // only apply to direct connections. Pin the proxy decision explicitly so the
+    // transport can't fall back to an unguarded direct connection.
+    const transport = proxy
+        ? { proxy: proxy.href, noProxy: [] }
+        : { agent: (0, network_1.destinationAgent)(destination, options) };
     return (0, promise_retry_1.promiseRetry)(async (retry, attemptNum) => {
         /* eslint-disable @typescript-eslint/no-explicit-any */
         const logRetry = (reason) => {
@@ -62922,8 +62931,13 @@ const fetchWithRetry = async (url, options = {}) => {
         };
         const response = await (0, make_fetch_happen_1.default)(url, {
             ...options,
+            ...transport,
+            redirect: 'manual',
             retry: false, // We're handling retries ourselves
         }).catch((reason) => {
+            if ((0, network_1.isNetworkPolicyError)(reason)) {
+                throw new network_1.NetworkPolicyError('connection to a non-public destination was blocked');
+            }
             logRetry(reason);
             return retry(reason);
         });
@@ -62997,6 +63011,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 const constants_1 = __nccwpck_require__(23688);
+const credentials_1 = __nccwpck_require__(62691);
 const error_1 = __nccwpck_require__(46803);
 const registry_1 = __nccwpck_require__(22138);
 const DOCKER_DEFAULT_REGISTRY = 'registry-1.docker.io';
@@ -63149,7 +63164,7 @@ const digestToTag = (digest) => {
 // registry.
 // https://github.com/moby/moby/blob/v24.0.2/registry/config.go#L25-L48
 const canonicalizeRegistryName = (registry) => {
-    return registry.endsWith('docker.io') ? DOCKER_DEFAULT_REGISTRY : registry;
+    return credentials_1.DOCKER_HUB_ALIASES.has(registry) ? DOCKER_DEFAULT_REGISTRY : registry;
 };
 
 
@@ -63232,6 +63247,191 @@ exports.parseImageName = parseImageName;
 
 /***/ }),
 
+/***/ 23391:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.resolveProxy = exports.destinationAgent = exports.validateDestination = exports.isNetworkPolicyError = exports.NetworkPolicyError = void 0;
+/*
+Copyright 2026 The Sigstore Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+const node_dns_1 = __importDefault(__nccwpck_require__(40610));
+const node_http_1 = __importDefault(__nccwpck_require__(37067));
+const node_https_1 = __importDefault(__nccwpck_require__(44708));
+const node_net_1 = __nccwpck_require__(77030);
+class NetworkPolicyError extends Error {
+    code = 'EOCINETWORKPOLICY';
+    constructor(reason) {
+        super(`OCI network policy: ${reason}`);
+        this.name = 'NetworkPolicyError';
+    }
+}
+exports.NetworkPolicyError = NetworkPolicyError;
+// Fetch wraps connection errors, preserving their code rather than their class.
+const isNetworkPolicyError = (error) => error instanceof NetworkPolicyError ||
+    (error instanceof Error &&
+        'code' in error &&
+        error.code === 'EOCINETWORKPOLICY');
+exports.isNetworkPolicyError = isNetworkPolicyError;
+const nonPublic = new node_net_1.BlockList();
+for (const [address, prefix] of [
+    ['0.0.0.0', 8],
+    ['10.0.0.0', 8],
+    ['100.64.0.0', 10],
+    ['127.0.0.0', 8],
+    ['168.63.129.16', 32],
+    ['169.254.0.0', 16],
+    ['172.16.0.0', 12],
+    ['192.0.0.0', 24],
+    ['192.0.2.0', 24],
+    ['192.88.99.0', 24],
+    ['192.168.0.0', 16],
+    ['198.18.0.0', 15],
+    ['198.51.100.0', 24],
+    ['203.0.113.0', 24],
+    ['224.0.0.0', 4],
+    ['240.0.0.0', 4],
+]) {
+    nonPublic.addSubnet(address, prefix, 'ipv4');
+}
+// Only currently allocated global-unicast IPv6 is eligible. Exclude special
+// purpose/transition ranges as well as documentation prefixes.
+const globalIPv6 = new node_net_1.BlockList();
+globalIPv6.addSubnet('2000::', 3, 'ipv6');
+nonPublic.addSubnet('2001::', 23, 'ipv6');
+nonPublic.addSubnet('2001:db8::', 32, 'ipv6');
+nonPublic.addSubnet('2002::', 16, 'ipv6');
+nonPublic.addSubnet('3fff::', 20, 'ipv6');
+const isPublicAddress = (address) => {
+    const family = (0, node_net_1.isIP)(address);
+    if (family === 4)
+        return !nonPublic.check(address, 'ipv4');
+    if (family === 6) {
+        return (globalIPv6.check(address, 'ipv6') && !nonPublic.check(address, 'ipv6'));
+    }
+    return false;
+};
+const parseURL = (value) => {
+    let url;
+    try {
+        url = new URL(value);
+    }
+    catch {
+        throw new NetworkPolicyError('invalid destination URL');
+    }
+    if (!['http:', 'https:'].includes(url.protocol) ||
+        url.username ||
+        url.password) {
+        throw new NetworkPolicyError('destination must be HTTP(S) without userinfo');
+    }
+    return url;
+};
+const privateOrigins = (options) => new Set((options.allowedPrivateOrigins || []).map((value) => {
+    const url = parseURL(value);
+    if (url.pathname !== '/' || url.search || url.hash) {
+        throw new NetworkPolicyError('private exceptions must be exact origins, not URLs with paths');
+    }
+    return url.origin;
+}));
+const validateDestination = (value, options = {}, previous) => {
+    const url = parseURL(value);
+    if (previous &&
+        parseURL(previous).protocol === 'https:' &&
+        url.protocol === 'http:') {
+        throw new NetworkPolicyError('HTTPS downgrades are prohibited');
+    }
+    const allowed = privateOrigins(options).has(url.origin);
+    if (url.protocol === 'http:' && !allowed) {
+        throw new NetworkPolicyError('HTTP requires an explicit origin exception');
+    }
+    const hostname = url.hostname.replace(/^\[|\]$/g, '').replace(/\.$/, '');
+    if (!allowed &&
+        (((0, node_net_1.isIP)(hostname) && !isPublicAddress(hostname)) ||
+            hostname === 'localhost' ||
+            hostname.endsWith('.localhost'))) {
+        throw new NetworkPolicyError('non-public destinations require an explicit origin exception');
+    }
+    return url;
+};
+exports.validateDestination = validateDestination;
+const destinationAgent = (url, options) => {
+    const allowed = privateOrigins(options).has(url.origin);
+    const lookup = (hostname, opts, callback) => {
+        // This is the socket's lookup, not a preflight: return only the checked
+        // results to net/tls.connect. Validate all answers before handing any back.
+        node_dns_1.default.lookup(hostname, { all: true, family: opts.family }, (err, addresses) => {
+            if (err) {
+                callback(err, []);
+            }
+            else if (!addresses.length ||
+                (!allowed &&
+                    addresses.some(({ address }) => !isPublicAddress(address)))) {
+                callback(new NetworkPolicyError('DNS resolved to a non-public destination'), []);
+            }
+            else if (opts.all) {
+                callback(null, addresses);
+            }
+            else {
+                callback(null, addresses[0].address, addresses[0].family);
+            }
+        });
+    };
+    // Do not share the dependency's global agent cache (which does not key on
+    // lookup/policy). No socket pooling crosses requests or origin exceptions.
+    const Agent = url.protocol === 'https:' ? node_https_1.default.Agent : node_http_1.default.Agent;
+    return new Agent({ keepAlive: false, lookup });
+};
+exports.destinationAgent = destinationAgent;
+const proxyEnv = (name) => Object.entries(process.env).find(([key, value]) => key.toLowerCase() === name && value)?.[1];
+// Mirrors @npmcli/agent's proxy selection (including NO_PROXY suffix matching)
+// but reads the environment per request. Returns the proxy to use, if any.
+const resolveProxy = (url, options) => {
+    const proxy = options.proxy ||
+        (url.protocol === 'https:'
+            ? proxyEnv('https_proxy')
+            : proxyEnv('https_proxy') || proxyEnv('http_proxy') || proxyEnv('proxy'));
+    if (!proxy)
+        return undefined;
+    const noProxy = options.noProxy || proxyEnv('no_proxy') || [];
+    const entries = (typeof noProxy === 'string' ? noProxy.split(',') : noProxy)
+        // URL hostnames are lowercase; compare entries the same way.
+        .map((entry) => entry.trim().toLowerCase())
+        .filter(Boolean);
+    const host = url.hostname.split('.').reverse();
+    const excluded = entries.some((entry) => {
+        const segments = entry.split('.').filter(Boolean).reverse();
+        return (segments.length > 0 && segments.every((segment, i) => host[i] === segment));
+    });
+    if (excluded)
+        return undefined;
+    try {
+        return new URL(proxy);
+    }
+    catch {
+        throw new NetworkPolicyError('invalid proxy URL');
+    }
+};
+exports.resolveProxy = resolveProxy;
+
+
+/***/ }),
+
 /***/ 22138:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -63261,6 +63461,7 @@ const constants_1 = __nccwpck_require__(23688);
 const credentials_1 = __nccwpck_require__(62691);
 const error_1 = __nccwpck_require__(46803);
 const fetch_1 = __importDefault(__nccwpck_require__(32721));
+const network_1 = __nccwpck_require__(23391);
 // Maximum number of redirects to follow in the manual redirect loop
 const MAX_REDIRECTS = 20;
 // Headers that carry credentials or origin-specific secrets
@@ -63309,17 +63510,28 @@ class RegistryClient {
     #baseURL;
     #registryOrigin;
     #repository;
+    #options;
     #fetch;
     // Registry-scoped credentials/Docker HttpHeaders stored separately
     #registryHeaders = {};
     constructor(registry, repository, opts) {
         this.#repository = repository;
-        // Transport fetch handles only retry/timeout/proxy — no credentials
+        this.#options = opts || {};
+        // Transport enforces destination policy and retry/timeout, never credentials.
         this.#fetch = fetch_1.default.defaults(opts);
-        // Use http for localhost registries, https otherwise
-        const hostname = new URL(`http://${registry}`).hostname;
-        /* istanbul ignore next */
-        const protocol = hostname === 'localhost' || hostname === '127.0.0.1' ? 'http' : 'https';
+        // HTTP is available only through an exact caller-configured origin.
+        const httpOrigin = new URL(`http://${registry}`).origin;
+        const protocol = opts?.allowedPrivateOrigins?.some((origin) => {
+            try {
+                return new URL(origin).origin === httpOrigin;
+            }
+            catch {
+                // Full configuration validation happens before the first request.
+                return false;
+            }
+        })
+            ? 'http'
+            : 'https';
         this.#baseURL = `${protocol}://${registry}`;
         this.#registryOrigin = new URL(this.#baseURL).origin;
     }
@@ -63342,7 +63554,7 @@ class RegistryClient {
         }
         const authHeader = probeResponse.headers.get(constants_1.HEADER_AUTHENTICATE) ||
             /* istanbul ignore next */ '';
-        const challenge = parseChallenge(authHeader);
+        const challenge = parseChallenge(authHeader, probeResponse.url);
         // If the challenge scheme is "basic" we don't need a token and can
         // authenticate requests using basic auth
         if (challenge.scheme === 'basic') {
@@ -63353,7 +63565,11 @@ class RegistryClient {
         let token;
         if (creds.username === '<token>') {
             // If the OAuth2 token request fails, try to fetch a distribution token
-            token = await this.#fetchOAuth2Token(creds, challenge).catch(() => undefined);
+            token = await this.#fetchOAuth2Token(creds, challenge).catch((err) => {
+                if ((0, network_1.isNetworkPolicyError)(err))
+                    throw err;
+                return undefined;
+            });
         }
         if (!token) {
             token = await this.#fetchDistributionToken(creds, challenge);
@@ -63402,6 +63618,7 @@ class RegistryClient {
             method: 'PUT',
             body: blob,
             headers: { [constants_1.HEADER_CONTENT_TYPE]: constants_1.CONTENT_TYPE_OCTET_STREAM },
+            previousURL: postResponse.url,
         }).then((0, error_1.ensureStatus)(201));
         return { mediaType: constants_1.CONTENT_TYPE_OCTET_STREAM, digest, size };
     }
@@ -63473,9 +63690,7 @@ class RegistryClient {
             },
             stateForRedirect: (state, targetOrigin) => {
                 const isSameOrigin = targetOrigin === this.#registryOrigin;
-                return isSameOrigin
-                    ? state
-                    : { defaultsSuppressed: true };
+                return isSameOrigin ? state : { defaultsSuppressed: true };
             },
         };
         return this.#redirectFetchWithPolicy(url, opts, policy);
@@ -63483,12 +63698,15 @@ class RegistryClient {
     // Fetch for token-exchange requests. Does NOT include registry credentials.
     async #tokenFetch(url, opts) {
         const policy = {
-            initial: { authOrigin: new URL(url).origin },
+            initial: { authOrigin: new URL(url).origin, authSuppressed: false },
             headersForHop: (state, targetOrigin, perReq) => {
-                const isSameOrigin = targetOrigin === state.authOrigin;
+                const isSameOrigin = targetOrigin === state.authOrigin && !state.authSuppressed;
                 return isSameOrigin ? perReq : stripSensitiveHeaders(perReq);
             },
-            stateForRedirect: (state) => state,
+            stateForRedirect: (state, targetOrigin) => ({
+                ...state,
+                authSuppressed: state.authSuppressed || targetOrigin !== state.authOrigin,
+            }),
         };
         return this.#redirectFetchWithPolicy(url, opts, policy);
     }
@@ -63499,8 +63717,14 @@ class RegistryClient {
         let body = opts.body;
         let perRequestHeaders = { ...(opts.headers || {}) };
         let state = policy.initial;
+        let previousUrl = opts.previousURL || this.#baseURL;
         for (let i = 0; i <= MAX_REDIRECTS; i++) {
-            const targetOrigin = new URL(currentUrl).origin;
+            const targetOrigin = (0, network_1.validateDestination)(currentUrl, this.#options, previousUrl).origin;
+            if (body &&
+                opts.credentialBodyOrigin &&
+                targetOrigin !== opts.credentialBodyOrigin) {
+                throw new network_1.NetworkPolicyError('cross-origin credential body redirect is prohibited');
+            }
             const headers = policy.headersForHop(state, targetOrigin, perRequestHeaders, this.#registryHeaders);
             const response = await this.#fetch(currentUrl, {
                 method,
@@ -63518,7 +63742,13 @@ class RegistryClient {
             if (!location) {
                 throw new Error(`redirect location header missing for: ${currentUrl}`);
             }
-            currentUrl = new URL(location, currentUrl).href;
+            previousUrl = currentUrl;
+            try {
+                currentUrl = new URL(location, currentUrl).href;
+            }
+            catch {
+                throw new network_1.NetworkPolicyError('invalid redirect destination URL');
+            }
             // Standard redirect method/body semantics
             let bodyDropped = false;
             if (response.status === 303) {
@@ -63528,8 +63758,7 @@ class RegistryClient {
                     bodyDropped = true;
                 }
             }
-            else if ([301, 302].includes(response.status) &&
-                method === 'POST') {
+            else if ([301, 302].includes(response.status) && method === 'POST') {
                 method = 'GET';
                 body = undefined;
                 bodyDropped = true;
@@ -63546,7 +63775,7 @@ class RegistryClient {
     }
     async #fetchDistributionToken(creds, challenge) {
         const basicAuth = (0, credentials_1.toBasicAuth)(creds);
-        const authURL = new URL(challenge.realm);
+        const authURL = (0, network_1.validateDestination)(challenge.realm, this.#options, challenge.sourceURL);
         authURL.searchParams.set('service', challenge.service);
         authURL.searchParams.set('scope', challenge.scope);
         // Token request bypasses registry credentials entirely. The explicit
@@ -63557,6 +63786,7 @@ class RegistryClient {
         return tokenResponse.json().then((json) => json.access_token || json.token);
     }
     async #fetchOAuth2Token(creds, challenge) {
+        const authURL = (0, network_1.validateDestination)(challenge.realm, this.#options, challenge.sourceURL);
         const body = new URLSearchParams({
             service: challenge.service,
             scope: challenge.scope,
@@ -63568,6 +63798,7 @@ class RegistryClient {
         const tokenResponse = await this.#tokenFetch(challenge.realm, {
             method: 'POST',
             body,
+            credentialBodyOrigin: authURL.origin,
         }).then((0, error_1.ensureStatus)(200));
         return tokenResponse.json().then((json) => json.access_token);
     }
@@ -63580,7 +63811,7 @@ class RegistryClient {
 exports.RegistryClient = RegistryClient;
 // Parses an auth challenge header into its components
 // https://datatracker.ietf.org/doc/html/rfc7235#section-4.1
-function parseChallenge(challenge) {
+function parseChallenge(challenge, sourceURL) {
     // Account for the possibility of spaces in the auth params
     const [scheme, ...rest] = challenge.split(' ');
     const authParams = rest.join(' ');
@@ -63589,6 +63820,7 @@ function parseChallenge(challenge) {
     }
     return {
         scheme: scheme.toLocaleLowerCase(),
+        sourceURL,
         realm: singleMatch(authParams, /realm="(.+?)"/),
         service: singleMatch(authParams, /service="(.+?)"/),
         scope: singleMatch(authParams, /scope="(.+?)"/),
@@ -102044,6 +102276,13 @@ module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:http");
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:http2");
+
+/***/ }),
+
+/***/ 44708:
+/***/ ((module) => {
+
+module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:https");
 
 /***/ }),
 
